@@ -287,7 +287,6 @@ export const CreateInvoice: React.FC = () => {
 
   // State for API submission
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Generate invoice number (8-digit format)
   const generateInvoiceNumber = () => {
@@ -302,7 +301,6 @@ export const CreateInvoice: React.FC = () => {
     const now = new Date().toISOString();
     
     setIsSubmitting(true);
-    setSubmitError(null);
 
     // Try to create via API first
     try {
