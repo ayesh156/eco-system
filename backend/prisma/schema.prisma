@@ -1,7 +1,7 @@
 // Prisma Schema for EcoSystem - Supabase PostgreSQL
 generator client {
-  provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
