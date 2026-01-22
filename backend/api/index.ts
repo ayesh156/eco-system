@@ -1,12 +1,15 @@
-// Vercel Serverless API Handler with Prisma
+// Vercel Serverless API Handler - Lazy Prisma Loading
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { PrismaClient } from '@prisma/client';
 
-// Prisma client singleton for serverless
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
-const prisma = globalForPrisma.prisma ?? new PrismaClient();
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
+// Lazy load Prisma to avoid cold start issues
+let prisma: any = null;
+
+async function getPrisma() {
+  if (!prisma) {
+    const { PrismaClient } = await import('@prisma/client');
+    prisma = new PrismaClient();
+  }
+  return prisma;
 }
 
 // CORS headers
@@ -19,7 +22,6 @@ function setCorsHeaders(res: VercelResponse) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
 
-  // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -28,25 +30,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const method = req.method || 'GET';
 
   try {
-    // Health check
+    // Health check - no DB needed
     if (url === '/health' || url === '/') {
       return res.status(200).json({ 
         status: 'ok', 
         timestamp: new Date().toISOString(),
-        message: 'EcoSystem API running on Vercel'
+        message: 'EcoSystem API running'
       });
     }
 
+    // Get Prisma client for DB operations
+    const db = await getPrisma();
+
     // ============== GET /api/v1/invoices ==============
     if (url.startsWith('/api/v1/invoices') && method === 'GET') {
-      // Check if it's a single invoice request
       const idMatch = url.match(/\/api\/v1\/invoices\/([^?/]+)/);
       
       if (idMatch) {
-        // Single invoice
-        const id = idMatch[1];
-        const invoice = await prisma.invoice.findUnique({
-          where: { id },
+        const invoice = await db.invoice.findUnique({
+          where: { id: idMatch[1] },
           include: {
             customer: true,
             items: { include: { product: true } },
@@ -57,89 +59,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!invoice) {
           return res.status(404).json({ success: false, error: 'Invoice not found' });
         }
-        
         return res.status(200).json({ success: true, data: invoice });
       }
 
       // List invoices
-      const urlObj = new URL(url, 'http://localhost');
-      const page = parseInt(urlObj.searchParams.get('page') || '1');
-      const limit = parseInt(urlObj.searchParams.get('limit') || '100');
-      const status = urlObj.searchParams.get('status');
-      const sortOrder = urlObj.searchParams.get('sortOrder') || 'desc';
-
-      const where: any = {};
-      if (status && status !== 'all') {
-        where.status = status.toUpperCase();
-      }
-
-      const [invoices, total] = await Promise.all([
-        prisma.invoice.findMany({
-          where,
-          include: {
-            customer: true,
-            items: { include: { product: true } },
-            payments: true,
-          },
-          orderBy: { date: sortOrder as 'asc' | 'desc' },
-          skip: (page - 1) * limit,
-          take: limit,
-        }),
-        prisma.invoice.count({ where }),
-      ]);
+      const invoices = await db.invoice.findMany({
+        include: {
+          customer: true,
+          items: { include: { product: true } },
+          payments: true,
+        },
+        orderBy: { date: 'desc' },
+        take: 100,
+      });
 
       return res.status(200).json({
         success: true,
         data: invoices,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
+        pagination: { page: 1, limit: 100, total: invoices.length, totalPages: 1 },
       });
     }
 
     // ============== GET /api/v1/customers ==============
     if (url.startsWith('/api/v1/customers') && method === 'GET') {
-      const customers = await prisma.customer.findMany({
-        orderBy: { name: 'asc' },
-      });
+      const customers = await db.customer.findMany({ orderBy: { name: 'asc' } });
       return res.status(200).json({ success: true, data: customers });
     }
 
     // ============== GET /api/v1/products ==============
     if (url.startsWith('/api/v1/products') && method === 'GET') {
-      const products = await prisma.product.findMany({
+      const products = await db.product.findMany({
         include: { category: true, brand: true },
         orderBy: { name: 'asc' },
       });
       return res.status(200).json({ success: true, data: products });
     }
 
-    // ============== GET /api/v1/categories ==============
-    if (url.startsWith('/api/v1/categories') && method === 'GET') {
-      const categories = await prisma.category.findMany({
-        orderBy: { name: 'asc' },
-      });
-      return res.status(200).json({ success: true, data: categories });
-    }
-
-    // ============== GET /api/v1/brands ==============
-    if (url.startsWith('/api/v1/brands') && method === 'GET') {
-      const brands = await prisma.brand.findMany({
-        orderBy: { name: 'asc' },
-      });
-      return res.status(200).json({ success: true, data: brands });
-    }
-
-    // 404 for unmatched routes
-    return res.status(404).json({ 
-      success: false, 
-      error: 'Route not found',
-      path: url,
-      method 
-    });
+    // 404
+    return res.status(404).json({ success: false, error: 'Route not found', path: url });
 
   } catch (error) {
     console.error('API Error:', error);
