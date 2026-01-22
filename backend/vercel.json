@@ -1,7 +1,19 @@
 {
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "framework": "express",
-  "outputDirectory": "dist"
+  "version": 2,
+  "builds": [
+    {
+      "src": "dist/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/health",
+      "dest": "dist/index.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "dist/index.js"
+    }
+  ]
 }
