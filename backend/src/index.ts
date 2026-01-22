@@ -24,12 +24,16 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 
 // CORS configuration - Allow all origins for API
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
+const allowedOrigins: (string | RegExp)[] = [
   'http://localhost:5173',
   'http://localhost:3000',
   /\.vercel\.app$/  // Allow all Vercel preview URLs
-].filter(Boolean);
+];
+
+// Add FRONTEND_URL if defined
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
