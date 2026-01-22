@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../lib/prisma.js';
-import { AppError } from '../middleware/errorHandler.js';
+import { prisma } from '../lib/prisma';
+import { AppError } from '../middleware/errorHandler';
 import { Prisma, InvoiceStatus, PaymentMethod, SalesChannel } from '@prisma/client';
 
 // Helper function to generate invoice number

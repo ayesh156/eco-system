@@ -4,15 +4,15 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 
-import { errorHandler } from './middleware/errorHandler.js';
-import { notFound } from './middleware/notFound.js';
+import { errorHandler } from './middleware/errorHandler';
+import { notFound } from './middleware/notFound';
 
 // Route imports
-import authRoutes from './routes/auth.routes.js';
-import invoiceRoutes from './routes/invoice.routes.js';
-import customerRoutes from './routes/customer.routes.js';
-import productRoutes from './routes/product.routes.js';
-import shopRoutes from './routes/shop.routes.js';
+import authRoutes from './routes/auth.routes';
+import invoiceRoutes from './routes/invoice.routes';
+import customerRoutes from './routes/customer.routes';
+import productRoutes from './routes/product.routes';
+import shopRoutes from './routes/shop.routes';
 
 // Load environment variables
 dotenv.config();

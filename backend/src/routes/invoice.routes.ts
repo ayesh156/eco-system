@@ -7,8 +7,8 @@ import {
   deleteInvoice,
   addPayment,
   getInvoiceStats,
-} from '../controllers/invoice.controller.js';
-import { validateInvoice, validateInvoiceUpdate, validatePayment } from '../validators/invoice.validator.js';
+} from '../controllers/invoice.controller';
+import { validateInvoice, validateInvoiceUpdate, validatePayment } from '../validators/invoice.validator';
 
 const router = Router();
 
