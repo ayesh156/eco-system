@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && npm run prisma:generate",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "prisma:generate": "prisma generate",
@@ -35,7 +35,8 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/morgan": "^1.9.9",
     "@types/node": "^20.10.6",
-    "eslint": "^8.56.0",
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
     "prisma": "^5.9.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
