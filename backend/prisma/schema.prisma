@@ -1,0 +1,348 @@
+// Prisma Schema for EcoSystem - Supabase PostgreSQL
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==========================================
+// SHOP MANAGEMENT (Multi-tenant)
+// ==========================================
+
+model Shop {
+  id            String    @id @default(cuid())
+  name          String    
+  slug          String    @unique  // URL-friendly name e.g., "ecotech"
+  description   String?
+  logo          String?
+  address       String?
+  phone         String?
+  email         String?
+  website       String?
+  
+  // Business info
+  businessRegNo String?   // Business registration number
+  taxId         String?   // Tax identification number
+  
+  // Settings
+  currency      String    @default("LKR")
+  taxRate       Float     @default(0)  // Default tax rate for invoices
+  
+  // Status
+  isActive      Boolean   @default(true)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations - All shop data
+  users         User[]
+  customers     Customer[]
+  categories    Category[]
+  brands        Brand[]
+  products      Product[]
+  invoices      Invoice[]
+
+  @@map("shops")
+}
+
+// ==========================================
+// AUTHENTICATION & USER MANAGEMENT
+// ==========================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          UserRole  @default(STAFF)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLogin     DateTime?
+
+  // Shop relation - User belongs to a shop
+  shopId        String?
+  shop          Shop?     @relation(fields: [shopId], references: [id])
+
+  // Relations
+  invoicesCreated   Invoice[]  @relation("InvoiceCreatedBy")
+  invoicesUpdated   Invoice[]  @relation("InvoiceUpdatedBy")
+  paymentsRecorded  InvoicePayment[]
+
+  @@index([shopId])
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN   // Platform admin (can manage all shops)
+  ADMIN         // Shop admin (full access to their shop)
+  MANAGER       // Shop manager
+  STAFF         // Shop staff
+}
+
+// ==========================================
+// CUSTOMER MANAGEMENT
+// ==========================================
+
+model Customer {
+  id            String    @id @default(cuid())
+  name          String
+  email         String?
+  phone         String
+  address       String?
+  totalSpent    Float     @default(0)
+  totalOrders   Int       @default(0)
+  lastPurchase  DateTime?
+  
+  // Credit management
+  creditBalance Float     @default(0)
+  creditLimit   Float     @default(0)
+  creditDueDate DateTime?
+  creditStatus  CreditStatus @default(CLEAR)
+  
+  // Shop relation
+  shopId        String
+  shop          Shop      @relation(fields: [shopId], references: [id])
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  invoices      Invoice[]
+
+  @@index([shopId])
+  @@map("customers")
+}
+
+enum CreditStatus {
+  CLEAR
+  ACTIVE
+  OVERDUE
+}
+
+// ==========================================
+// PRODUCT MANAGEMENT
+// ==========================================
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  
+  // Shop relation
+  shopId      String
+  shop        Shop      @relation(fields: [shopId], references: [id])
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products    Product[]
+
+  @@unique([shopId, name])  // Unique name per shop
+  @@index([shopId])
+  @@map("categories")
+}
+
+model Brand {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  
+  // Shop relation
+  shopId      String
+  shop        Shop      @relation(fields: [shopId], references: [id])
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products    Product[]
+
+  @@unique([shopId, name])  // Unique name per shop
+  @@index([shopId])
+  @@map("brands")
+}
+
+model Product {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  
+  // Pricing
+  price           Float     // Selling price
+  costPrice       Float?    // Cost/purchase price
+  profitMargin    Float?
+  
+  // Stock
+  stock           Int       @default(0)
+  reservedStock   Int       @default(0)
+  lowStockThreshold Int     @default(10)
+  
+  // Identifiers
+  serialNumber    String?
+  barcode         String?
+  
+  // Warranty
+  warranty        String?   // e.g., "6 months", "1 year"
+  
+  // Media
+  image           String?
+  
+  // Shop relation
+  shopId          String
+  shop            Shop      @relation(fields: [shopId], references: [id])
+  
+  // Relations
+  categoryId      String?
+  category        Category? @relation(fields: [categoryId], references: [id])
+  brandId         String?
+  brand           Brand?    @relation(fields: [brandId], references: [id])
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  invoiceItems    InvoiceItem[]
+
+  @@unique([shopId, barcode])  // Unique barcode per shop
+  @@index([shopId])
+  @@map("products")
+}
+
+// ==========================================
+// INVOICE MANAGEMENT
+// ==========================================
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String
+  
+  // Shop relation
+  shopId        String
+  shop          Shop          @relation(fields: [shopId], references: [id])
+  
+  // Customer relation
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  customerName  String        // Denormalized for quick access
+  
+  // Amounts
+  subtotal      Float
+  tax           Float         @default(0)
+  discount      Float         @default(0)
+  total         Float
+  paidAmount    Float         @default(0)
+  dueAmount     Float         @default(0)
+  
+  // Status
+  status        InvoiceStatus @default(UNPAID)
+  
+  // Dates
+  date          DateTime      @default(now())
+  dueDate       DateTime
+  
+  // Payment info
+  paymentMethod PaymentMethod?
+  salesChannel  SalesChannel  @default(ON_SITE)
+  
+  // Notes
+  notes         String?
+  
+  // Audit
+  createdById   String?
+  createdBy     User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  updatedById   String?
+  updatedBy     User?         @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id])
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  items         InvoiceItem[]
+  payments      InvoicePayment[]
+
+  @@unique([shopId, invoiceNumber])  // Unique invoice number per shop
+  @@index([shopId])
+  @@index([customerId])
+  @@index([status])
+  @@index([date])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id              String    @id @default(cuid())
+  
+  // Invoice relation
+  invoiceId       String
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  // Product relation
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id])
+  productName     String    // Denormalized for quick access
+  
+  // Quantities and pricing
+  quantity        Int
+  unitPrice       Float
+  originalPrice   Float?    // Original price before any discount
+  discount        Float     @default(0)
+  total           Float
+  
+  // Warranty
+  warrantyDueDate DateTime?
+  
+  createdAt       DateTime  @default(now())
+
+  @@index([invoiceId])
+  @@index([productId])
+  @@map("invoice_items")
+}
+
+model InvoicePayment {
+  id            String        @id @default(cuid())
+  
+  // Invoice relation
+  invoiceId     String
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  // Payment details
+  amount        Float
+  paymentMethod PaymentMethod
+  paymentDate   DateTime      @default(now())
+  
+  // Notes and metadata
+  notes         String?
+  reference     String?       // Transaction reference number
+  
+  // Recorded by
+  recordedById  String?
+  recordedBy    User?         @relation(fields: [recordedById], references: [id])
+  
+  createdAt     DateTime      @default(now())
+
+  @@index([invoiceId])
+  @@map("invoice_payments")
+}
+
+enum InvoiceStatus {
+  UNPAID
+  HALFPAY
+  FULLPAID
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  CHEQUE
+  CREDIT
+}
+
+enum SalesChannel {
+  ON_SITE
+  ONLINE
+}
