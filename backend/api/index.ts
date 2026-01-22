@@ -173,6 +173,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
       
+      // Try with INV- prefix
+      if (!invoice) {
+        const invoiceNum = id.startsWith('INV-') ? id : `INV-${id}`;
+        invoice = await db.invoice.findFirst({
+          where: { invoiceNumber: invoiceNum },
+          include: {
+            customer: true,
+            items: { include: { product: true } },
+            payments: { orderBy: { paymentDate: 'desc' } },
+          },
+        });
+      }
+      
       if (!invoice) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
@@ -247,10 +260,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (invoiceUpdateMatch && (method === 'PUT' || method === 'PATCH')) {
       const id = invoiceUpdateMatch[1];
       
-      // Find invoice by ID or invoice number
+      // Find invoice by ID or invoice number (with or without INV- prefix)
       let existingInvoice = await db.invoice.findUnique({ where: { id } });
       if (!existingInvoice) {
         existingInvoice = await db.invoice.findFirst({ where: { invoiceNumber: id } });
+      }
+      if (!existingInvoice) {
+        // Try with INV- prefix
+        const invoiceNum = id.startsWith('INV-') ? id : `INV-${id}`;
+        existingInvoice = await db.invoice.findFirst({ where: { invoiceNumber: invoiceNum } });
       }
       if (!existingInvoice) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
@@ -259,7 +277,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { status, paidAmount, notes, customerName, discount, tax, total, dueAmount, items } = body;
       
       const updateData: any = {};
-      if (status !== undefined) updateData.status = status.toUpperCase();
+      if (status !== undefined && status !== null) updateData.status = String(status).toUpperCase();
       if (paidAmount !== undefined) updateData.paidAmount = paidAmount;
       if (notes !== undefined) updateData.notes = notes;
       if (customerName !== undefined) updateData.customerName = customerName;
@@ -303,10 +321,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (invoiceDeleteMatch && method === 'DELETE') {
       const id = invoiceDeleteMatch[1];
       
-      // Find invoice by ID or invoice number
+      // Find invoice by ID or invoice number (with or without INV- prefix)
       let existingInvoice = await db.invoice.findUnique({ where: { id } });
       if (!existingInvoice) {
         existingInvoice = await db.invoice.findFirst({ where: { invoiceNumber: id } });
+      }
+      if (!existingInvoice) {
+        const invoiceNum = id.startsWith('INV-') ? id : `INV-${id}`;
+        existingInvoice = await db.invoice.findFirst({ where: { invoiceNumber: invoiceNum } });
       }
       if (!existingInvoice) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
@@ -326,7 +348,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const invoiceId = paymentMatch[1];
       const { amount, paymentMethod, paymentDate, notes, reference } = body;
       
-      // Find invoice by ID or invoice number
+      // Find invoice by ID or invoice number (with or without INV- prefix)
       let existingInvoice = await db.invoice.findUnique({ 
         where: { id: invoiceId },
         include: { payments: true },
@@ -334,6 +356,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!existingInvoice) {
         existingInvoice = await db.invoice.findFirst({ 
           where: { invoiceNumber: invoiceId },
+          include: { payments: true },
+        });
+      }
+      if (!existingInvoice) {
+        const invoiceNum = invoiceId.startsWith('INV-') ? invoiceId : `INV-${invoiceId}`;
+        existingInvoice = await db.invoice.findFirst({ 
+          where: { invoiceNumber: invoiceNum },
           include: { payments: true },
         });
       }
