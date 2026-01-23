@@ -279,9 +279,9 @@ model InvoiceItem {
   invoiceId       String
   invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   
-  // Product relation
-  productId       String
-  product         Product   @relation(fields: [productId], references: [id])
+  // Product relation (optional for quick-add items)
+  productId       String?
+  product         Product?  @relation(fields: [productId], references: [id])
   productName     String    // Denormalized for quick access
   
   // Quantities and pricing

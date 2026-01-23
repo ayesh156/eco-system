@@ -249,19 +249,42 @@ export const createInvoice = async (
       throw new AppError('At least one item is required', 400);
     }
 
-    // Validate all product IDs exist
+    // Define the validated item type
+    type ValidatedItem = {
+      productId: string | null;
+      productName: string;
+      quantity: number;
+      unitPrice: number;
+      originalPrice?: number;
+      discount?: number;
+      warrantyDueDate?: string;
+    };
+
+    // Validate product IDs - check if they exist, set to null if not found (for quick-add items)
+    const validatedItems: ValidatedItem[] = [];
     for (const item of items) {
-      const product = await prisma.product.findUnique({
-        where: { id: item.productId }
-      });
-      if (!product) {
-        console.log(`⚠️ Product not found: ${item.productId} (${item.productName})`);
-        // Don't fail, just log - product might be a quick-add item
+      let validProductId: string | null = null;
+      
+      if (item.productId) {
+        const product = await prisma.product.findUnique({
+          where: { id: item.productId }
+        });
+        if (product) {
+          validProductId = item.productId;
+        } else {
+          console.log(`⚠️ Product not found: ${item.productId} (${item.productName}) - treating as quick-add item`);
+        }
       }
+      
+      validatedItems.push({
+        ...item,
+        productId: validProductId,
+      });
     }
 
     // Calculate totals
-    const subtotal = items.reduce((sum: number, item: { quantity: number; unitPrice: number }) => {
+    // Calculate totals using validated items
+    const subtotal = validatedItems.reduce((sum: number, item: { quantity: number; unitPrice: number }) => {
       return sum + (item.quantity * item.unitPrice);
     }, 0);
 
@@ -292,8 +315,8 @@ export const createInvoice = async (
           notes,
           shopId: invoiceShopId,
           items: {
-            create: items.map((item: {
-              productId: string;
+            create: validatedItems.map((item: {
+              productId: string | null;
               productName: string;
               quantity: number;
               unitPrice: number;
@@ -301,7 +324,7 @@ export const createInvoice = async (
               discount?: number;
               warrantyDueDate?: string;
             }) => ({
-              productId: item.productId,
+              productId: item.productId, // Can be null for quick-add items
               productName: item.productName,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
@@ -341,14 +364,16 @@ export const createInvoice = async (
         },
       });
 
-      // Update product stock
-      for (const item of items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: { decrement: item.quantity },
-          },
-        });
+      // Update product stock (only for items with valid productId)
+      for (const item of validatedItems) {
+        if (item.productId) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: { decrement: item.quantity },
+            },
+          });
+        }
       }
 
       return newInvoice;
@@ -418,11 +443,32 @@ export const updateInvoice = async (
     let newTax = tax !== undefined ? tax : existingInvoice.tax;
     let newDiscount = discount !== undefined ? discount : existingInvoice.discount;
     let newPaidAmount = paidAmount !== undefined ? paidAmount : existingInvoice.paidAmount;
+    let validatedItems: Array<{
+      productId: string | null;
+      productName: string;
+      quantity: number;
+      unitPrice: number;
+      originalPrice?: number;
+      discount?: number;
+      warrantyDueDate?: string;
+    }> = [];
 
     if (items && items.length > 0) {
       subtotal = items.reduce((sum: number, item: { quantity: number; unitPrice: number }) => {
         return sum + (item.quantity * item.unitPrice);
       }, 0);
+
+      // Validate products and allow null productId for quick-add items
+      for (const item of items) {
+        const product = await prisma.product.findUnique({
+          where: { id: item.productId },
+        });
+        
+        validatedItems.push({
+          ...item,
+          productId: product ? item.productId : null, // Set to null if product doesn't exist
+        });
+      }
     }
 
     const total = subtotal + newTax - newDiscount;
@@ -432,7 +478,7 @@ export const updateInvoice = async (
     // Update in transaction
     const invoice = await prisma.$transaction(async (tx) => {
       // Delete existing items if new items provided
-      if (items && items.length > 0) {
+      if (validatedItems.length > 0) {
         await tx.invoiceItem.deleteMany({
           where: { invoiceId: invoiceId },
         });
@@ -454,10 +500,10 @@ export const updateInvoice = async (
           ...(paymentMethod && { paymentMethod: paymentMethod as PaymentMethod }),
           ...(salesChannel && { salesChannel: salesChannel as SalesChannel }),
           ...(notes !== undefined && { notes }),
-          ...(items && items.length > 0 && {
+          ...(validatedItems.length > 0 && {
             items: {
-              create: items.map((item: {
-                productId: string;
+              create: validatedItems.map((item: {
+                productId: string | null;
                 productName: string;
                 quantity: number;
                 unitPrice: number;
@@ -465,7 +511,7 @@ export const updateInvoice = async (
                 discount?: number;
                 warrantyDueDate?: string;
               }) => ({
-                productId: item.productId,
+                productId: item.productId, // Can be null for quick-add items
                 productName: item.productName,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
@@ -536,14 +582,16 @@ export const deleteInvoice = async (
 
     // Delete in transaction (restore stock)
     await prisma.$transaction(async (tx) => {
-      // Restore product stock
+      // Restore product stock (only for items with valid productId)
       for (const item of invoice.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: { increment: item.quantity },
-          },
-        });
+        if (item.productId) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: { increment: item.quantity },
+            },
+          });
+        }
       }
 
       // Update customer stats
