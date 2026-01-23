@@ -240,14 +240,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const product = await db.product.findUnique({ where: { id: item.productId } });
                 if (product) validProductId = item.productId;
               }
+              const itemPrice = item.unitPrice || item.price || 0;
               return {
                 productId: validProductId,
-                productName: item.productName || item.name,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice || item.price,
-                originalPrice: item.originalPrice,
+                productName: item.productName || item.name || 'Unknown Product',
+                quantity: item.quantity || 1,
+                unitPrice: itemPrice,
+                originalPrice: item.originalPrice || itemPrice,
                 discount: item.discount || 0,
-                total: item.total || (item.quantity * (item.unitPrice || item.price)),
+                total: item.total || (item.quantity * itemPrice),
                 warrantyDueDate: item.warrantyDueDate ? new Date(item.warrantyDueDate) : null,
               };
             })),
