@@ -56,6 +56,7 @@ export const CreateInvoice: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
   const [products, setProducts] = useState<Product[]>(mockProducts);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isUsingAPI, setIsUsingAPI] = useState(false);
   
   const [step, setStep] = useState<Step>(1);
