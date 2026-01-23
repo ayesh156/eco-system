@@ -43,6 +43,23 @@ export const errorHandler = (
   } else if (err.name === 'TokenExpiredError') {
     statusCode = 401;
     message = 'Your token has expired. Please log in again.';
+  } else if (err.name === 'PrismaClientKnownRequestError') {
+    // Handle Prisma-specific errors
+    const prismaError = err as any;
+    if (prismaError.code === 'P2025') {
+      statusCode = 404;
+      message = 'Record not found. The requested resource does not exist.';
+    } else if (prismaError.code === 'P2002') {
+      statusCode = 409;
+      message = 'A record with this unique value already exists.';
+    } else if (prismaError.code === 'P2003') {
+      statusCode = 400;
+      message = 'Foreign key constraint failed. Referenced record does not exist.';
+    }
+  } else if (err.name === 'PrismaClientValidationError') {
+    statusCode = 400;
+    message = 'Invalid data format. Please check your request data.';
+  }
   }
 
   const response: ErrorResponse = {

@@ -74,6 +74,11 @@ export const Invoices: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  
+  // Operation loading states
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
 
   // Fetch invoices from API
   const fetchInvoices = useCallback(async (showRefresh = false) => {
@@ -514,45 +519,58 @@ export const Invoices: React.FC = () => {
     setShowPaymentModal(true);
   };
 
-  const handleSaveEdit = async (updatedInvoice: Invoice) => {
-    // If using API, update via API
-    if (isUsingAPI && updatedInvoice.apiId) {
-      try {
-        const apiUpdatedInvoice = await invoiceService.update(updatedInvoice.apiId, {
-          items: updatedInvoice.items.map(item => ({
-            productId: item.productId,
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            originalPrice: item.originalPrice,
-            warrantyDueDate: item.warrantyDueDate,
-          })),
-          tax: updatedInvoice.tax,
-          dueDate: updatedInvoice.dueDate,
-          status: denormalizeStatus(updatedInvoice.status),
-        });
-        
-        const convertedInvoice = convertAPIInvoiceToFrontend(apiUpdatedInvoice);
-        setInvoices(invoices.map(inv => inv.id === updatedInvoice.id ? convertedInvoice : inv));
-        toast.success('Invoice updated successfully', {
-          description: `Invoice #${updatedInvoice.id} has been updated.`,
-        });
-        console.log('✅ Invoice updated via API');
-        return;
-      } catch (error) {
-        console.error('❌ Failed to update invoice via API:', error);
-        toast.error('Failed to update invoice', {
-          description: error instanceof Error ? error.message : 'Please try again.',
-        });
-        return;
-      }
-    }
+  const handleSaveEdit = async (updatedInvoice: Invoice): Promise<void> => {
+    setIsSaving(true);
+    console.log('🔄 Saving invoice:', updatedInvoice.id, 'apiId:', updatedInvoice.apiId, 'isUsingAPI:', isUsingAPI);
     
-    // Local update
-    setInvoices(invoices.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
-    toast.success('Invoice updated locally', {
-      description: `Invoice #${updatedInvoice.id} has been updated.`,
-    });
+    try {
+      // If using API, update via API
+      if (isUsingAPI && updatedInvoice.apiId) {
+        try {
+          const apiUpdatedInvoice = await invoiceService.update(updatedInvoice.apiId, {
+            items: updatedInvoice.items.map(item => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              originalPrice: item.originalPrice,
+              warrantyDueDate: item.warrantyDueDate,
+            })),
+            tax: updatedInvoice.tax,
+            dueDate: updatedInvoice.dueDate,
+            status: denormalizeStatus(updatedInvoice.status),
+          });
+          
+          const convertedInvoice = convertAPIInvoiceToFrontend(apiUpdatedInvoice);
+          setInvoices(prevInvoices => prevInvoices.map(inv => inv.id === updatedInvoice.id ? convertedInvoice : inv));
+          toast.success('Invoice updated successfully', {
+            description: `Invoice #${updatedInvoice.id} has been updated.`,
+          });
+          console.log('✅ Invoice updated via API');
+          // Close modal and reset state on success
+          setShowEditModal(false);
+          setSelectedInvoice(null);
+          return;
+        } catch (error) {
+          console.error('❌ Failed to update invoice via API:', error);
+          toast.error('Failed to update invoice', {
+            description: error instanceof Error ? error.message : 'Please try again.',
+          });
+          throw error; // Re-throw to prevent modal from closing
+        }
+      }
+      
+      // Local update
+      setInvoices(prevInvoices => prevInvoices.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
+      toast.success('Invoice updated locally', {
+        description: `Invoice #${updatedInvoice.id} has been updated.`,
+      });
+      // Close modal and reset state on success
+      setShowEditModal(false);
+      setSelectedInvoice(null);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDeleteClick = (invoice: Invoice) => {
@@ -561,7 +579,11 @@ export const Invoices: React.FC = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (selectedInvoice) {
+    if (!selectedInvoice) return;
+    
+    setIsDeleting(true);
+    
+    try {
       // If using API, delete via API
       if (isUsingAPI && selectedInvoice.apiId) {
         try {
@@ -575,8 +597,6 @@ export const Invoices: React.FC = () => {
           toast.error('Failed to delete invoice', {
             description: error instanceof Error ? error.message : 'Please try again.',
           });
-          setShowDeleteModal(false);
-          setSelectedInvoice(null);
           return;
         }
       } else {
@@ -585,9 +605,11 @@ export const Invoices: React.FC = () => {
         });
       }
       
-      setInvoices(invoices.filter(inv => inv.id !== selectedInvoice.id));
+      setInvoices(prevInvoices => prevInvoices.filter(inv => inv.id !== selectedInvoice.id));
       setShowDeleteModal(false);
       setSelectedInvoice(null);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -595,9 +617,9 @@ export const Invoices: React.FC = () => {
    * Handle invoice payment with bi-directional customer credit sync
    * When invoice payment is made, it also reduces the customer's credit balance
    */
-  const handlePayment = async (invoiceId: string, amount: number, paymentMethod: string, notes?: string) => {
+  const handlePayment = async (invoiceId: string, amount: number, paymentMethod: string, notes?: string): Promise<void> => {
     const invoice = invoices.find(inv => inv.id === invoiceId);
-    if (!invoice) return;
+    if (!invoice) throw new Error('Invoice not found');
 
     // If using API, add payment via API
     if (isUsingAPI && invoice.apiId) {
@@ -618,7 +640,6 @@ export const Invoices: React.FC = () => {
           description: `Rs. ${amount.toLocaleString()} payment added to invoice #${invoiceId}.`,
         });
         console.log('✅ Payment recorded via API');
-        setShowPaymentModal(false);
         setSelectedInvoice(null);
         return;
       } catch (error) {
@@ -626,7 +647,7 @@ export const Invoices: React.FC = () => {
         toast.error('Failed to record payment', {
           description: error instanceof Error ? error.message : 'Please try again.',
         });
-        return;
+        throw error; // Re-throw so modal can handle it
       }
     }
 
@@ -1763,10 +1784,13 @@ export const Invoices: React.FC = () => {
         invoice={selectedInvoice}
         products={mockProducts}
         onClose={() => {
-          setShowEditModal(false);
-          setSelectedInvoice(null);
+          if (!isSaving) {
+            setShowEditModal(false);
+            setSelectedInvoice(null);
+          }
         }}
         onSave={handleSaveEdit}
+        isSaving={isSaving}
       />
 
       <DeleteConfirmationModal
@@ -1775,9 +1799,12 @@ export const Invoices: React.FC = () => {
         message={`Are you sure you want to delete invoice "${selectedInvoice?.id}"? This action cannot be undone.`}
         onConfirm={handleConfirmDelete}
         onCancel={() => {
-          setShowDeleteModal(false);
-          setSelectedInvoice(null);
+          if (!isDeleting) {
+            setShowDeleteModal(false);
+            setSelectedInvoice(null);
+          }
         }}
+        isLoading={isDeleting}
       />
 
       {/* Invoice Payment Modal - For managing half payments and credit */}

@@ -12,8 +12,9 @@ interface InvoicePaymentModalProps {
   isOpen: boolean;
   invoice: Invoice | null;
   onClose: () => void;
-  onPayment: (invoiceId: string, amount: number, paymentMethod: string, notes?: string) => void;
+  onPayment: (invoiceId: string, amount: number, paymentMethod: string, notes?: string) => Promise<void> | void;
   paymentHistory?: CustomerPayment[];
+  isProcessing?: boolean;
 }
 
 export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
@@ -22,6 +23,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   onClose,
   onPayment,
   paymentHistory = [],
+  isProcessing: externalProcessing = false,
 }) => {
   const { theme } = useTheme();
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
@@ -51,18 +53,23 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   };
 
   const handlePayment = async () => {
-    if (!invoice || paymentAmount <= 0) return;
+    if (!invoice || paymentAmount <= 0 || isProcessing || externalProcessing) return;
     
     setIsProcessing(true);
-    // Simulate payment processing with nice animation
-    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    onPayment(invoice.id, paymentAmount, paymentMethod, paymentNotes);
-    setShowSuccess(true);
-    
-    setTimeout(() => {
-      onClose();
-    }, 2000);
+    try {
+      // Call the parent handler and wait for it to complete
+      await onPayment(invoice.id, paymentAmount, paymentMethod, paymentNotes);
+      setShowSuccess(true);
+      
+      // Wait a moment to show success animation then close
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (error) {
+      // Error handling is done in parent component
+      setIsProcessing(false);
+    }
   };
 
   const quickAmounts = invoice ? [

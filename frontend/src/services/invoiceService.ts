@@ -264,6 +264,7 @@ export const invoiceService = {
    * Create a new invoice
    */
   async create(data: CreateInvoiceData): Promise<APIInvoice> {
+    console.log('📝 Creating invoice with data:', data);
     const response = await fetch(`${API_BASE_URL}/invoices`, {
       method: 'POST',
       headers: {
@@ -272,6 +273,7 @@ export const invoiceService = {
       body: JSON.stringify(data),
     });
     const result = await handleResponse<APIResponse<APIInvoice>>(response);
+    console.log('✅ Invoice created - DB ID:', result.data.id, 'Invoice Number:', result.data.invoiceNumber);
     return result.data;
   },
 
@@ -279,6 +281,7 @@ export const invoiceService = {
    * Update an existing invoice
    */
   async update(id: string, data: UpdateInvoiceData): Promise<APIInvoice> {
+    console.log('📝 Updating invoice with ID:', id, 'Data:', data);
     const response = await fetch(`${API_BASE_URL}/invoices/${id}`, {
       method: 'PUT',
       headers: {
@@ -332,6 +335,7 @@ export const invoiceService = {
 import type { Invoice, InvoiceItem, InvoicePayment } from '../data/mockData';
 
 export const convertAPIInvoiceToFrontend = (apiInvoice: APIInvoice): Invoice => {
+  console.log('🔄 Converting invoice - DB ID:', apiInvoice.id, 'Invoice Number:', apiInvoice.invoiceNumber);
   return {
     id: apiInvoice.invoiceNumber || apiInvoice.id,
     apiId: apiInvoice.id, // Store actual database UUID for API operations
