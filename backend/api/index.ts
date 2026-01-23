@@ -233,15 +233,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           salesChannel: salesChannel || 'ON_SITE',
           notes,
           items: {
-            create: (items || []).map((item: any) => ({
-              productId: item.productId,
-              productName: item.productName || item.name,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice || item.price,
-              originalPrice: item.originalPrice,
-              discount: item.discount || 0,
-              total: item.total || (item.quantity * (item.unitPrice || item.price)),
-              warrantyDueDate: item.warrantyDueDate ? new Date(item.warrantyDueDate) : null,
+            create: await Promise.all((items || []).map(async (item: any) => {
+              // Validate productId - set to null if product doesn't exist
+              let validProductId = null;
+              if (item.productId) {
+                const product = await db.product.findUnique({ where: { id: item.productId } });
+                if (product) validProductId = item.productId;
+              }
+              return {
+                productId: validProductId,
+                productName: item.productName || item.name,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice || item.price,
+                originalPrice: item.originalPrice,
+                discount: item.discount || 0,
+                total: item.total || (item.quantity * (item.unitPrice || item.price)),
+                warrantyDueDate: item.warrantyDueDate ? new Date(item.warrantyDueDate) : null,
+              };
             })),
           },
         },
@@ -289,18 +297,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Update items if provided
       if (items && items.length > 0) {
         await db.invoiceItem.deleteMany({ where: { invoiceId: existingInvoice.id } });
-        await db.invoiceItem.createMany({
-          data: items.map((item: any) => ({
+        
+        // Validate productIds for each item
+        const validatedItems = await Promise.all(items.map(async (item: any) => {
+          let validProductId = null;
+          if (item.productId) {
+            const product = await db.product.findUnique({ where: { id: item.productId } });
+            if (product) validProductId = item.productId;
+          }
+          return {
             invoiceId: existingInvoice.id,
-            productId: item.productId,
+            productId: validProductId,
             productName: item.productName,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             originalPrice: item.originalPrice,
             discount: item.discount || 0,
             total: item.total,
-          })),
-        });
+          };
+        }));
+        
+        await db.invoiceItem.createMany({ data: validatedItems });
       }
       
       const invoice = await db.invoice.update({
