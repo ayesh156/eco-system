@@ -78,7 +78,6 @@ export const Invoices: React.FC = () => {
   // Operation loading states
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
 
   // Fetch invoices from API
   const fetchInvoices = useCallback(async (showRefresh = false) => {
