@@ -139,8 +139,11 @@ export const getInvoiceById = async (
   next: NextFunction
 ) => {
   try {
-    const invoice = await prisma.invoice.findUnique({
-      where: { id: req.params.id },
+    const { id } = req.params;
+    
+    // Try to find by ID first, then by invoice number
+    let invoice = await prisma.invoice.findUnique({
+      where: { id },
       include: {
         customer: true,
         items: {
@@ -160,8 +163,37 @@ export const getInvoiceById = async (
       },
     });
 
+    // If not found by ID, try by invoice number
     if (!invoice) {
-      throw new AppError('Invoice not found', 404);
+      invoice = await prisma.invoice.findFirst({
+        where: { 
+          OR: [
+            { invoiceNumber: id },
+            { invoiceNumber: { contains: id } }
+          ]
+        },
+        include: {
+          customer: true,
+          items: {
+            include: {
+              product: true
+            }
+          },
+          payments: {
+            orderBy: { paymentDate: 'desc' }
+          },
+          createdBy: {
+            select: { id: true, name: true, email: true }
+          },
+          updatedBy: {
+            select: { id: true, name: true, email: true }
+          },
+        },
+      });
+    }
+
+    if (!invoice) {
+      throw new AppError(`Invoice not found with ID or number: ${id}`, 404);
     }
 
     res.json({
@@ -195,19 +227,37 @@ export const createInvoice = async (
       shopId, // Can be provided in request body
     } = req.body;
 
+    console.log('📝 Creating invoice:', { customerId, itemCount: items?.length, tax, discount, dueDate, paymentMethod, salesChannel, paidAmount });
+
     // Validate customer exists
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
     });
 
     if (!customer) {
-      throw new AppError('Customer not found', 404);
+      throw new AppError(`Customer not found with ID: ${customerId}`, 404);
     }
 
     // Use customer's shopId if not provided in request
     const invoiceShopId = shopId || customer.shopId;
     if (!invoiceShopId) {
-      throw new AppError('Shop ID is required', 400);
+      throw new AppError('Shop ID is required. Customer does not have a shop assigned.', 400);
+    }
+
+    // Validate items
+    if (!items || items.length === 0) {
+      throw new AppError('At least one item is required', 400);
+    }
+
+    // Validate all product IDs exist
+    for (const item of items) {
+      const product = await prisma.product.findUnique({
+        where: { id: item.productId }
+      });
+      if (!product) {
+        console.log(`⚠️ Product not found: ${item.productId} (${item.productName})`);
+        // Don't fail, just log - product might be a quick-add item
+      }
     }
 
     // Calculate totals
@@ -337,15 +387,31 @@ export const updateInvoice = async (
       status: manualStatus,
     } = req.body;
 
-    // Check if invoice exists
-    const existingInvoice = await prisma.invoice.findUnique({
+    // Check if invoice exists - try by ID first, then by invoiceNumber
+    let existingInvoice = await prisma.invoice.findUnique({
       where: { id },
       include: { items: true },
     });
 
+    // If not found by ID, try by invoice number (for legacy/display ID support)
     if (!existingInvoice) {
-      throw new AppError('Invoice not found', 404);
+      existingInvoice = await prisma.invoice.findFirst({
+        where: { 
+          OR: [
+            { invoiceNumber: id },
+            { invoiceNumber: { contains: id } }
+          ]
+        },
+        include: { items: true },
+      });
     }
+
+    if (!existingInvoice) {
+      throw new AppError(`Invoice not found with ID or number: ${id}`, 404);
+    }
+
+    // Use the actual database ID for updates
+    const invoiceId = existingInvoice.id;
 
     // Calculate new totals if items are provided
     let subtotal = existingInvoice.subtotal;
@@ -368,13 +434,13 @@ export const updateInvoice = async (
       // Delete existing items if new items provided
       if (items && items.length > 0) {
         await tx.invoiceItem.deleteMany({
-          where: { invoiceId: id },
+          where: { invoiceId: invoiceId },
         });
       }
 
       // Update invoice
       const updatedInvoice = await tx.invoice.update({
-        where: { id },
+        where: { id: invoiceId },
         data: {
           ...(customerId && { customerId }),
           subtotal,
@@ -442,15 +508,31 @@ export const deleteInvoice = async (
   try {
     const { id } = req.params;
 
-    // Check if invoice exists
-    const invoice = await prisma.invoice.findUnique({
+    // Check if invoice exists - try by ID first, then by invoiceNumber
+    let invoice = await prisma.invoice.findUnique({
       where: { id },
       include: { items: true },
     });
 
+    // If not found by ID, try by invoice number
     if (!invoice) {
-      throw new AppError('Invoice not found', 404);
+      invoice = await prisma.invoice.findFirst({
+        where: { 
+          OR: [
+            { invoiceNumber: id },
+            { invoiceNumber: { contains: id } }
+          ]
+        },
+        include: { items: true },
+      });
     }
+
+    if (!invoice) {
+      throw new AppError(`Invoice not found with ID or number: ${id}`, 404);
+    }
+
+    // Use actual database ID
+    const invoiceId = invoice.id;
 
     // Delete in transaction (restore stock)
     await prisma.$transaction(async (tx) => {
@@ -476,7 +558,7 @@ export const deleteInvoice = async (
 
       // Delete invoice (cascade deletes items and payments)
       await tx.invoice.delete({
-        where: { id },
+        where: { id: invoiceId },
       });
     });
 
@@ -501,14 +583,29 @@ export const addPayment = async (
     const { id } = req.params;
     const { amount, paymentMethod, notes, reference } = req.body;
 
-    // Get invoice
-    const invoice = await prisma.invoice.findUnique({
+    // Get invoice - try by ID first, then by invoiceNumber
+    let invoice = await prisma.invoice.findUnique({
       where: { id },
     });
 
+    // If not found by ID, try by invoice number
     if (!invoice) {
-      throw new AppError('Invoice not found', 404);
+      invoice = await prisma.invoice.findFirst({
+        where: { 
+          OR: [
+            { invoiceNumber: id },
+            { invoiceNumber: { contains: id } }
+          ]
+        },
+      });
     }
+
+    if (!invoice) {
+      throw new AppError(`Invoice not found with ID or number: ${id}`, 404);
+    }
+
+    // Use actual database ID
+    const invoiceId = invoice.id;
 
     if (invoice.status === 'FULLPAID') {
       throw new AppError('Invoice is already fully paid', 400);
@@ -528,7 +625,7 @@ export const addPayment = async (
     const [payment, updatedInvoice] = await prisma.$transaction(async (tx) => {
       const newPayment = await tx.invoicePayment.create({
         data: {
-          invoiceId: id,
+          invoiceId: invoiceId,
           amount,
           paymentMethod: paymentMethod as PaymentMethod,
           notes,
@@ -537,7 +634,7 @@ export const addPayment = async (
       });
 
       const updated = await tx.invoice.update({
-        where: { id },
+        where: { id: invoiceId },
         data: {
           paidAmount: newPaidAmount,
           dueAmount: newDueAmount,

@@ -12,11 +12,13 @@ import {
   denormalizeSalesChannel,
   convertAPIInvoiceToFrontend,
 } from '../services/invoiceService';
+import { customerService, convertAPICustomerToFrontend } from '../services/customerService';
+import { productService, convertAPIProductToFrontend } from '../services/productService';
 import {
   FileText, User, Package, CheckCircle, ChevronRight, ChevronLeft,
   Search, Plus, Trash2, ArrowLeft, UserX, CreditCard,
   Building2, ShoppingCart, Receipt, Calendar,
-  Zap, Banknote, Printer, X, Minus, Edit2, Shield, Store, Globe, GripVertical
+  Zap, Banknote, Printer, X, Minus, Edit2, Shield, Store, Globe, GripVertical, RefreshCw
 } from 'lucide-react';
 
 // Extended Invoice Item with warranty tracking
@@ -50,8 +52,11 @@ export const CreateInvoice: React.FC = () => {
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   
-  const [customers] = useState<Customer[]>(mockCustomers);
-  const [products] = useState<Product[]>(mockProducts);
+  // API data states
+  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isUsingAPI, setIsUsingAPI] = useState(false);
   
   const [step, setStep] = useState<Step>(1);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -63,6 +68,40 @@ export const CreateInvoice: React.FC = () => {
   const [discountType, setDiscountType] = useState('none');
   const [enableTax, setEnableTax] = useState<boolean>(true);
   const taxRate = 15;
+  
+  // Fetch customers and products from API
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoadingData(true);
+      try {
+        // Fetch customers and products in parallel
+        const [customersResult, productsResult] = await Promise.all([
+          customerService.getAll({ limit: 1000 }),
+          productService.getAll({ limit: 1000 }),
+        ]);
+        
+        const apiCustomers = customersResult.customers.map(convertAPICustomerToFrontend);
+        const apiProducts = productsResult.products.map(convertAPIProductToFrontend);
+        
+        if (apiCustomers.length > 0) {
+          setCustomers(apiCustomers);
+          console.log('✅ Loaded customers from API:', apiCustomers.length);
+        }
+        if (apiProducts.length > 0) {
+          setProducts(apiProducts);
+          console.log('✅ Loaded products from API:', apiProducts.length);
+        }
+        setIsUsingAPI(true);
+      } catch (error) {
+        console.warn('⚠️ API not available, using mock data:', error);
+        setIsUsingAPI(false);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
   
   // Quick add product state
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -582,6 +621,19 @@ export const CreateInvoice: React.FC = () => {
       ? 'border-slate-600 bg-slate-700/50 text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
       : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
   }`;
+
+  // Loading state while fetching data
+  if (isLoadingData) {
+    return (
+      <div className="h-[calc(100vh-120px)] flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className={`w-10 h-10 mx-auto mb-4 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+          <p className={`text-lg font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Loading...</p>
+          <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Fetching customers and products</p>
+        </div>
+      </div>
+    );
+  }
 
   // Print Preview Modal
   if (showPrintPreview && createdInvoice) {
