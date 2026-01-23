@@ -215,7 +215,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const lastNum = lastInvoice ? parseInt(lastInvoice.invoiceNumber.replace(/\D/g, '')) : 10260000;
       const invoiceNumber = `INV-${lastNum + 1}`;
 
-      const calculatedTotal = total || (subtotal || 0) + (tax || 0) - (discount || 0);
+      // Calculate subtotal from items if not provided
+      const calculatedSubtotal = subtotal || (items || []).reduce((sum: number, item: any) => {
+        const qty = item.quantity || 1;
+        const price = item.unitPrice || item.price || 0;
+        return sum + (qty * price);
+      }, 0);
+      
+      const calculatedTax = tax || 0;
+      const calculatedDiscount = discount || 0;
+      const calculatedTotal = total || (calculatedSubtotal + calculatedTax - calculatedDiscount);
       const calculatedPaid = paidAmount || 0;
       const calculatedDue = calculatedTotal - calculatedPaid;
       
@@ -231,9 +240,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           customerId,
           customerName,
           shopId: invoiceShopId,
-          subtotal: subtotal || 0,
-          tax: tax || 0,
-          discount: discount || 0,
+          subtotal: calculatedSubtotal,
+          tax: calculatedTax,
+          discount: calculatedDiscount,
           total: calculatedTotal,
           paidAmount: calculatedPaid,
           dueAmount: calculatedDue,
@@ -294,7 +303,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
-      const { status, paidAmount, notes, customerName, discount, tax, total, dueAmount, items } = body;
+      const { status, paidAmount, notes, customerName, discount, tax, total, dueAmount, items, subtotal } = body;
+      
+      // Calculate subtotal from items if items are provided
+      let calculatedSubtotal = subtotal;
+      if (items && items.length > 0) {
+        calculatedSubtotal = items.reduce((sum: number, item: any) => {
+          const qty = item.quantity || 1;
+          const price = item.unitPrice || item.price || 0;
+          return sum + (qty * price);
+        }, 0);
+      }
       
       const updateData: any = {};
       if (status !== undefined && status !== null) updateData.status = String(status).toUpperCase();
@@ -303,8 +322,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (customerName !== undefined) updateData.customerName = customerName;
       if (discount !== undefined) updateData.discount = discount;
       if (tax !== undefined) updateData.tax = tax;
-      if (total !== undefined) updateData.total = total;
-      if (dueAmount !== undefined) updateData.dueAmount = dueAmount;
+      if (calculatedSubtotal !== undefined) updateData.subtotal = calculatedSubtotal;
+      
+      // Recalculate total if subtotal, tax or discount changed
+      if (calculatedSubtotal !== undefined || tax !== undefined || discount !== undefined) {
+        const newSubtotal = calculatedSubtotal !== undefined ? calculatedSubtotal : existingInvoice.subtotal;
+        const newTax = tax !== undefined ? tax : existingInvoice.tax;
+        const newDiscount = discount !== undefined ? discount : existingInvoice.discount;
+        updateData.total = newSubtotal + newTax - newDiscount;
+        
+        // Recalculate dueAmount
+        const newPaidAmount = paidAmount !== undefined ? paidAmount : existingInvoice.paidAmount;
+        updateData.dueAmount = updateData.total - newPaidAmount;
+      } else if (total !== undefined) {
+        updateData.total = total;
+      }
+      
+      if (dueAmount !== undefined && !updateData.dueAmount) updateData.dueAmount = dueAmount;
       
       // Update items if provided
       if (items && items.length > 0) {
