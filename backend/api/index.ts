@@ -194,11 +194,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== CREATE INVOICE ====================
     if (path === '/api/v1/invoices' && method === 'POST') {
-      const { customerId, items, subtotal, tax, discount, total, paidAmount, status, date, dueDate, paymentMethod, salesChannel, notes } = body;
+      const { customerId, items, subtotal, tax, discount, total, paidAmount, status, date, dueDate, paymentMethod, salesChannel, notes, shopId } = body;
       
-      // Get customer name
+      // Get customer name and shopId from customer if not provided
       const customer = await db.customer.findUnique({ where: { id: customerId } });
       const customerName = customer?.name || 'Unknown Customer';
+      
+      // Get shopId - from request, from customer, or get default shop
+      let invoiceShopId = shopId || customer?.shopId;
+      if (!invoiceShopId) {
+        const defaultShop = await db.shop.findFirst();
+        invoiceShopId = defaultShop?.id;
+      }
+      if (!invoiceShopId) {
+        return res.status(400).json({ success: false, error: 'Shop ID is required' });
+      }
       
       // Generate invoice number
       const lastInvoice = await db.invoice.findFirst({ orderBy: { invoiceNumber: 'desc' } });
@@ -220,6 +230,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           invoiceNumber,
           customerId,
           customerName,
+          shopId: invoiceShopId,
           subtotal: subtotal || 0,
           tax: tax || 0,
           discount: discount || 0,
