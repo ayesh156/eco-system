@@ -311,9 +311,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             productName: item.productName,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            originalPrice: item.originalPrice,
+            originalPrice: item.originalPrice || item.unitPrice,
             discount: item.discount || 0,
-            total: item.total,
+            total: item.total || (item.quantity * item.unitPrice),
           };
         }));
         
