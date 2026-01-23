@@ -117,10 +117,13 @@ export interface CreateInvoiceData {
     unitPrice: number;
     originalPrice?: number;
     discount?: number;
+    total?: number;
     warrantyDueDate?: string;
   }[];
+  subtotal?: number;
   tax?: number;
   discount?: number;
+  total?: number;
   dueDate: string;
   paymentMethod?: PaymentMethod;
   salesChannel?: SalesChannel;
