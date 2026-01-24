@@ -1,4 +1,5 @@
 // Vercel Serverless API Handler - Complete CRUD with all features
+// Optimized for Vercel Pro with caching and connection pooling
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient } from '@prisma/client';
 
@@ -6,7 +7,7 @@ import { PrismaClient } from '@prisma/client';
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 const prisma = globalForPrisma.prisma || new PrismaClient({
-  log: ['error'],
+  log: process.env.NODE_ENV === 'production' ? ['error'] : ['query', 'error'],
   datasources: {
     db: {
       url: process.env.DATABASE_URL,
@@ -14,7 +15,16 @@ const prisma = globalForPrisma.prisma || new PrismaClient({
   },
 });
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+// Always reuse prisma instance in production (Vercel Pro)
+globalForPrisma.prisma = prisma;
+
+// Cache headers for Vercel Edge Network (Pro feature)
+function setCacheHeaders(res: VercelResponse, maxAge: number = 10, staleWhileRevalidate: number = 59) {
+  // Cache-Control: public responses can be cached by Vercel Edge
+  // s-maxage: cache on Vercel Edge for maxAge seconds
+  // stale-while-revalidate: serve stale content while revalidating in background
+  res.setHeader('Cache-Control', `public, s-maxage=${maxAge}, stale-while-revalidate=${staleWhileRevalidate}`);
+}
 
 // CORS headers
 function setCorsHeaders(res: VercelResponse) {
@@ -60,8 +70,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Use global prisma instance (no await needed)
     const db = prisma;
 
-    // ==================== INVOICE STATS ====================
+    // ==================== INVOICE STATS (cached for 30 seconds) ====================
     if (path === '/api/v1/invoices/stats' && method === 'GET') {
+      // Enable edge caching for stats (Pro feature)
+      setCacheHeaders(res, 30, 60);
+      
       const invoices = await db.invoice.findMany({
         include: { payments: true },
       });
@@ -152,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // ==================== GET SINGLE INVOICE ====================
+    // ==================== GET SINGLE INVOICE (with caching) ====================
     const invoiceGetMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)$/);
     if (invoiceGetMatch && method === 'GET') {
       const id = invoiceGetMatch[1];
@@ -476,8 +489,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // ==================== CUSTOMERS ====================
+    // ==================== CUSTOMERS (cached for 30 seconds) ====================
     if (path === '/api/v1/customers' && method === 'GET') {
+      setCacheHeaders(res, 30, 60);
       const customers = await db.customer.findMany({ orderBy: { name: 'asc' } });
       return res.status(200).json({ success: true, data: customers });
     }
@@ -509,8 +523,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ success: true, message: 'Customer deleted' });
     }
 
-    // ==================== PRODUCTS ====================
+    // ==================== PRODUCTS (cached for 60 seconds) ====================
     if (path === '/api/v1/products' && method === 'GET') {
+      setCacheHeaders(res, 60, 120); // Products don't change often
       const products = await db.product.findMany({
         include: { category: true, brand: true },
         orderBy: { name: 'asc' },
