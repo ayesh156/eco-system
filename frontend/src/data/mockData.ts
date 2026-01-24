@@ -1800,7 +1800,6 @@ export interface Invoice {
   total: number;
   status: 'unpaid' | 'fullpaid' | 'halfpay';
   paidAmount?: number; // Amount paid so far (for halfpay tracking)
-  dueAmount?: number; // Amount still due (total - paidAmount)
   date: string;
   dueDate: string;
   paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'credit';

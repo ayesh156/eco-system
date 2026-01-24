@@ -152,9 +152,18 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
       await onPayment(invoice.id, paymentAmount, paymentMethod, paymentNotes, paymentDateTime);
       setShowSuccess(true);
       
-      // Wait a moment to show success animation then close
+      // Wait for success animation, then switch to history tab to show the new payment
       setTimeout(() => {
-        onClose();
+        setShowSuccess(false);
+        setIsProcessing(false);
+        setActiveTab('history'); // Switch to history tab to show the newly added payment
+        // Reset payment form
+        setPaymentAmount(0);
+        setPaymentMethod('cash');
+        setPaymentNotes('');
+        const now = new Date();
+        setPaymentDate(formatDateForInput(now));
+        setPaymentTime(formatTimeForInput(now));
       }, 1500);
     } catch (error) {
       // Error handling is done in parent component
