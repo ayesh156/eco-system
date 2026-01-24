@@ -26,11 +26,32 @@ function setCacheHeaders(res: VercelResponse, maxAge: number = 10, staleWhileRev
   res.setHeader('Cache-Control', `public, s-maxage=${maxAge}, stale-while-revalidate=${staleWhileRevalidate}`);
 }
 
-// CORS headers
-function setCorsHeaders(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+// CORS headers - Must use specific origin for credentials
+function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
+  const origin = req.headers.origin || '';
+  
+  // Allowed origins - add your Vercel frontend URLs here
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'https://eco-system-hdt8.vercel.app',  // Main frontend
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:3000',
+  ].filter(Boolean);
+
+  // Also allow any vercel.app subdomain for preview deployments
+  const isVercelPreview = origin.endsWith('.vercel.app');
+  
+  if (allowedOrigins.includes(origin) || isVercelPreview) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (process.env.FRONTEND_URL) {
+    res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL);
+  }
+  
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-ID');
+  res.setHeader('Access-Control-Expose-Headers', 'set-cookie, X-Request-ID');
 }
 
 // Parse URL
@@ -47,7 +68,7 @@ function parseUrl(url: string) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(res);
+  setCorsHeaders(req, res);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
