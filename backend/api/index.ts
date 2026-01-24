@@ -75,6 +75,22 @@ function parseUrl(url: string) {
   return { path, query };
 }
 
+// Extract shopId from JWT token - CRITICAL for multi-tenant isolation
+function getShopIdFromToken(req: VercelRequest): string | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  const token = authHeader.substring(7);
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { shopId?: string };
+    return decoded.shopId || null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res);
 
@@ -85,6 +101,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { path, query } = parseUrl(req.url || '/');
   const method = req.method || 'GET';
   const body = req.body || {};
+  
+  // Get shopId from authenticated user's token
+  const shopId = getShopIdFromToken(req);
 
   try {
     // Health check
@@ -313,10 +332,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== INVOICE STATS (cached for 30 seconds) ====================
     if (path === '/api/v1/invoices/stats' && method === 'GET') {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
       // Enable edge caching for stats (Pro feature)
       setCacheHeaders(res, 30, 60);
       
       const invoices = await db.invoice.findMany({
+        where: { shopId }, // CRITICAL: Filter by shopId
         include: { payments: true },
       });
       
@@ -359,6 +384,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== INVOICES LIST ====================
     if (path === '/api/v1/invoices' && method === 'GET') {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
       const page = parseInt(query.page || '1');
       const limit = parseInt(query.limit || '100');
       const status = query.status;
@@ -367,7 +397,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const sortBy = query.sortBy || 'date';
       const sortOrder = (query.sortOrder || 'desc') as 'asc' | 'desc';
 
-      const where: any = {};
+      const where: any = { shopId }; // CRITICAL: Always filter by shopId
       if (status && status !== 'all') {
         where.status = status.toUpperCase();
       }
@@ -416,6 +446,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ==================== GET SINGLE INVOICE (with caching) ====================
     const invoiceGetMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)$/);
     if (invoiceGetMatch && method === 'GET') {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
       const id = invoiceGetMatch[1];
       
       // Try finding by ID first, then by invoice number
@@ -456,28 +491,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!invoice) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
+      
+      // CRITICAL: Verify ownership before returning data
+      if (invoice.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
+      }
+      
       return res.status(200).json({ success: true, data: invoice });
     }
 
     // ==================== CREATE INVOICE ====================
     if (path === '/api/v1/invoices' && method === 'POST') {
-      const { customerId, items, subtotal, tax, discount, total, paidAmount, status, date, dueDate, paymentMethod, salesChannel, notes, shopId } = body;
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
       
-      // Get customer name and shopId from customer if not provided
+      const { customerId, items, subtotal, tax, discount, total, paidAmount, status, date, dueDate, paymentMethod, salesChannel, notes } = body;
+      
+      // Get customer name from customer
       const customer = await db.customer.findUnique({ where: { id: customerId } });
       const customerName = customer?.name || 'Unknown Customer';
       
-      // Get shopId - from request, from customer, or get default shop
-      let invoiceShopId = shopId || customer?.shopId;
-      if (!invoiceShopId) {
-        const defaultShop = await db.shop.findFirst();
-        invoiceShopId = defaultShop?.id;
-      }
-      if (!invoiceShopId) {
-        return res.status(400).json({ success: false, error: 'Shop ID is required' });
+      // Verify customer belongs to same shop
+      if (customer && customer.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Customer does not belong to your shop' });
       }
       
-      // Generate invoice number
+      // Use authenticated user's shopId - NEVER trust shopId from request body
+      const invoiceShopId = shopId;
+      
+      // Generate invoice number for this shop
       const lastInvoice = await db.invoice.findFirst({ orderBy: { invoiceNumber: 'desc' } });
       const lastNum = lastInvoice ? parseInt(lastInvoice.invoiceNumber.replace(/\D/g, '')) : 10260000;
       const invoiceNumber = `INV-${lastNum + 1}`;
@@ -554,6 +598,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ==================== UPDATE INVOICE ====================
     const invoiceUpdateMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)$/);
     if (invoiceUpdateMatch && (method === 'PUT' || method === 'PATCH')) {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
       const id = invoiceUpdateMatch[1];
       
       // Find invoice by ID or invoice number (with or without INV- prefix)
@@ -568,6 +617,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (!existingInvoice) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+      
+      // CRITICAL: Verify ownership before update
+      if (existingInvoice.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
       }
       
       const { status, paidAmount, notes, customerName, discount, tax, total, dueAmount, items, subtotal, dueDate } = body;
@@ -650,6 +704,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ==================== DELETE INVOICE ====================
     const invoiceDeleteMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)$/);
     if (invoiceDeleteMatch && method === 'DELETE') {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
       const id = invoiceDeleteMatch[1];
       
       // Find invoice by ID or invoice number (with or without INV- prefix)
@@ -665,6 +724,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
+      // CRITICAL: Verify ownership before deleting
+      if (existingInvoice.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
+      }
+      
       // Delete related items and payments first
       await db.invoiceItem.deleteMany({ where: { invoiceId: existingInvoice.id } });
       await db.invoicePayment.deleteMany({ where: { invoiceId: existingInvoice.id } });
@@ -676,6 +740,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ==================== ADD PAYMENT ====================
     const paymentMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/payments$/);
     if (paymentMatch && method === 'POST') {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
       const invoiceId = paymentMatch[1];
       const { amount, paymentMethod, paymentDate, notes, reference } = body;
       
@@ -699,6 +768,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (!existingInvoice) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+      
+      // CRITICAL: Verify ownership before adding payment
+      if (existingInvoice.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
       }
       
       const payment = await db.invoicePayment.create({
@@ -742,6 +816,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // GET reminders for an invoice
     const reminderGetMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/reminders$/);
     if (reminderGetMatch && method === 'GET') {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
       const invoiceId = reminderGetMatch[1];
       
       // Find invoice by ID or invoice number
@@ -755,6 +834,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (!existingInvoice) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+      
+      // CRITICAL: Verify ownership before returning reminders
+      if (existingInvoice.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
       }
       
       const reminders = await db.invoiceReminder.findMany({
@@ -772,8 +856,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // POST - Create a new reminder for an invoice
     const reminderPostMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/reminders$/);
     if (reminderPostMatch && method === 'POST') {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
       const invoiceId = reminderPostMatch[1];
-      const { type, channel, message, customerPhone, customerName, shopId } = body;
+      // NOTE: Don't destructure shopId from body - use authenticated shopId
+      const { type, channel, message, customerPhone, customerName } = body;
       
       // Find invoice by ID or invoice number
       let existingInvoice = await db.invoice.findUnique({ 
@@ -797,11 +887,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
-      // Create the reminder
+      // CRITICAL: Verify ownership before creating reminder
+      if (existingInvoice.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
+      }
+      
+      // Create the reminder - use authenticated shopId, not from request body
       const reminder = await db.invoiceReminder.create({
         data: {
           invoiceId: existingInvoice.id,
-          shopId: shopId || existingInvoice.shopId,
+          shopId: shopId, // CRITICAL: Always use authenticated shopId
           type: type?.toUpperCase() === 'OVERDUE' ? 'OVERDUE' : 'PAYMENT',
           channel: channel || 'whatsapp',
           message: message || '',
@@ -824,42 +919,83 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== CUSTOMERS (cached for 30 seconds) ====================
     if (path === '/api/v1/customers' && method === 'GET') {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
       setCacheHeaders(res, 30, 60);
-      const customers = await db.customer.findMany({ orderBy: { name: 'asc' } });
+      const customers = await db.customer.findMany({ 
+        where: { shopId }, // CRITICAL: Filter by shopId
+        orderBy: { name: 'asc' } 
+      });
       return res.status(200).json({ success: true, data: customers });
     }
 
     if (path === '/api/v1/customers' && method === 'POST') {
-      const customer = await db.customer.create({ data: body });
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      const customer = await db.customer.create({ 
+        data: { ...body, shopId } // CRITICAL: Set shopId from token
+      });
       return res.status(201).json({ success: true, data: customer });
     }
 
     const customerMatch = path.match(/^\/api\/v1\/customers\/([^/]+)$/);
     if (customerMatch && method === 'GET') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
       const customer = await db.customer.findUnique({ where: { id: customerMatch[1] } });
       if (!customer) {
         return res.status(404).json({ success: false, error: 'Customer not found' });
+      }
+      // Verify ownership
+      if (customer.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
       }
       return res.status(200).json({ success: true, data: customer });
     }
 
     if (customerMatch && (method === 'PUT' || method === 'PATCH')) {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      // Verify ownership before update
+      const existing = await db.customer.findUnique({ where: { id: customerMatch[1] } });
+      if (!existing || existing.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      const { shopId: _, ...safeData } = body; // Prevent shopId tampering
       const customer = await db.customer.update({
         where: { id: customerMatch[1] },
-        data: body,
+        data: safeData,
       });
       return res.status(200).json({ success: true, data: customer });
     }
 
     if (customerMatch && method === 'DELETE') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      // Verify ownership before delete
+      const existing = await db.customer.findUnique({ where: { id: customerMatch[1] } });
+      if (!existing || existing.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
       await db.customer.delete({ where: { id: customerMatch[1] } });
       return res.status(200).json({ success: true, message: 'Customer deleted' });
     }
 
     // ==================== PRODUCTS (cached for 60 seconds) ====================
     if (path === '/api/v1/products' && method === 'GET') {
+      // Require shopId for multi-tenant isolation
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
       setCacheHeaders(res, 60, 120); // Products don't change often
       const products = await db.product.findMany({
+        where: { shopId }, // CRITICAL: Filter by shopId
         include: { category: true, brand: true },
         orderBy: { name: 'asc' },
       });
@@ -867,8 +1003,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (path === '/api/v1/products' && method === 'POST') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
       const product = await db.product.create({ 
-        data: body,
+        data: { ...body, shopId }, // CRITICAL: Set shopId from token
         include: { category: true, brand: true },
       });
       return res.status(201).json({ success: true, data: product });
@@ -876,6 +1015,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const productMatch = path.match(/^\/api\/v1\/products\/([^/]+)$/);
     if (productMatch && method === 'GET') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
       const product = await db.product.findUnique({ 
         where: { id: productMatch[1] },
         include: { category: true, brand: true },
@@ -883,19 +1025,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!product) {
         return res.status(404).json({ success: false, error: 'Product not found' });
       }
+      // Verify ownership
+      if (product.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
       return res.status(200).json({ success: true, data: product });
     }
 
     if (productMatch && (method === 'PUT' || method === 'PATCH')) {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      // Verify ownership before update
+      const existing = await db.product.findUnique({ where: { id: productMatch[1] } });
+      if (!existing || existing.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      const { shopId: _, ...safeData } = body;
       const product = await db.product.update({
         where: { id: productMatch[1] },
-        data: body,
+        data: safeData,
         include: { category: true, brand: true },
       });
       return res.status(200).json({ success: true, data: product });
     }
 
     if (productMatch && method === 'DELETE') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      // Verify ownership before delete
+      const existing = await db.product.findUnique({ where: { id: productMatch[1] } });
+      if (!existing || existing.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
       await db.product.delete({ where: { id: productMatch[1] } });
       return res.status(200).json({ success: true, message: 'Product deleted' });
     }
