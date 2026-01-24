@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import type { Invoice, CustomerPayment } from '../../data/mockData';
+import type { Invoice } from '../../data/mockData';
 import { 
   X, CheckCircle, AlertTriangle, Sparkles, Calculator, Calendar,
   CreditCard, FileCheck, Receipt,
@@ -13,7 +13,6 @@ interface InvoicePaymentModalProps {
   invoice: Invoice | null;
   onClose: () => void;
   onPayment: (invoiceId: string, amount: number, paymentMethod: string, notes?: string, paymentDateTime?: string) => Promise<void> | void;
-  paymentHistory?: CustomerPayment[];
   isProcessing?: boolean;
 }
 
@@ -22,7 +21,6 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   invoice,
   onClose,
   onPayment,
-  paymentHistory = [],
   isProcessing: externalProcessing = false,
 }) => {
   const { theme } = useTheme();
@@ -32,6 +30,9 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'payment' | 'history'>('payment');
+  
+  // Use invoice payments directly for real-time updates
+  const paymentHistory = invoice?.payments || [];
   
   // Date/Time picker states
   const [paymentDate, setPaymentDate] = useState<string>('');
@@ -235,15 +236,32 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
         <div className="relative overflow-hidden">
           <div className={`absolute inset-0 ${
             isOverdue 
-              ? 'bg-gradient-to-r from-rose-600 via-red-600 to-orange-600' 
+              ? 'bg-gradient-to-br from-rose-500 via-pink-600 to-red-700' 
               : invoice.status === 'halfpay'
-                ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-yellow-600'
-                : 'bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600'
+                ? 'bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700'
+                : 'bg-gradient-to-br from-cyan-500 via-teal-600 to-emerald-700'
           }`} />
-          {/* Decorative pattern */}
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute top-0 left-0 w-40 h-40 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2" />
-            <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/10 rounded-full translate-x-1/2 translate-y-1/2" />
+          {/* Modern mesh gradient overlay */}
+          <div className="absolute inset-0">
+            <div className={`absolute inset-0 opacity-30 ${
+              isOverdue 
+                ? 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-400 via-transparent to-transparent'
+                : invoice.status === 'halfpay'
+                  ? 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-pink-400 via-transparent to-transparent'
+                  : 'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-400 via-transparent to-transparent'
+            }`} />
+            <div className={`absolute inset-0 opacity-20 ${
+              isOverdue 
+                ? 'bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-yellow-400 via-transparent to-transparent'
+                : invoice.status === 'halfpay'
+                  ? 'bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-cyan-400 via-transparent to-transparent'
+                  : 'bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-emerald-400 via-transparent to-transparent'
+            }`} />
+          </div>
+          {/* Decorative shapes */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/10 rounded-full blur-xl" />
           </div>
           
           <div className="relative px-6 py-5">

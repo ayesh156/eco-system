@@ -642,11 +642,13 @@ export const Invoices: React.FC = () => {
           prevInvoices.map(inv => inv.id === invoiceId ? convertedInvoice : inv)
         );
         
+        // Update selectedInvoice so modal shows updated payment history
+        setSelectedInvoice(convertedInvoice);
+        
         toast.success('Payment recorded successfully', {
           description: `Rs. ${amount.toLocaleString()} payment added to invoice #${invoiceId}.`,
         });
         console.log('✅ Payment recorded via API');
-        setSelectedInvoice(null);
         return;
       } catch (error) {
         console.error('❌ Failed to record payment via API:', error);
@@ -1887,15 +1889,6 @@ export const Invoices: React.FC = () => {
           setSelectedInvoice(null);
         }}
         onPayment={handlePayment}
-        paymentHistory={selectedInvoice?.payments?.map(p => ({
-          id: p.id,
-          invoiceId: p.invoiceId,
-          amount: p.amount,
-          paymentDate: p.paymentDate,
-          paymentMethod: p.paymentMethod,
-          notes: p.notes,
-          source: 'invoice' as const
-        })) || []}
       />
     </div>
   );

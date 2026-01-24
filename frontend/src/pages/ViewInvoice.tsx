@@ -188,7 +188,9 @@ export const ViewInvoice: React.FC = () => {
   };
 
   // Handle payment for invoice
-  const handlePayment = async (invoiceId: string, amount: number, paymentMethod: string, notes?: string) => {
+  const handlePayment = async (invoiceId: string, amount: number, paymentMethod: string, notes?: string, paymentDateTime?: string) => {
+    const paymentDate = paymentDateTime || new Date().toISOString();
+    
     // If using API, add payment via API
     if (isUsingAPI && apiInvoiceId) {
       try {
@@ -196,9 +198,10 @@ export const ViewInvoice: React.FC = () => {
           amount,
           paymentMethod: denormalizePaymentMethod(paymentMethod),
           notes,
+          paymentDate,
         });
         
-        // Convert and update local state
+        // Convert and update local state - this updates the invoice prop for the modal
         const convertedInvoice = convertAPIInvoiceToFrontend(updatedInvoice);
         setInvoices([convertedInvoice]);
         
@@ -206,14 +209,14 @@ export const ViewInvoice: React.FC = () => {
           description: `Rs. ${amount.toLocaleString()} payment added to invoice #${invoiceId}.`,
         });
         console.log('✅ Payment recorded via API');
-        setShowPaymentModal(false);
+        // Don't close modal here - let success animation play
         return;
       } catch (error) {
         console.error('❌ Failed to record payment via API:', error);
         toast.error('Failed to record payment', {
           description: error instanceof Error ? error.message : 'Please try again.',
         });
-        return;
+        throw error;
       }
     }
 
@@ -226,7 +229,7 @@ export const ViewInvoice: React.FC = () => {
             id: `pay-${Date.now()}`,
             invoiceId: invoiceId,
             amount: amount,
-            paymentDate: new Date().toISOString(),
+            paymentDate: paymentDate,
             paymentMethod: paymentMethod as 'cash' | 'card' | 'bank' | 'cheque',
             notes: notes
           };
