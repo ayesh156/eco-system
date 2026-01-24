@@ -298,7 +298,7 @@ export const Invoices: React.FC = () => {
   const sendWhatsAppReminder = (invoice: Invoice) => {
     const customer = customers.find(c => c.id === invoice.customerId);
     if (!customer?.phone) {
-      alert('Customer phone number not found!');
+      toast.error('Customer phone number not found!');
       return;
     }
 
@@ -306,11 +306,11 @@ export const Invoices: React.FC = () => {
     const dueAmount = invoice.total - (invoice.paidAmount || 0);
     const dueDate = new Date(invoice.dueDate);
     const today = new Date();
-    const isOverdue = dueDate < today && invoice.status !== 'fullpaid';
-    const daysOverdue = isOverdue ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+    const isOverdueNow = dueDate < today && invoice.status !== 'fullpaid';
+    const daysOverdue = isOverdueNow ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
     // Choose template based on overdue status
-    let message = isOverdue 
+    let message = isOverdueNow 
       ? mockWhatsAppSettings.overdueReminderTemplate 
       : mockWhatsAppSettings.paymentReminderTemplate;
 
@@ -336,9 +336,40 @@ export const Invoices: React.FC = () => {
     }
     phone = phone.replace('+', '');
 
+    // Track the reminder locally
+    const newReminder = {
+      id: `reminder-${Date.now()}`,
+      invoiceId: invoice.id,
+      type: isOverdueNow ? 'overdue' as const : 'payment' as const,
+      channel: 'whatsapp' as const,
+      sentAt: new Date().toISOString(),
+      message: message,
+      customerPhone: phone,
+      customerName: invoice.customerName,
+    };
+
+    // Update invoice with reminder tracking
+    setInvoices(prev => prev.map(inv => {
+      if (inv.id === invoice.id || inv.apiId === invoice.apiId) {
+        const existingReminders = inv.reminders || [];
+        return {
+          ...inv,
+          reminders: [...existingReminders, newReminder],
+          reminderCount: (inv.reminderCount || 0) + 1,
+          lastReminderDate: newReminder.sentAt,
+        };
+      }
+      return inv;
+    }));
+
     // Open WhatsApp with the message using wa.me format
     const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
+
+    // Show success toast
+    toast.success(`${isOverdueNow ? 'Overdue' : 'Payment'} reminder sent to ${invoice.customerName}`, {
+      description: `Reminder #${(invoice.reminderCount || 0) + 1} sent via WhatsApp`,
+    });
   };
 
   // Check if invoice needs reminder (unpaid or halfpay)
@@ -1343,11 +1374,16 @@ export const Invoices: React.FC = () => {
                                 </button>
                                 <button 
                                   onClick={() => sendWhatsAppReminder(invoice)}
-                                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25"
+                                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25 relative"
                                   title="Send Urgent Overdue Reminder via WhatsApp"
                                 >
                                   <MessageCircle className="w-4 h-4" />
                                   🚨 Send Urgent Reminder
+                                  {invoice.reminderCount && invoice.reminderCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                                      {invoice.reminderCount}
+                                    </span>
+                                  )}
                                 </button>
                               </>
                             ) : (
@@ -1365,11 +1401,16 @@ export const Invoices: React.FC = () => {
                                 </div>
                                 <button 
                                   onClick={() => sendWhatsAppReminder(invoice)}
-                                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-emerald-500/25"
+                                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-emerald-500/25 relative"
                                   title="Send Payment Reminder via WhatsApp"
                                 >
                                   <MessageCircle className="w-4 h-4" />
                                   💬 Send Reminder
+                                  {invoice.reminderCount && invoice.reminderCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                                      {invoice.reminderCount}
+                                    </span>
+                                  )}
                                 </button>
                               </>
                             )}
@@ -1667,7 +1708,7 @@ export const Invoices: React.FC = () => {
                           {needsReminder(invoice) && (
                             <button 
                               onClick={() => sendWhatsAppReminder(invoice)}
-                              className={`p-2 rounded-xl transition-colors ${
+                              className={`p-2 rounded-xl transition-colors relative ${
                                 isOverdue(invoice)
                                   ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                                   : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
@@ -1675,6 +1716,13 @@ export const Invoices: React.FC = () => {
                               title={isOverdue(invoice) ? 'Send Overdue Reminder via WhatsApp' : 'Send Payment Reminder via WhatsApp'}
                             >
                               <MessageCircle className="w-4 h-4" />
+                              {invoice.reminderCount && invoice.reminderCount > 0 && (
+                                <span className={`absolute -top-1 -right-1 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center ${
+                                  isOverdue(invoice) ? 'bg-rose-600' : 'bg-green-700'
+                                }`}>
+                                  {invoice.reminderCount}
+                                </span>
+                              )}
                             </button>
                           )}
                         </div>

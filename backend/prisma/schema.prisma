@@ -36,6 +36,11 @@ model Shop {
   // Status
   isActive      Boolean   @default(true)
   
+  // WhatsApp Reminder Templates
+  reminderEnabled           Boolean   @default(true)
+  paymentReminderTemplate   String?   @db.Text
+  overdueReminderTemplate   String?   @db.Text
+  
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -46,6 +51,7 @@ model Shop {
   brands        Brand[]
   products      Product[]
   invoices      Invoice[]
+  invoiceReminders InvoiceReminder[]
 
   @@map("shops")
 }
@@ -263,6 +269,7 @@ model Invoice {
   // Relations
   items         InvoiceItem[]
   payments      InvoicePayment[]
+  reminders     InvoiceReminder[]
 
   @@unique([shopId, invoiceNumber])  // Unique invoice number per shop
   @@index([shopId])
@@ -346,4 +353,44 @@ enum PaymentMethod {
 enum SalesChannel {
   ON_SITE
   ONLINE
+}
+
+// ==========================================
+// REMINDER TRACKING
+// ==========================================
+
+model InvoiceReminder {
+  id            String        @id @default(cuid())
+  
+  // Invoice relation
+  invoiceId     String
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  // Shop relation
+  shopId        String
+  shop          Shop          @relation(fields: [shopId], references: [id])
+  
+  // Reminder details
+  type          ReminderType  @default(PAYMENT)
+  channel       String        @default("whatsapp")  // whatsapp, sms, email
+  sentAt        DateTime      @default(now())
+  
+  // Message content
+  message       String?       @db.Text
+  
+  // Customer info at time of send
+  customerPhone String?
+  customerName  String?
+  
+  createdAt     DateTime      @default(now())
+
+  @@index([invoiceId])
+  @@index([shopId])
+  @@index([sentAt])
+  @@map("invoice_reminders")
+}
+
+enum ReminderType {
+  PAYMENT
+  OVERDUE
 }

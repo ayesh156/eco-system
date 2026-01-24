@@ -34,7 +34,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   const [quantity, setQuantity] = useState(1);
   
   // Payment method for adding products
-  const [addPaymentMethod, setAddPaymentMethod] = useState<'cash' | 'card' | 'bank' | 'cheque' | 'credit'>('credit');
+  const [addPaymentMethod, setAddPaymentMethod] = useState<'cash' | 'card' | 'bank' | 'credit'>('credit');
   
   // Tax states
   const [hasTax, setHasTax] = useState(true);
@@ -616,18 +616,17 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                 <CreditCard className="w-4 h-4 text-blue-500" />
                 Payment Method
               </Label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {[
                   { value: 'cash', label: 'Cash', emoji: '💵', color: 'emerald' },
                   { value: 'card', label: 'Card', emoji: '💳', color: 'blue' },
                   { value: 'bank', label: 'Bank', emoji: '🏦', color: 'purple' },
-                  { value: 'cheque', label: 'Cheque', emoji: '📝', color: 'amber' },
                   { value: 'credit', label: 'Credit', emoji: '⏳', color: 'red' },
                 ].map(({ value, label, emoji, color }) => (
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setAddPaymentMethod(value as 'cash' | 'card' | 'bank' | 'cheque' | 'credit')}
+                    onClick={() => setAddPaymentMethod(value as 'cash' | 'card' | 'bank' | 'credit')}
                     className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
                       addPaymentMethod === value
                         ? `scale-105`
@@ -636,8 +635,8 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                           : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                     style={addPaymentMethod === value ? {
-                      borderColor: color === 'emerald' ? '#10b981' : color === 'blue' ? '#3b82f6' : color === 'purple' ? '#8b5cf6' : color === 'amber' ? '#f59e0b' : '#ef4444',
-                      backgroundColor: color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : color === 'purple' ? 'rgba(139, 92, 246, 0.1)' : color === 'amber' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+                      borderColor: color === 'emerald' ? '#10b981' : color === 'blue' ? '#3b82f6' : color === 'purple' ? '#8b5cf6' : '#ef4444',
+                      backgroundColor: color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : color === 'purple' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)'
                     } : {}}
                   >
                     <span className="text-xl">{emoji}</span>

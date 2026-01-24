@@ -1811,6 +1811,21 @@ export interface Invoice {
   creditContribution?: number; // How much of this invoice is on credit
   creditSettlements?: { paymentId: string; amount: number; date: string }[]; // Credit payments applied to this invoice
   warrantyCredits?: { warrantyClaimId: string; amount: number; date: string }[]; // Credits from warranty claims
+  // Reminder tracking
+  reminders?: InvoiceReminder[];
+  reminderCount?: number; // Total reminders sent
+  lastReminderDate?: string; // Last reminder date
+}
+
+export interface InvoiceReminder {
+  id: string;
+  invoiceId: string;
+  type: 'payment' | 'overdue';
+  channel: 'whatsapp' | 'sms' | 'email';
+  sentAt: string; // ISO date with time
+  message?: string;
+  customerPhone?: string;
+  customerName?: string;
 }
 
 export interface InvoiceItem {
