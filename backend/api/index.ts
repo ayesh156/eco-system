@@ -1,15 +1,20 @@
 // Vercel Serverless API Handler - Complete CRUD with all features
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { PrismaClient } from '@prisma/client';
 
-// Lazy load Prisma
-let prisma: any = null;
-async function getPrisma() {
-  if (!prisma) {
-    const { PrismaClient } = await import('@prisma/client');
-    prisma = new PrismaClient();
-  }
-  return prisma;
-}
+// Global Prisma instance to reuse across requests (prevents cold start issues)
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+
+const prisma = globalForPrisma.prisma || new PrismaClient({
+  log: ['error'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+});
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 // CORS headers
 function setCorsHeaders(res: VercelResponse) {
@@ -52,7 +57,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const db = await getPrisma();
+    // Use global prisma instance (no await needed)
+    const db = prisma;
 
     // ==================== INVOICE STATS ====================
     if (path === '/api/v1/invoices/stats' && method === 'GET') {
