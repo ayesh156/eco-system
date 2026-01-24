@@ -14,6 +14,7 @@ import {
   denormalizePaymentMethod,
   denormalizeStatus,
 } from '../services/invoiceService';
+import { reminderService } from '../services/reminderService';
 import {
   FileText, ArrowLeft, Printer, Edit3, User, Phone,
   Package, CheckCircle, Clock,
@@ -202,7 +203,7 @@ export const ViewInvoice: React.FC = () => {
   };
 
   // WhatsApp payment reminder function
-  const sendWhatsAppReminder = () => {
+  const sendWhatsAppReminder = async () => {
     if (!invoice || !customer?.phone) {
       toast.error('Customer phone number not found! Please add a phone number to the customer profile.');
       return;
@@ -250,12 +251,59 @@ export const ViewInvoice: React.FC = () => {
     }
     phone = phone.replace('+', '');
 
+    // Try to save reminder to database (if using API)
+    let reminderCount = (invoice.reminderCount || 0) + 1;
+    if (isUsingAPI && apiInvoiceId) {
+      try {
+        const result = await reminderService.create(apiInvoiceId, {
+          type: isOverdue ? 'overdue' : 'payment',
+          channel: 'whatsapp',
+          message: message,
+          customerPhone: phone,
+          customerName: invoice.customerName,
+        });
+        reminderCount = result.reminderCount;
+        console.log('✅ Reminder saved to database, count:', reminderCount);
+      } catch (error) {
+        console.warn('⚠️ Could not save reminder to database:', error);
+        // Continue anyway - local tracking will still work
+      }
+    }
+
+    // Track the reminder locally
+    const newReminder = {
+      id: `reminder-${Date.now()}`,
+      invoiceId: invoice.id,
+      type: isOverdue ? 'overdue' as const : 'payment' as const,
+      channel: 'whatsapp' as const,
+      sentAt: new Date().toISOString(),
+      message: message,
+      customerPhone: phone,
+      customerName: invoice.customerName,
+    };
+
+    // Update invoice with reminder tracking - update both local and cached invoices
+    const updateWithReminder = (prev: Invoice[]) => prev.map(inv => {
+      if (inv.id === invoice.id || inv.apiId === apiInvoiceId) {
+        const existingReminders = inv.reminders || [];
+        return {
+          ...inv,
+          reminders: [...existingReminders, newReminder],
+          reminderCount: reminderCount,
+          lastReminderDate: newReminder.sentAt,
+        };
+      }
+      return inv;
+    });
+    setInvoices(updateWithReminder);
+    setCachedInvoices(updateWithReminder);
+
     // Open WhatsApp with the message using wa.me format
     const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
     
-    toast.success('WhatsApp reminder opened', {
-      description: `Reminder for invoice #${invoice.id} prepared for ${invoice.customerName}`,
+    toast.success(`${isOverdue ? 'Overdue' : 'Payment'} reminder sent to ${invoice.customerName}`, {
+      description: `Reminder #${reminderCount} sent via WhatsApp`,
     });
   };
 
