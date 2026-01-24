@@ -1,16 +1,19 @@
 {
   "version": 2,
+  "framework": null,
   "installCommand": "npm install && npx prisma generate",
-  "builds": [
-    {
-      "src": "api/index.ts",
-      "use": "@vercel/node"
+  "buildCommand": null,
+  "outputDirectory": null,
+  "functions": {
+    "api/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 30
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "api/index.ts"
+      "source": "/(.*)",
+      "destination": "/api/index.ts"
     }
   ]
 }
