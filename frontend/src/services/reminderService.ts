@@ -1,8 +1,22 @@
 // Reminder Service - API calls for invoice reminders
 
+import { getAccessToken } from './authService';
+
 // Remove /api/v1 suffix if present since we add it in the endpoints
 const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const API_BASE_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
+
+// Helper to get authorization headers
+const getAuthHeaders = (): Record<string, string> => {
+  const token = getAccessToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
 
 export interface InvoiceReminder {
   id: string;
@@ -45,7 +59,10 @@ export const reminderService = {
     const url = `${API_BASE_URL}/api/v1/invoices/${invoiceId}/reminders`;
     console.log('🔍 Fetching reminders from:', url);
     
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -69,9 +86,7 @@ export const reminderService = {
   async create(invoiceId: string, reminder: CreateReminderRequest): Promise<{ reminder: InvoiceReminder; reminderCount: number }> {
     const response = await fetch(`${API_BASE_URL}/api/v1/invoices/${invoiceId}/reminders`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(reminder),
     });
     
