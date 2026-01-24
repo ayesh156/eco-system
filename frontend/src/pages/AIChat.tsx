@@ -61,7 +61,7 @@ export const AIChat: React.FC = () => {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: `Ayubowan! 🙏 Welcome to ECOTEC AI Assistant!
+        content: `Ayubowan! 🙏 Welcome to Eco System AI Assistant!
 
 I'm here to help you with anything related to the ECOTEC System:
 
@@ -511,7 +511,7 @@ How can I help you today? 😊`,
             <h1 className={`text-2xl lg:text-3xl font-bold ${
               theme === 'dark' ? 'text-white' : 'text-slate-900'
             }`}>
-              ECOTEC AI Assistant
+              Eco System AI Assistant
             </h1>
             <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
               Your intelligent assistant for the ECOTEC System

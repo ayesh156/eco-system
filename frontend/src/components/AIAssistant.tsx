@@ -85,7 +85,7 @@ export const AIAssistant: React.FC = () => {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: `Ayubowan! 🙏 Welcome to ECOTEC AI Assistant!
+        content: `Ayubowan! 🙏 Welcome to Eco System AI Assistant!
 
 🔥 **Real-Time Data Access Enabled!**
 I can analyze your **actual system data** including:
@@ -674,7 +674,7 @@ How can I help you today? 😊`,
             ? 'bg-slate-800 text-white' 
             : 'bg-white text-slate-900 shadow-lg'
         }`}>
-          ECOTEC AI Assistant
+          Eco System AI Assistant
         </div>
         
         {/* Add custom keyframe animations to the document */}

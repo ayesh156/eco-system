@@ -654,7 +654,7 @@ const systemData = {
 #### Step 3: Update Welcome Message (Optional but Recommended)
 If the new section is significant, add it to the welcome message capabilities list:
 ```tsx
-content: `Ayubowan! 🙏 Welcome to ECOTEC AI Assistant!
+content: `Ayubowan! 🙏 Welcome to Eco System AI Assistant!
 
 🔥 **Real-Time Data Access Enabled!**
 I can analyze your **actual system data** including:

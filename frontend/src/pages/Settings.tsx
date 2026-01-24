@@ -360,13 +360,13 @@ export const Settings: React.FC = () => {
                           : 'bg-gradient-to-r from-slate-400 to-slate-500'
                       }`}
                       style={{
-                        boxShadow: taxEnabled
+                        boxShadow: taxSettings.enabled
                           ? '0 0 20px rgba(16, 185, 129, 0.4)' 
                           : '0 0 10px rgba(100, 116, 139, 0.2)'
                       }}
                     >
                       <div className={`absolute top-1 w-8 h-8 rounded-full bg-white flex items-center justify-center transition-all duration-500 ${
-                        taxEnabled ? 'translate-x-11' : 'translate-x-1'
+                        taxSettings.enabled ? 'translate-x-11' : 'translate-x-1'
                       }`}
                       style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
                       >

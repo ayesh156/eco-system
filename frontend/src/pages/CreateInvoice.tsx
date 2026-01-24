@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTaxSettings } from '../contexts/TaxSettingsContext';
 import { useDataCache } from '../contexts/DataCacheContext';
 import { toast } from 'sonner';
 import { mockInvoices } from '../data/mockData';
@@ -48,6 +49,7 @@ const warrantyOptions = [
 
 export const CreateInvoice: React.FC = () => {
   const { theme } = useTheme();
+  const { settings: taxSettings } = useTaxSettings();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts } = useDataCache();
@@ -67,8 +69,8 @@ export const CreateInvoice: React.FC = () => {
   const [items, setItems] = useState<ExtendedInvoiceItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
   const [discountType, setDiscountType] = useState('none');
-  const [enableTax, setEnableTax] = useState<boolean>(false);
-  const taxRate = 15;
+  const [enableTax, setEnableTax] = useState<boolean>(taxSettings.enabled);
+  const taxRate = taxSettings.defaultPercentage;
   
   // Fetch customers and products from API (using cache context)
   useEffect(() => {

@@ -22,7 +22,7 @@ interface ChatMessage {
 }
 
 // System prompt that defines AI behavior
-const SYSTEM_PROMPT = `You are ECOTEC AI Assistant - a helpful, friendly, and knowledgeable assistant for the ECOTEC Computer & Mobile Shop Management System.
+const SYSTEM_PROMPT = `You are Eco System AI Assistant - a helpful, friendly, and knowledgeable assistant for the ECOTEC Computer & Mobile Shop Management System.
 
 IMPORTANT LANGUAGE RULES:
 1. You MUST respond in the SAME language the user uses:
