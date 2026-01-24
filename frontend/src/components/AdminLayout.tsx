@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import {
   Package, FileText, Users, LayoutDashboard, Settings, Database,
   Moon, Sun, Menu, X, ChevronLeft, ChevronRight, Bell, Search,
   User, HelpCircle, ChevronDown, Sparkles, TrendingUp,
   FolderTree, Building, Shield, Truck, ClipboardCheck, Wrench, Layers, ClipboardList,
-  Calculator, FileCheck, Wallet, Brain, Zap, StickyNote, CalendarDays, Lightbulb
+  Calculator, FileCheck, Wallet, Brain, Zap, StickyNote, CalendarDays, Lightbulb, LogOut
 } from 'lucide-react';
 import { useIsMobile } from '../hooks/use-mobile';
 import logoImage from '../assets/logo.jpg';
@@ -32,7 +33,9 @@ interface AdminLayoutProps {
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { theme, toggleTheme, aiAutoFillEnabled, toggleAiAutoFill } = useTheme();
+  const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -46,6 +49,17 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const mobileSidebarNavRef = useRef<HTMLElement>(null);
   const sidebarScrollPositionRef = useRef<number>(0);
   const mobileSidebarScrollPositionRef = useRef<number>(0);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setProfileDropdownOpen(false);
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   // Save sidebar scroll position before route change
   useEffect(() => {
@@ -810,8 +824,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     <User className="w-4 h-4 text-white" />
                   </div>
                   <div className="hidden md:block text-left">
-                    <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Admin</p>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>ECOTEC</p>
+                    <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{user?.role || 'User'}</p>
+                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{user?.shop?.name || 'No Shop'}</p>
                   </div>
                   <ChevronDown className={`w-4 h-4 transition-transform ${profileDropdownOpen ? 'rotate-180' : ''} ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
                 </button>
@@ -821,8 +835,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   <div className={`absolute right-0 top-full mt-2 w-56 rounded-xl border shadow-xl overflow-hidden ${theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                     }`}>
                     <div className={`px-4 py-3 border-b ${theme === 'dark' ? 'border-slate-800' : 'border-slate-100'}`}>
-                      <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Admin User</p>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>admin@ecotec.lk</p>
+                      <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{user?.name || 'User'}</p>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{user?.email || 'user@email.com'}</p>
+                      {user?.shop && (
+                        <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>{user.shop.name}</p>
+                      )}
                     </div>
                     <div className="py-2">
                       <Link to="/settings" className={`flex items-center gap-3 px-4 py-2 text-sm ${theme === 'dark' ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'
@@ -835,6 +852,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         <HelpCircle className="w-4 h-4" />
                         Help & Support
                       </Link>
+                      <div className={`border-t my-2 ${theme === 'dark' ? 'border-slate-800' : 'border-slate-100'}`}></div>
+                      <button 
+                        onClick={handleLogout}
+                        className={`flex items-center gap-3 px-4 py-2 text-sm w-full ${theme === 'dark' ? 'text-red-400 hover:bg-slate-800' : 'text-red-600 hover:bg-red-50'
+                        }`}>
+                        <LogOut className="w-4 h-4" />
+                        Logout
+                      </button>
                     </div>
                   </div>
                 )}

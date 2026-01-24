@@ -1,0 +1,1716 @@
+# AI Coding Agent Instructions for Echotech System
+
+## ⚡ CRITICAL: Task Management & Length Limit Prevention
+
+**IMPORTANT:** When given large/complex tasks, you MUST follow these rules to avoid "response hit the length limit" errors:
+
+### Breaking Down Large Tasks:
+1. **Never attempt to complete everything in one response** - Split into logical subtasks
+2. **Prioritize working code over lengthy explanations** - Code first, explain briefly
+3. **Create files incrementally** - One file at a time for large components
+4. **Use efficient patterns** - Reuse existing code patterns from the codebase
+5. **Stop and continue** - If a task is large, complete part of it and indicate what's next
+
+### Creative Task Execution:
+1. **Analyze the request** - Understand the full scope before starting
+2. **Plan the approach** - Identify all files that need to be created/modified
+3. **Execute in phases**:
+   - Phase 1: Core structure (routes, navigation, basic page)
+   - Phase 2: UI components and styling
+   - Phase 3: Functionality and interactions
+   - Phase 4: Polish and refinements
+4. **Communicate progress** - Brief updates on what's done and what's next
+
+### Example Task Breakdown:
+```
+Large Task: "Create a complete Estimates page with wizard, PDF export, email"
+
+Split into:
+1. First: Create basic Estimates page with list view
+2. Then: Add filters and search functionality  
+3. Then: Create Estimate form/wizard modal
+4. Then: Add PDF export feature
+5. Finally: Add email functionality
+```
+
+---
+
+## 🌐 Language Understanding (Singlish/Sri Lankan English Support)
+
+**IMPORTANT:** The user may provide instructions in **Singlish** (Sri Lankan English mix - a blend of Sinhala transliterated in English letters mixed with English words). You MUST:
+
+1. **Understand Singlish instructions** and interpret them correctly in English
+2. **Respond in clear English** regardless of input language
+3. **Common Singlish patterns to recognize:**
+   - "hadanna" = create/build/make
+   - "danna" = put/add
+   - "balanna" = look/check/see
+   - "eka"/"ekak" = one/this/that thing
+   - "wage" = like/similar to
+   - "ekata" = to it/for it
+   - "anuwa" = according to
+   - "awashya" = necessary/needed
+   - "mee" = this
+   - "page eka" = this page
+   - "component ekak" = a component
+   - "work karanawa" = working/functioning
+   - "error enawa" = getting error
+   - "fix karanna" = fix it
+   - "add karanna" = add it
+   - "delete karanna" = delete it
+   - "update karanna" = update it
+   - "design eka" = the design
+   - "theme eka" = the theme
+   - "modal ekak" = a modal
+   - "button ekak" = a button
+   - "form ekak" = a form
+   - "table ekak" = a table
+   - "hondai" = good/nice
+   - "hondatama" = properly/well
+   - "wenas karanna" = change it
+   - "thawa" = more/another
+   - "puluwan" = can/possible
+   - "behe" = cannot/not possible
+   - "monawada" = what
+   - "kohomada" = how
+   - "aeyi" = why
+
+---
+
+## 🏆 Project Vision: World-Class Computer & Mobile Shop Management System
+
+**Think like a world-best software engineer** when working on this project. Echotech System is designed to be a **premium, enterprise-grade computer and mobile shop management system**.
+
+### 🌍 World-Class Features (Analyze & Implement):
+Study and implement features from world-leading POS/Shop management systems:
+- **Square POS** - Clean UI, quick checkout, inventory management
+- **Lightspeed** - Advanced reporting, multi-location support
+- **Vend** - Customer loyalty, product variants
+- **ShopKeep** - Employee management, real-time analytics
+- **Toast POS** - Order management, kitchen display systems
+
+### 🇱🇰 Sri Lankan Business Adaptation:
+Customize all features for Sri Lankan computer/mobile shop context:
+
+1. **Currency & Pricing:**
+   - Always use LKR (Rs.) format: `Rs. 150,000.00`
+   - Support for price negotiations (common in SL shops)
+   - Installment/Leasing options (very popular for electronics)
+
+2. **Local Business Practices:**
+   - **Warranty Cards** - Physical warranty card generation (Sri Lankan shops issue these)
+   - **Trade-in/Exchange** - Used device trade-in system
+   - **Repair Job Cards** - Detailed repair tracking (common in mobile shops)
+   - **WhatsApp Integration** - Send invoices/updates via WhatsApp (widely used in SL)
+   - **Cash/Card/Bank Transfer** - Multiple payment methods including bank deposits
+
+3. **Tax & Compliance:**
+   - Support for Sri Lankan tax calculations
+   - Invoice formats compliant with local requirements
+
+4. **Local Inventory Needs:**
+   - IMEI tracking for mobile phones
+   - Serial number tracking for computers/laptops
+   - Barcode/QR code support
+   - Low stock alerts with supplier info
+
+5. **Customer Management:**
+   - NIC (National ID) storage for warranty claims
+   - Credit sales tracking (common practice)
+   - Customer loyalty programs
+
+6. **Reporting for SL Business:**
+   - Daily sales summary
+   - Profit margin reports
+   - Outstanding credit reports
+   - Warranty expiry reports
+
+---
+
+## 📁 Project Architecture
+
+### Technology Stack
+- **React 18+** with TypeScript (strict mode)
+- **Vite** for lightning-fast development
+- **Tailwind CSS** for utility-first styling
+- **Radix UI** for accessible primitives
+- **React Router v6** for navigation
+- **TanStack Query** for data management
+- **Lucide React** for beautiful icons
+
+### Directory Structure
+```
+src/
+├── components/           # Reusable UI components
+│   ├── ui/              # Base UI primitives (Button, Card, Input, etc.)
+│   ├── modals/          # Modal dialogs for CRUD operations
+│   ├── AdminLayout.tsx  # Main layout with sidebar navigation
+│   └── Printable*.tsx   # Print-ready document components
+├── pages/               # Route-based page components
+├── contexts/            # React Context providers (Theme, etc.)
+├── hooks/               # Custom React hooks
+├── lib/                 # Utility functions
+├── data/                # Mock data and type definitions
+└── assets/              # Static assets (images, fonts)
+```
+
+---
+
+## 🎨 Design System & Theme
+
+### Theme Implementation
+The system supports **light/dark mode** via `ThemeContext`. Always implement both themes:
+
+```tsx
+// Always use theme-aware styling
+const { theme } = useTheme();
+
+// Dark mode classes
+className={`${theme === 'dark' 
+  ? 'bg-slate-900 text-white border-slate-700' 
+  : 'bg-white text-slate-900 border-slate-200'
+}`}
+```
+
+### Color Palette
+```
+Primary Accent: emerald-500 (#10b981) - Main brand color
+Secondary Accent: blue-500 (#3b82f6) - Secondary actions
+Success: green-500 (#22c55e)
+Warning: amber-500 (#f59e0b)
+Error: red-500 (#ef4444)
+Info: sky-500 (#0ea5e9)
+
+Dark Mode Background Gradient:
+- from-slate-900 via-slate-900 to-slate-950
+- Cards: bg-slate-800/50 with border-slate-700/50
+
+Light Mode:
+- Background: slate-50 to white
+- Cards: bg-white with border-slate-200
+```
+
+### Modern UI Patterns (MUST FOLLOW)
+
+#### 1. Card Component Style
+```tsx
+<div className={`relative overflow-hidden rounded-2xl border p-6 ${
+  theme === 'dark' 
+    ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50' 
+    : 'bg-white border-slate-200 shadow-sm'
+}`}>
+  {/* Glassmorphism blur effect */}
+  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-blue-500/10 rounded-full blur-3xl" />
+  <div className="relative">
+    {/* Content here */}
+  </div>
+</div>
+```
+
+#### 2. Button Styles
+```tsx
+// Primary gradient button
+<button className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all">
+
+// Secondary button (dark mode)
+<button className={`px-4 py-2 rounded-xl border transition-all ${
+  theme === 'dark'
+    ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50 text-slate-300'
+    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+}`}>
+
+// Icon button
+<button className={`p-2.5 rounded-xl border transition-all ${
+  theme === 'dark' 
+    ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50 text-slate-400' 
+    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+}`}>
+```
+
+#### 3. Input Fields
+```tsx
+<input className={`w-full px-4 py-2.5 rounded-xl border transition-all ${
+  theme === 'dark'
+    ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20'
+    : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
+}`} />
+```
+
+#### 4. Table Design
+```tsx
+// Table container
+<div className={`rounded-2xl border overflow-hidden ${
+  theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+}`}>
+  <table className="w-full">
+    <thead className={`${
+      theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
+    }`}>
+      <tr>
+        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${
+          theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+        }`}>Column</th>
+      </tr>
+    </thead>
+    <tbody className={`divide-y ${
+      theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'
+    }`}>
+      <tr className={`transition-colors ${
+        theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'
+      }`}>
+        <td className={`px-6 py-4 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+          Content
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+```
+
+#### 5. Modal Design
+```tsx
+<Dialog open={isOpen} onOpenChange={onClose}>
+  <DialogContent className={`max-w-2xl ${
+    theme === 'dark' 
+      ? 'bg-slate-900 border-slate-700/50' 
+      : 'bg-white border-slate-200'
+  }`}>
+    <DialogHeader>
+      <DialogTitle className={`text-xl font-semibold ${
+        theme === 'dark' ? 'text-white' : 'text-slate-900'
+      }`}>
+        Modal Title
+      </DialogTitle>
+    </DialogHeader>
+    {/* Modal content */}
+  </DialogContent>
+</Dialog>
+```
+
+#### 6. Status Badges
+```tsx
+// Status badge with gradient background
+<span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+  status === 'active'
+    ? 'bg-gradient-to-r from-emerald-500/10 to-green-500/10 text-emerald-400 border border-emerald-500/20'
+    : status === 'pending'
+    ? 'bg-gradient-to-r from-amber-500/10 to-yellow-500/10 text-amber-400 border border-amber-500/20'
+    : 'bg-gradient-to-r from-red-500/10 to-rose-500/10 text-red-400 border border-red-500/20'
+}`}>
+  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+  {status}
+</span>
+```
+
+#### 7. Page Header Pattern
+```tsx
+<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+  <div>
+    <h1 className={`text-2xl lg:text-3xl font-bold ${
+      theme === 'dark' ? 'text-white' : 'text-slate-900'
+    }`}>
+      Page Title
+    </h1>
+    <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+      Page description goes here
+    </p>
+  </div>
+  <div className="flex items-center gap-3">
+    {/* Action buttons */}
+  </div>
+</div>
+```
+
+---
+
+## 📝 Component Creation Guidelines
+
+### When Creating New Components:
+
+1. **Always use TypeScript** with proper interfaces:
+```tsx
+interface ComponentProps {
+  title: string;
+  items: ItemType[];
+  onAction: (id: string) => void;
+  isLoading?: boolean;
+}
+
+export const Component: React.FC<ComponentProps> = ({ title, items, onAction, isLoading = false }) => {
+  const { theme } = useTheme();
+  // ...
+};
+```
+
+2. **Always import and use theme**:
+```tsx
+import { useTheme } from '../contexts/ThemeContext';
+```
+
+3. **Use Lucide icons**:
+```tsx
+import { Package, Search, Plus, Edit, Trash2 } from 'lucide-react';
+```
+
+4. **Implement responsive design**:
+```tsx
+className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6"
+```
+
+5. **Add smooth transitions**:
+```tsx
+className="transition-all duration-300 ease-in-out"
+```
+
+### Modal Component Template:
+```tsx
+import React from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { X } from 'lucide-react';
+
+interface ModalNameProps {
+  isOpen: boolean;
+  onClose: () => void;
+  // Add other props
+}
+
+export const ModalName: React.FC<ModalNameProps> = ({ isOpen, onClose }) => {
+  const { theme } = useTheme();
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={`max-w-2xl ${
+        theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white'
+      }`}>
+        <DialogHeader>
+          <DialogTitle className={theme === 'dark' ? 'text-white' : 'text-slate-900'}>
+            Title
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6 py-4">
+          {/* Content */}
+        </div>
+
+        <div className={`flex justify-end gap-3 pt-4 border-t ${
+          theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+        }`}>
+          <button onClick={onClose} className={`px-4 py-2 rounded-xl ${
+            theme === 'dark' 
+              ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' 
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}>
+            Cancel
+          </button>
+          <button className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl">
+            Save
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+```
+
+### Page Component Template:
+```tsx
+import React, { useState } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
+import { Search, Plus, Filter } from 'lucide-react';
+
+export const PageName: React.FC = () => {
+  const { theme } = useTheme();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  return (
+    <div className="space-y-6 pb-8">
+      {/* Page Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h1 className={`text-2xl lg:text-3xl font-bold ${
+            theme === 'dark' ? 'text-white' : 'text-slate-900'
+          }`}>
+            Page Title
+          </h1>
+          <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            Manage your items here
+          </p>
+        </div>
+        <button className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all">
+          <Plus className="w-5 h-5" />
+          Add New
+        </button>
+      </div>
+
+      {/* Search & Filters */}
+      <div className={`rounded-2xl border p-4 ${
+        theme === 'dark' 
+          ? 'bg-slate-800/30 border-slate-700/50' 
+          : 'bg-white border-slate-200 shadow-sm'
+      }`}>
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${
+              theme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+            }`} />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${
+                theme === 'dark'
+                  ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500'
+                  : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+              }`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Cards or content */}
+      </div>
+    </div>
+  );
+};
+```
+
+---
+
+## 💰 Currency Formatting (Sri Lankan Rupees)
+
+Always use LKR formatting for monetary values:
+```tsx
+const formatCurrency = (amount: number): string => {
+  return `Rs. ${amount.toLocaleString('en-LK')}`;
+};
+
+// Usage
+<span>{formatCurrency(150000)}</span> // Rs. 150,000
+```
+
+---
+
+## 🔄 State Management Patterns
+
+### Local State
+```tsx
+const [items, setItems] = useState<ItemType[]>([]);
+const [isLoading, setIsLoading] = useState(false);
+const [error, setError] = useState<string | null>(null);
+```
+
+### Form State
+```tsx
+const [formData, setFormData] = useState({
+  name: '',
+  email: '',
+  phone: '',
+});
+
+const handleChange = (field: string, value: string) => {
+  setFormData(prev => ({ ...prev, [field]: value }));
+};
+```
+
+### Modal State
+```tsx
+const [isModalOpen, setIsModalOpen] = useState(false);
+const [selectedItem, setSelectedItem] = useState<ItemType | null>(null);
+
+const openEditModal = (item: ItemType) => {
+  setSelectedItem(item);
+  setIsModalOpen(true);
+};
+```
+
+---
+
+## 📱 Responsive Design Rules
+
+1. **Mobile-first approach**
+2. **Breakpoints:**
+   - `sm:` 640px
+   - `md:` 768px
+   - `lg:` 1024px
+   - `xl:` 1280px
+   - `2xl:` 1536px
+
+3. **Common patterns:**
+```tsx
+// Grid layouts
+className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+
+// Flex direction
+className="flex flex-col lg:flex-row"
+
+// Spacing
+className="gap-4 lg:gap-6"
+
+// Text sizes
+className="text-lg lg:text-xl"
+
+// Padding
+className="p-4 lg:p-6"
+```
+
+---
+
+## ✅ Code Quality Checklist
+
+Before submitting any code, ensure:
+
+- [ ] TypeScript types/interfaces are properly defined
+- [ ] Both dark and light themes are implemented
+- [ ] Components are responsive (mobile-friendly)
+- [ ] Smooth transitions/animations are added
+- [ ] Icons use Lucide React
+- [ ] Currency uses LKR format (Rs.)
+- [ ] Error states are handled
+- [ ] Loading states are implemented
+- [ ] Accessibility (a11y) is considered
+- [ ] Code follows existing patterns in the codebase
+
+---
+
+## 🚫 Things to AVOID
+
+1. **Never use inline styles** - Use Tailwind classes
+2. **Never hardcode colors** - Use theme-aware classes
+3. **Never ignore TypeScript errors** - Fix them properly
+4. **Never skip responsive design** - Test all breakpoints
+5. **Never use px units in Tailwind** - Use the spacing scale
+6. **Never forget dark mode** - Always implement both themes
+7. **Never use alert()** - Use proper modal dialogs
+8. **Never use console.log in production** - Remove debug logs
+
+---
+
+## 📚 Reference Files
+
+When creating new components, reference these existing files for patterns:
+
+- **Page Layout:** `src/pages/Dashboard.tsx`, `src/pages/Products.tsx`
+- **Modals:** `src/components/modals/InvoiceWizardModal.tsx`
+- **UI Components:** `src/components/ui/button.tsx`, `src/components/ui/card.tsx`
+- **Theme Usage:** `src/contexts/ThemeContext.tsx`
+- **Layout:** `src/components/AdminLayout.tsx`
+
+---
+
+## 🆘 Getting Help
+
+If instructions are unclear or you need more context:
+1. Ask for clarification in English
+2. Reference similar existing components
+3. Follow the established patterns strictly
+4. When in doubt, prioritize user experience and visual consistency
+
+---
+
+## 🤖 AUTO-UPDATE AI ASSISTANT (MANDATORY)
+
+**CRITICAL INSTRUCTION:** When creating or modifying ANY section/feature in the system, you MUST update the `AIAssistant.tsx` component to ensure the AI can analyze and respond to queries about that section. This is a **NON-NEGOTIABLE** requirement.
+
+### When to Update AIAssistant:
+1. **New Page/Section Created** - Add data import and mapping
+2. **New Data Type Added to mockData.ts** - Import and include in systemData
+3. **Existing Section Enhanced** - Update the data mapping to include new fields
+4. **New Feature with Queryable Data** - Ensure AI can access and analyze it
+
+### Step-by-Step Update Process:
+
+#### Step 1: Import the Data
+Add the new mock data import at the top of `AIAssistant.tsx`:
+```tsx
+import { 
+  mockProducts, 
+  mockCustomers,
+  // ... existing imports
+  mockNewFeature  // ← Add new data import
+} from '../data/mockData';
+```
+
+#### Step 2: Add to systemData Object
+In the `handleSendMessage` function, add the new data to the `systemData` object with ALL relevant fields:
+```tsx
+const systemData = {
+  // ... existing data
+  newFeature: mockNewFeature.map(item => ({
+    id: item.id,
+    name: item.name,
+    // Include ALL fields that might be useful for AI analysis
+    // Include calculated fields, status, dates, amounts, relationships
+    status: item.status,
+    createdAt: item.createdAt,
+    // etc.
+  })),
+};
+```
+
+#### Step 3: Update Welcome Message (Optional but Recommended)
+If the new section is significant, add it to the welcome message capabilities list:
+```tsx
+content: `Ayubowan! 🙏 Welcome to ECOTEC AI Assistant!
+
+🔥 **Real-Time Data Access Enabled!**
+I can analyze your **actual system data** including:
+• 📦 Products, Stock & Inventory
+• 👥 Customers & Credit Balances
+• 📄 Invoices & Sales Data
+// ... existing items
+• 🆕 New Feature Data  // ← Add new section
+
+**Try asking:**
+// ... existing examples
+• "New feature query example?"  // ← Add example query
+`
+```
+
+#### Step 4: Update geminiService.ts (If Needed)
+If the new section requires special query detection, update `isDataQuery()` method in `geminiService.ts`:
+```tsx
+isDataQuery(message: string): boolean {
+  const dataKeywords = [
+    // ... existing keywords
+    'newfeature', 'new feature', // ← Add keywords
+  ];
+  // ...
+}
+```
+
+### Data Mapping Guidelines:
+
+**INCLUDE in systemData:**
+- ✅ All ID fields (for specific lookups)
+- ✅ All name/title fields (for search)
+- ✅ All status fields (for filtering)
+- ✅ All date fields (for time-based queries)
+- ✅ All amount/price fields (for financial analysis)
+- ✅ All relationship fields (customerId, supplierId, etc.)
+- ✅ Nested items arrays (invoice items, GRN items, etc.)
+- ✅ Calculated totals and balances
+
+**Field Mapping Example:**
+```tsx
+// For a new "Quotations" section:
+quotations: mockQuotations.map(q => ({
+  id: q.id,
+  quotationNumber: q.quotationNumber,
+  customerId: q.customerId,
+  customerName: q.customerName,
+  customerPhone: q.customerPhone,
+  subtotal: q.subtotal,
+  discount: q.discount,
+  tax: q.tax,
+  total: q.total,
+  validUntil: q.validUntil,
+  status: q.status, // 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired'
+  createdAt: q.createdAt,
+  notes: q.notes,
+  items: q.items?.map(item => ({
+    productId: item.productId,
+    productName: item.productName,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    total: item.total
+  }))
+})),
+```
+
+### Common Query Patterns AI Should Handle:
+After updating, the AI should be able to answer queries like:
+- "Show me [section] with status [status]"
+- "How many [items] today/this week/this month?"
+- "What's the total [amount] for [section]?"
+- "[Section] eke details denna" (Singlish)
+- "List all [items] for customer [name]"
+- "Pending [section] monawada?" (Singlish)
+
+### Verification Checklist:
+After updating AIAssistant, verify:
+- [ ] Data is imported correctly
+- [ ] All useful fields are mapped in systemData
+- [ ] Nested items/arrays are included
+- [ ] Welcome message updated (if significant feature)
+- [ ] Test by asking AI about the new section
+- [ ] AI can filter, search, and analyze the new data
+
+### Example Complete Update:
+When adding an "Estimates" section:
+
+1. **mockData.ts** - Create mock data with full structure
+2. **AIAssistant.tsx** - Import and map in systemData:
+```tsx
+estimates: mockEstimates.map(e => ({
+  id: e.id,
+  estimateNumber: e.estimateNumber,
+  customerId: e.customerId,
+  customerName: e.customerName,
+  status: e.status,
+  subtotal: e.subtotal,
+  total: e.total,
+  validUntil: e.validUntil,
+  createdAt: e.createdAt,
+  items: e.items?.map(i => ({...}))
+})),
+```
+3. **Welcome Message** - Add: `• 📝 Estimates & Quotations`
+4. **Example Query** - Add: `• "Pending estimates monawada?"`
+
+---
+
+**Remember:** You are building a **premium, world-class** computer shop management system. Every component should look professional, modern, and polished. Think like a senior software engineer at a top tech company!
+
+---
+
+## 🔧 Recent Changes & Implementation Details
+
+### 📡 Backend API (Express + Prisma)
+
+#### Invoice API Enhancements
+- **Reminder Count in Response**: Invoice queries now include `_count: { select: { reminders: true } }` to return reminder counts
+- **Due Date Update**: The `PUT/PATCH` endpoint for invoices now properly updates the `dueDate` field
+- **Invoice Lookup**: API supports lookup by both UUID and invoice number (with or without `INV-` prefix)
+
+#### Invoice Reminders API (`/api/v1/invoices/:invoiceId/reminders`)
+- **GET**: Fetch all reminders for an invoice (supports both ID and invoice number)
+- **POST**: Create a new reminder with type, channel, message, customerPhone, customerName
+- Returns updated reminder count after creation
+
+### 🖥️ Frontend Changes
+
+#### Invoice Interface Updates (`src/data/mockData.ts`)
+```typescript
+export interface Invoice {
+  // ... existing fields
+  apiId?: string; // Actual database UUID for API operations
+  reminderCount?: number; // Total reminders sent from database
+  customer?: Customer; // Customer object from API
+}
+```
+
+#### Invoice Service (`src/services/invoiceService.ts`)
+- `APIInvoice` interface includes `reminderCount?: number`
+- `convertAPIInvoiceToFrontend` maps:
+  - `apiId: apiInvoice.id` - Store actual database UUID
+  - `reminderCount: apiInvoice.reminderCount || 0`
+  - `customer: apiInvoice.customer`
+
+#### Invoices Page (`src/pages/Invoices.tsx`)
+1. **WhatsApp Reminder Integration**:
+   - Uses `whatsAppSettings` from context instead of mock data
+   - Reminder buttons conditionally hidden based on `whatsAppSettings.enabled`
+   - Supports both card view and table view
+
+2. **Card Design (Payment/Status Section)**:
+   - Removed fixed `min-h-[88px]` to eliminate empty space when reminders disabled
+   - When reminders disabled: Shows "Record Payment" button + status indicator
+   - When reminders enabled: Shows reminder buttons with count badges
+
+3. **Data Loading**:
+   - Loads customers in parallel with invoices for phone number lookup
+   - Uses `loadCustomers`, `cachedCustomers` from DataCacheContext
+   - Syncs both local state and context cache on updates
+
+4. **Reminder Tracking**:
+   - Reminder count loaded from database on page refresh
+   - Updates local state after sending reminder
+   - Shows reminder history modal with API data
+
+#### ViewInvoice Page (`src/pages/ViewInvoice.tsx`)
+- Uses `useWhatsAppSettings()` context instead of mock data
+- Uses `useDataCache()` for customer data
+- Conditional WhatsApp reminder button based on settings
+
+### 🗄️ Database Schema (Prisma)
+
+#### InvoiceReminder Model
+```prisma
+model InvoiceReminder {
+  id            String   @id @default(uuid())
+  invoiceId     String
+  shopId        String
+  type          String   // 'PAYMENT' | 'OVERDUE'
+  channel       String   @default("whatsapp")
+  sentAt        DateTime @default(now())
+  message       String?
+  customerPhone String?
+  customerName  String?
+  createdAt     DateTime @default(now())
+  
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id])
+  shop          Shop     @relation(fields: [shopId], references: [id])
+}
+```
+
+### 🚀 Running the Project
+
+#### Backend (Port 3001)
+```bash
+cd backend
+npm install
+npm run prisma:generate
+npx tsx watch src/index.ts
+```
+
+#### Frontend (Port 5173)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+#### Build Commands
+```bash
+# Frontend
+cd frontend && npm run build
+
+# Backend
+cd backend && npm run build
+```
+
+### 📝 Key Implementation Notes
+
+1. **Reminder Button Visibility**: Always check `whatsAppSettings.enabled` before showing reminder buttons
+2. **Invoice ID vs API ID**: Use `invoice.apiId` for API calls, `invoice.id` for display (invoice number)
+3. **Cache Syncing**: Always update both local state and context cache after modifications
+4. **Customer Phone Lookup**: Check both cached customers and invoice's embedded customer data
+5. **Reminder Service API URL**: The `reminderService.ts` strips `/api/v1` suffix from `VITE_API_URL` since endpoints include the full path
+6. **Invoice Customer Type**: The `Invoice.customer` is a minimal embedded type `{ id, name, email?, phone }`, not the full `Customer` interface
+
+---
+
+## 🔒 Backend Security Standards (MANDATORY)
+
+**CRITICAL:** When creating ANY new backend routes, controllers, or API endpoints, you MUST follow these security standards based on **OWASP API Security Top 10 (2023)**, **NIST SP 800-53**, and **CIS Benchmarks**.
+
+### 🛡️ Security Checklist for New Backend Features
+
+Before submitting any backend code, ensure ALL items are checked:
+
+- [ ] **Authentication** - Route uses `protect` middleware
+- [ ] **Shop Isolation** - Route uses `requireShop` middleware for multi-tenant data
+- [ ] **Authorization** - Route uses `authorize('ADMIN')` for sensitive operations
+- [ ] **Rate Limiting** - Appropriate rate limiter applied
+- [ ] **Input Validation** - All inputs validated with express-validator
+- [ ] **Input Sanitization** - Request body sanitized (automatic via global middleware)
+- [ ] **BOLA Prevention** - Entity ownership verified before access
+- [ ] **No Hardcoded Secrets** - Use `src/config/security.ts` for all secrets
+
+---
+
+### 📁 Backend Security Architecture
+
+```
+backend/src/
+├── config/
+│   └── security.ts          # 🔐 Centralized security config (JWT, CORS, passwords)
+├── middleware/
+│   ├── auth.ts              # 🔒 protect, requireShop, authorize, requireShopAccess
+│   ├── rateLimiter.ts       # ⏱️ Rate limiting (auth, API, sensitive, shop registration)
+│   ├── validation.ts        # ✅ Input validation & sanitization
+│   └── errorHandler.ts      # 🚨 Secure error responses
+├── types/
+│   └── express.d.ts         # 📝 TypeScript type definitions for Express
+└── routes/
+    └── *.routes.ts          # Apply middleware in correct order
+```
+
+---
+
+### 🔐 1. Authentication & Authorization Middleware
+
+**ALWAYS import from `src/middleware/auth.ts`:**
+
+```typescript
+import { protect, requireShop, authorize, requireShopAccess } from '../middleware/auth';
+import type { AuthRequest } from '../middleware/auth';
+```
+
+#### Middleware Usage:
+
+| Middleware | Purpose | When to Use |
+|------------|---------|-------------|
+| `protect` | Validates JWT token | ALL authenticated routes |
+| `requireShop` | Ensures user has a shopId | Routes accessing shop-specific data |
+| `authorize('ADMIN')` | Role-based access | Admin-only operations |
+| `authorize('ADMIN', 'MANAGER')` | Multiple roles | Manager+ operations |
+| `requireShopAccess` | Validates shop ownership | Routes with `:id` param for shops |
+
+#### Route Pattern Examples:
+
+```typescript
+// ✅ CORRECT: Full protection chain
+router.get('/', protect, requireShop, getAllItems);
+router.post('/', protect, requireShop, validateItem, createItem);
+router.put('/:id', protect, requireShop, authorize('ADMIN'), updateItem);
+router.delete('/:id', protect, requireShop, authorize('ADMIN'), deleteItem);
+
+// ❌ WRONG: Missing protection
+router.get('/', getAllItems);  // NO! Anyone can access
+router.post('/', createItem);  // NO! No auth, no validation
+```
+
+---
+
+### ⏱️ 2. Rate Limiting
+
+**ALWAYS import from `src/middleware/rateLimiter.ts`:**
+
+```typescript
+import { 
+  authRateLimiter,           // Auth endpoints (10 req/15min)
+  loginRateLimiter,          // Login only (5 failures/hour per IP+email)
+  apiRateLimiter,            // General API (100 req/min) - Applied globally
+  sensitiveRateLimiter,      // Sensitive ops (20 req/15min)
+  shopRegistrationRateLimiter // Shop creation (3/day)
+} from '../middleware/rateLimiter';
+```
+
+#### When to Apply Rate Limiters:
+
+| Rate Limiter | Apply To |
+|--------------|----------|
+| `authRateLimiter` | `/auth/register`, `/auth/login`, `/auth/refresh` |
+| `loginRateLimiter` | `/auth/login` (stacks with authRateLimiter) |
+| `sensitiveRateLimiter` | Password change, user creation, invoice creation, updates |
+| `shopRegistrationRateLimiter` | `/shops/register` |
+| `apiRateLimiter` | Applied globally in `index.ts` - no need to add manually |
+
+#### Example:
+
+```typescript
+// Auth routes
+router.post('/login', authRateLimiter, loginRateLimiter, loginValidation, login);
+router.post('/register', authRateLimiter, registerValidation, register);
+
+// Sensitive operations
+router.post('/', protect, requireShop, sensitiveRateLimiter, validateItem, createItem);
+router.put('/password', protect, sensitiveRateLimiter, changePassword);
+```
+
+---
+
+### ✅ 3. Input Validation
+
+**ALWAYS import from `src/middleware/validation.ts`:**
+
+```typescript
+import { 
+  validateCustomer,
+  validateProduct,
+  validateShopRegistration,
+  handleValidationErrors,
+  validateUUID,
+  validateEmail,
+  validatePhone,
+  validateCurrency,
+  validateDate,
+  validatePagination,
+  validateSearch,
+  sanitizeRequestBody,  // Applied globally
+} from '../middleware/validation';
+```
+
+#### Creating New Validators:
+
+```typescript
+// Example: New "Warranty" validator
+export const validateWarranty = [
+  body('productId')
+    .notEmpty()
+    .withMessage('Product ID is required')
+    .isUUID(4)
+    .withMessage('Product ID must be a valid UUID'),
+  
+  body('customerId')
+    .notEmpty()
+    .withMessage('Customer ID is required'),
+  
+  body('warrantyPeriod')
+    .isInt({ min: 1, max: 120 })
+    .withMessage('Warranty period must be 1-120 months'),
+  
+  body('purchaseDate')
+    .isISO8601()
+    .withMessage('Purchase date must be a valid date'),
+  
+  body('notes')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Notes must not exceed 500 characters'),
+  
+  handleValidationErrors,  // ALWAYS add this last!
+];
+```
+
+#### Using Validators in Routes:
+
+```typescript
+// With validation array middleware, add explicit types
+router.post('/', validateWarranty, async (req: Request, res: Response, next: NextFunction) => {
+  // req.body is now validated and safe
+});
+```
+
+---
+
+### 🏪 4. Multi-Tenant Shop Isolation (BOLA Prevention)
+
+**CRITICAL:** Every database query MUST filter by `shopId` to prevent **Broken Object Level Authorization (BOLA)**.
+
+#### Pattern for GET (List) Operations:
+
+```typescript
+router.get('/', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+    
+    if (!shopId) {
+      return res.status(403).json({ success: false, message: 'Shop access required' });
+    }
+
+    // ✅ CORRECT: Filter by shopId
+    const items = await prisma.item.findMany({
+      where: { shopId },  // <-- MANDATORY
+      orderBy: { createdAt: 'desc' },
+    });
+    
+    res.json({ success: true, data: items });
+  } catch (error) {
+    next(error);
+  }
+});
+```
+
+#### Pattern for GET (Single) Operations:
+
+```typescript
+router.get('/:id', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+
+    const item = await prisma.item.findUnique({
+      where: { id: req.params.id },
+    });
+    
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not found' });
+    }
+    
+    // ✅ CRITICAL: Verify ownership BEFORE returning data
+    if (item.shopId !== shopId) {
+      return res.status(403).json({ success: false, message: 'Item does not belong to your shop' });
+    }
+    
+    res.json({ success: true, data: item });
+  } catch (error) {
+    next(error);
+  }
+});
+```
+
+#### Pattern for CREATE Operations:
+
+```typescript
+router.post('/', validateItem, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+    
+    if (!shopId) {
+      return res.status(403).json({ success: false, message: 'Shop access required' });
+    }
+
+    // ✅ CRITICAL: Prevent shopId override from request body
+    const { shopId: _, ...safeData } = req.body;
+
+    const item = await prisma.item.create({
+      data: {
+        ...safeData,
+        shopId,  // <-- ALWAYS use authenticated user's shopId
+      },
+    });
+    
+    res.status(201).json({ success: true, data: item });
+  } catch (error) {
+    next(error);
+  }
+});
+```
+
+#### Pattern for UPDATE Operations:
+
+```typescript
+router.put('/:id', validateItem, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+
+    // Step 1: Fetch existing record
+    const existing = await prisma.item.findUnique({
+      where: { id: req.params.id },
+    });
+    
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Item not found' });
+    }
+    
+    // Step 2: ✅ VERIFY OWNERSHIP before update
+    if (existing.shopId !== shopId) {
+      return res.status(403).json({ success: false, message: 'Item does not belong to your shop' });
+    }
+
+    // Step 3: Prevent shopId tampering
+    const { shopId: _, ...safeData } = req.body;
+
+    const item = await prisma.item.update({
+      where: { id: req.params.id },
+      data: safeData,  // Don't allow shopId change
+    });
+    
+    res.json({ success: true, data: item });
+  } catch (error) {
+    next(error);
+  }
+});
+```
+
+#### Pattern for DELETE Operations:
+
+```typescript
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+
+    const existing = await prisma.item.findUnique({
+      where: { id: req.params.id },
+    });
+    
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Item not found' });
+    }
+    
+    // ✅ VERIFY OWNERSHIP before delete
+    if (existing.shopId !== shopId) {
+      return res.status(403).json({ success: false, message: 'Item does not belong to your shop' });
+    }
+
+    await prisma.item.delete({
+      where: { id: req.params.id },
+    });
+    
+    res.json({ success: true, message: 'Item deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+```
+
+---
+
+### 🔑 5. Secure Configuration (No Hardcoded Secrets!)
+
+**NEVER hardcode secrets. ALWAYS use `src/config/security.ts`:**
+
+```typescript
+import { jwtConfig, passwordConfig, corsConfig } from '../config/security';
+
+// ✅ CORRECT: Use secure config
+const token = jwt.sign(payload, jwtConfig.secret, { expiresIn: jwtConfig.accessTokenExpiry });
+const salt = await bcrypt.genSalt(passwordConfig.bcryptRounds);
+
+// ❌ WRONG: Hardcoded fallback
+const JWT_SECRET = process.env.JWT_SECRET || 'some-secret';  // NO!
+```
+
+#### Available Security Configs:
+
+```typescript
+// JWT Configuration
+jwtConfig.secret              // Access token secret
+jwtConfig.refreshSecret       // Refresh token secret
+jwtConfig.accessTokenExpiry   // '15m'
+jwtConfig.refreshTokenExpiry  // '7d'
+jwtConfig.cookieName          // 'refreshToken'
+jwtConfig.getCookieOptions()  // HttpOnly, Secure, SameSite options
+
+// Password Configuration
+passwordConfig.minLength      // 8
+passwordConfig.maxLength      // 128
+passwordConfig.bcryptRounds   // 12
+passwordConfig.validate(pwd)  // Returns { valid: boolean, errors: string[] }
+
+// CORS Configuration
+corsConfig.getAllowedOrigins()
+corsConfig.validateOrigin(origin, callback)
+```
+
+---
+
+### 📝 6. Complete Route File Template
+
+Use this template when creating new route files:
+
+```typescript
+/**
+ * [Entity] Routes
+ * CRUD operations for [Entity] with full security
+ */
+
+import { Router, Request, Response, NextFunction } from 'express';
+import { prisma } from '../lib/prisma';
+import { protect, requireShop, authorize } from '../middleware/auth';
+import type { AuthRequest } from '../middleware/auth';
+import { sensitiveRateLimiter } from '../middleware/rateLimiter';
+// Import your validator from validation.ts
+
+const router = Router();
+
+// 🔒 Apply authentication to ALL routes
+router.use(protect, requireShop);
+
+// GET all (filtered by shop)
+router.get('/', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+    
+    if (!shopId) {
+      return res.status(403).json({ success: false, message: 'Shop access required' });
+    }
+
+    const items = await prisma.entity.findMany({
+      where: { shopId },
+      orderBy: { createdAt: 'desc' },
+    });
+    
+    res.json({ success: true, data: items });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET by ID (with ownership check)
+router.get('/:id', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+
+    const item = await prisma.entity.findUnique({
+      where: { id: req.params.id },
+    });
+    
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+    
+    if (item.shopId !== shopId) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    res.json({ success: true, data: item });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST create (with validation & rate limiting)
+router.post('/', sensitiveRateLimiter, /* validateEntity, */ async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+    
+    if (!shopId) {
+      return res.status(403).json({ success: false, message: 'Shop access required' });
+    }
+
+    const { shopId: _, ...safeData } = req.body;
+
+    const item = await prisma.entity.create({
+      data: { ...safeData, shopId },
+    });
+    
+    res.status(201).json({ success: true, data: item });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT update (admin only, with validation)
+router.put('/:id', authorize('ADMIN'), /* validateEntity, */ async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+
+    const existing = await prisma.entity.findUnique({
+      where: { id: req.params.id },
+    });
+    
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+    
+    if (existing.shopId !== shopId) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { shopId: _, ...safeData } = req.body;
+
+    const item = await prisma.entity.update({
+      where: { id: req.params.id },
+      data: safeData,
+    });
+    
+    res.json({ success: true, data: item });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE (admin only)
+router.delete('/:id', authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = authReq.user?.shopId;
+
+    const existing = await prisma.entity.findUnique({
+      where: { id: req.params.id },
+    });
+    
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+    
+    if (existing.shopId !== shopId) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    await prisma.entity.delete({
+      where: { id: req.params.id },
+    });
+    
+    res.json({ success: true, message: 'Deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;
+```
+
+---
+
+### 🚫 Backend Security Anti-Patterns (NEVER DO THESE!)
+
+```typescript
+// ❌ NEVER: Route without authentication
+router.get('/items', getAllItems);
+
+// ❌ NEVER: Missing shopId filter (data leak!)
+const items = await prisma.item.findMany(); // Exposes ALL shops' data!
+
+// ❌ NEVER: Trust shopId from request body
+const item = await prisma.item.create({
+  data: { ...req.body }  // Attacker can set any shopId!
+});
+
+// ❌ NEVER: Update without ownership check
+const item = await prisma.item.update({
+  where: { id: req.params.id },  // Any user can update any item!
+  data: req.body
+});
+
+// ❌ NEVER: Hardcoded secrets
+const JWT_SECRET = 'my-secret-key';
+
+// ❌ NEVER: Missing rate limiting on auth
+router.post('/login', login);  // Brute force vulnerable!
+
+// ❌ NEVER: Expose internal errors
+catch (error) {
+  res.status(500).json({ error: error.message, stack: error.stack });
+}
+```
+
+---
+
+### ✅ Backend Security Verification Checklist
+
+When reviewing backend code, verify:
+
+1. **Every route file:**
+   - [ ] Uses `router.use(protect, requireShop)` at the top
+   - [ ] Has explicit types: `async (req: Request, res: Response, next: NextFunction)`
+
+2. **Every database query:**
+   - [ ] Includes `where: { shopId }` for list operations
+   - [ ] Verifies `item.shopId === shopId` before returning/updating/deleting
+
+3. **Every create operation:**
+   - [ ] Destructures to remove shopId: `const { shopId: _, ...safeData } = req.body`
+   - [ ] Uses authenticated user's shopId: `data: { ...safeData, shopId }`
+
+4. **Every sensitive operation:**
+   - [ ] Has appropriate rate limiter
+   - [ ] Has input validation
+   - [ ] Uses `authorize()` for admin-only actions
+
+5. **Error handling:**
+   - [ ] Uses `next(error)` for error propagation
+   - [ ] Never exposes internal error details to client
+
+---
+
+### ⚠️ Critical Implementation Issues & Solutions
+
+**IMPORTANT:** These are critical issues discovered during development. Follow these patterns EXACTLY to avoid runtime errors.
+
+---
+
+#### 🔧 Issue 1: dotenv Loading Order (TypeScript Import Hoisting)
+
+**Problem:** TypeScript hoists all `import` statements to the top of the file, regardless of where they appear in code. This means `dotenv.config()` runs AFTER all imports are resolved, causing security config to read `undefined` environment variables.
+
+**Symptoms:**
+```
+⚠️  WARNING: JWT_SECRET not set. Using development fallback (NOT SECURE)
+⚠️  WARNING: DATABASE_URL not set. Database operations will fail.
+```
+Even when `.env` file exists and is properly configured!
+
+**Root Cause:**
+```typescript
+// ❌ WRONG: This LOOKS correct but doesn't work!
+import dotenv from 'dotenv';
+import { corsConfig } from './config/security'; // This runs BEFORE dotenv.config()!
+
+dotenv.config(); // Too late! security.ts already read undefined env vars
+```
+
+**Solution - Multi-Path .env Loading in `src/index.ts`:**
+```typescript
+import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+
+// Load environment variables FIRST (before any security config)
+// Try multiple paths for tsx/node compatibility
+const envPaths = [
+  path.join(process.cwd(), '.env'),
+  path.join(process.cwd(), 'backend', '.env'),
+  path.resolve(__dirname, '../.env'),
+];
+
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    console.log(`📁 Loading .env from: ${envPath}`);
+    dotenv.config({ path: envPath });
+    break;
+  }
+}
+
+// NOW import security config (after env vars are loaded)
+import { corsConfig } from './config/security';
+```
+
+**Solution - Lazy Evaluation in `src/config/security.ts`:**
+```typescript
+// ❌ WRONG: Evaluated at module load time (before dotenv)
+const isProduction = process.env.NODE_ENV === 'production';
+
+// ✅ CORRECT: Lazy evaluation via getter functions
+const getIsProduction = () => process.env.NODE_ENV === 'production';
+const getIsDevelopment = () => process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+
+// ❌ WRONG: Runs immediately when module loads
+validateSecurityConfig();
+
+// ✅ CORRECT: Lazy validation - runs when config is first accessed
+let validationRun = false;
+const ensureValidated = () => {
+  if (!validationRun) {
+    validationRun = true;
+    validateSecurityConfig();
+  }
+};
+
+// Use in getters:
+export const jwtConfig = {
+  get secret(): string {
+    ensureValidated(); // Triggers validation on first access
+    return process.env.JWT_SECRET || getDevFallback();
+  },
+};
+```
+
+---
+
+#### 🔧 Issue 2: express-rate-limit IPv6 Validation Error
+
+**Problem:** express-rate-limit v7+ requires special handling for IPv6 addresses. Custom `keyGenerator` functions that use `req.ip` directly will fail validation.
+
+**Error Message:**
+```
+Error [ERR_ERL_KEY_GEN_IPV6]: Custom keyGenerator appears to use request IP 
+without calling the ipKeyGenerator helper function.
+```
+
+**Root Cause:**
+```typescript
+// ❌ WRONG: Custom keyGenerator without ipKeyGenerator helper
+import rateLimit from 'express-rate-limit';
+
+const getClientId = (req: Request): string => {
+  return req.ip || req.socket.remoteAddress || 'unknown';
+};
+
+export const authRateLimiter = rateLimit({
+  keyGenerator: getClientId,  // FAILS! IPv6 not handled
+});
+```
+
+**Solution - Use Default keyGenerator:**
+```typescript
+// ✅ CORRECT: Let express-rate-limit handle IP extraction
+import rateLimit from 'express-rate-limit';
+
+export const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, message: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // NO keyGenerator - use default (handles IPv6 correctly)
+});
+
+export const loginRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Too many login attempts' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  // NO keyGenerator - use default
+});
+```
+
+**If Custom Key Required (e.g., email-based):**
+```typescript
+import rateLimit, { Options } from 'express-rate-limit';
+
+// Use the built-in IP key generator as base
+export const emailBasedRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  // For email+IP based limiting, handle in skip/handler instead
+  skip: (req) => {
+    // Custom logic here
+    return false;
+  },
+});
+```
+
+---
+
+#### 🔧 Issue 3: TypeScript Type Conflicts in Express Middleware
+
+**Problem:** Multiple files defining `AuthRequest` or `AuthUser` interfaces cause type conflicts.
+
+**Solution - Unified Types in `src/types/express.d.ts`:**
+```typescript
+import { Request } from 'express';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+  shopId?: string;
+}
+
+export interface AuthRequest extends Request {
+  user?: AuthUser;
+  requestId?: string;
+}
+
+// Augment Express namespace
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthUser;
+      requestId?: string;
+    }
+  }
+}
+```
+
+**Usage in route handlers:**
+```typescript
+import type { AuthRequest } from '../types/express';
+
+router.get('/', async (req, res, next) => {
+  const authReq = req as AuthRequest;
+  const shopId = authReq.user?.shopId;
+  // ...
+});
+```
+
+---
+
+#### 🔧 Issue 4: Working Directory Issues with tsx
+
+**Problem:** When running `npx tsx src/index.ts` from different directories, `process.cwd()` returns different paths, breaking relative file lookups.
+
+**Solution - Multi-Path Resolution:**
+```typescript
+import path from 'path';
+import fs from 'fs';
+
+// Try multiple possible paths
+const envPaths = [
+  path.join(process.cwd(), '.env'),           // If cwd is backend/
+  path.join(process.cwd(), 'backend', '.env'), // If cwd is project root
+  path.resolve(__dirname, '../.env'),          // Relative to source file
+];
+
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    break;
+  }
+}
+```
+
+---
+
+### 📋 Backend Startup Verification
+
+After starting the backend, verify this output:
+
+**✅ Correct Output:**
+```
+📁 Loading .env from: D:\...\backend\.env
+🚀 Server running on http://localhost:3001
+📊 Environment: development
+📡 API available at http://localhost:3001/api/v1
+```
+
+**❌ Incorrect Output (env not loading):**
+```
+⚠️  WARNING: JWT_SECRET not set. Using development fallback (NOT SECURE)
+⚠️  WARNING: DATABASE_URL not set. Database operations will fail.
+🚀 Server running on http://localhost:3001
+```
+
+If you see warnings, the `.env` file is not being loaded. Check:
+1. `.env` file exists in `backend/` folder
+2. `dotenv.config()` runs with correct path BEFORE security imports
+3. Terminal working directory is `backend/` folder

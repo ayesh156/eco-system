@@ -150,6 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             customer: true,
             items: { include: { product: true } },
             payments: { orderBy: { paymentDate: 'desc' } },
+            _count: { select: { reminders: true } },
           },
           orderBy,
           skip: (page - 1) * limit,
@@ -158,9 +159,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         db.invoice.count({ where }),
       ]);
 
+      // Map invoices to include reminderCount at top level
+      const invoicesWithReminderCount = invoices.map((inv: any) => ({
+        ...inv,
+        reminderCount: inv._count?.reminders || 0,
+      }));
+
       return res.status(200).json({
         success: true,
-        data: invoices,
+        data: invoicesWithReminderCount,
         pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       });
     }
@@ -322,7 +329,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
-      const { status, paidAmount, notes, customerName, discount, tax, total, dueAmount, items, subtotal } = body;
+      const { status, paidAmount, notes, customerName, discount, tax, total, dueAmount, items, subtotal, dueDate } = body;
       
       // Calculate subtotal from items if items are provided
       let calculatedSubtotal = subtotal;
@@ -341,6 +348,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (customerName !== undefined) updateData.customerName = customerName;
       if (discount !== undefined) updateData.discount = discount;
       if (tax !== undefined) updateData.tax = tax;
+      if (dueDate !== undefined) updateData.dueDate = new Date(dueDate);
       if (calculatedSubtotal !== undefined) updateData.subtotal = calculatedSubtotal;
       
       // Recalculate total if subtotal, tax or discount changed

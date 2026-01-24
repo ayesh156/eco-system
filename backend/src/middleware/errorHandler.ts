@@ -60,7 +60,6 @@ export const errorHandler = (
     statusCode = 400;
     message = 'Invalid data format. Please check your request data.';
   }
-  }
 
   const response: ErrorResponse = {
     success: false,

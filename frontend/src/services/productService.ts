@@ -3,6 +3,8 @@
  * Handles all product-related API calls to the backend
  */
 
+import { getAccessToken } from './authService';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 // ===================================
@@ -52,6 +54,18 @@ interface APIResponse<T> {
 // Helper Functions
 // ===================================
 
+// Helper to get authorization headers
+const getAuthHeaders = (): Record<string, string> => {
+  const token = getAccessToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 const handleResponse = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Network error' }));
@@ -78,7 +92,9 @@ export const productService = {
 
     const url = `${API_BASE_URL}/products?${queryParams.toString()}`;
     console.log('📝 Fetching products from:', url);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+    });
     const result = await handleResponse<APIResponse<APIProduct[]>>(response);
     
     console.log('✅ Loaded products from API:', result.data.length);
@@ -92,7 +108,9 @@ export const productService = {
    * Get a single product by ID
    */
   async getById(id: string): Promise<APIProduct> {
-    const response = await fetch(`${API_BASE_URL}/products/${id}`);
+    const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+      headers: getAuthHeaders(),
+    });
     const result = await handleResponse<APIResponse<APIProduct>>(response);
     return result.data;
   },

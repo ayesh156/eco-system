@@ -3,6 +3,8 @@
  * Handles all invoice-related API calls to the backend
  */
 
+import { apiClient, getAccessToken } from './authService';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 // ===================================
@@ -60,6 +62,7 @@ export interface APIInvoice {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  reminderCount?: number;
   customer?: {
     id: string;
     name: string;
@@ -158,6 +161,18 @@ interface APIResponse<T> {
 // Helper Functions
 // ===================================
 
+// Helper to get authorization headers
+const getAuthHeaders = (): Record<string, string> => {
+  const token = getAccessToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 const handleResponse = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Network error' }));
@@ -246,7 +261,9 @@ export const invoiceService = {
     if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
     const url = `${API_BASE_URL}/invoices?${queryParams.toString()}`;
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+    });
     const result = await handleResponse<APIResponse<APIInvoice[]>>(response);
     
     return {
@@ -259,7 +276,9 @@ export const invoiceService = {
    * Get a single invoice by ID
    */
   async getById(id: string): Promise<APIInvoice> {
-    const response = await fetch(`${API_BASE_URL}/invoices/${id}`);
+    const response = await fetch(`${API_BASE_URL}/invoices/${id}`, {
+      headers: getAuthHeaders(),
+    });
     const result = await handleResponse<APIResponse<APIInvoice>>(response);
     return result.data;
   },
@@ -271,9 +290,7 @@ export const invoiceService = {
     console.log('📝 Creating invoice with data:', data);
     const response = await fetch(`${API_BASE_URL}/invoices`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     const result = await handleResponse<APIResponse<APIInvoice>>(response);
@@ -288,9 +305,7 @@ export const invoiceService = {
     console.log('📝 Updating invoice with ID:', id, 'Data:', data);
     const response = await fetch(`${API_BASE_URL}/invoices/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     const result = await handleResponse<APIResponse<APIInvoice>>(response);
@@ -303,6 +318,7 @@ export const invoiceService = {
   async delete(id: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/invoices/${id}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
     await handleResponse<APIResponse<null>>(response);
   },
@@ -313,9 +329,7 @@ export const invoiceService = {
   async addPayment(invoiceId: string, data: AddPaymentData): Promise<{ payment: APIInvoicePayment; invoice: APIInvoice }> {
     const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/payments`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     const result = await handleResponse<APIResponse<{ payment: APIInvoicePayment; invoice: APIInvoice }>>(response);
@@ -326,7 +340,9 @@ export const invoiceService = {
    * Get invoice statistics
    */
   async getStats(): Promise<APIInvoiceStats> {
-    const response = await fetch(`${API_BASE_URL}/invoices/stats`);
+    const response = await fetch(`${API_BASE_URL}/invoices/stats`, {
+      headers: getAuthHeaders(),
+    });
     const result = await handleResponse<APIResponse<APIInvoiceStats>>(response);
     return result.data;
   },
@@ -374,6 +390,8 @@ export const convertAPIInvoiceToFrontend = (apiInvoice: APIInvoice): Invoice => 
     lastPaymentDate: apiInvoice.payments?.length 
       ? apiInvoice.payments[0].paymentDate 
       : undefined,
+    reminderCount: apiInvoice.reminderCount || 0,
+    customer: apiInvoice.customer,
   };
 };
 

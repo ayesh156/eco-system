@@ -3,6 +3,8 @@
  * Handles all customer-related API calls to the backend
  */
 
+import { getAccessToken } from './authService';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 // ===================================
@@ -45,6 +47,18 @@ interface APIResponse<T> {
 // Helper Functions
 // ===================================
 
+// Helper to get authorization headers
+const getAuthHeaders = (): Record<string, string> => {
+  const token = getAccessToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 const handleResponse = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Network error' }));
@@ -70,7 +84,9 @@ export const customerService = {
 
     const url = `${API_BASE_URL}/customers?${queryParams.toString()}`;
     console.log('📝 Fetching customers from:', url);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+    });
     const result = await handleResponse<APIResponse<APICustomer[]>>(response);
     
     console.log('✅ Loaded customers from API:', result.data.length);
@@ -84,7 +100,9 @@ export const customerService = {
    * Get a single customer by ID
    */
   async getById(id: string): Promise<APICustomer> {
-    const response = await fetch(`${API_BASE_URL}/customers/${id}`);
+    const response = await fetch(`${API_BASE_URL}/customers/${id}`, {
+      headers: getAuthHeaders(),
+    });
     const result = await handleResponse<APIResponse<APICustomer>>(response);
     return result.data;
   },

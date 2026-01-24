@@ -36,6 +36,7 @@ export const Invoices: React.FC = () => {
     invoices: cachedInvoices, 
     loadInvoices, 
     products: cachedProducts,
+    loadProducts,
     customers: cachedCustomers,
     loadCustomers,
     setInvoices: setCachedInvoices
@@ -146,6 +147,13 @@ export const Invoices: React.FC = () => {
       setProducts(cachedProducts);
     }
   }, [cachedProducts]);
+  
+  // Load products for edit modal when page mounts
+  useEffect(() => {
+    if (cachedProducts.length === 0) {
+      loadProducts();
+    }
+  }, [cachedProducts.length, loadProducts]);
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -360,7 +368,14 @@ export const Invoices: React.FC = () => {
       .replace(/\{\{totalAmount\}\}/g, invoice.total.toLocaleString())
       .replace(/\{\{paidAmount\}\}/g, (invoice.paidAmount || 0).toLocaleString())
       .replace(/\{\{dueAmount\}\}/g, dueAmount.toLocaleString())
-      .replace(/\{\{dueDate\}\}/g, dueDate.toLocaleDateString('en-GB'))
+      .replace(/\{\{dueDate\}\}/g, dueDate.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      }))
       .replace(/\{\{daysOverdue\}\}/g, daysOverdue.toString());
 
     // Format phone number (remove dashes and ensure country code)
@@ -498,7 +513,14 @@ export const Invoices: React.FC = () => {
   const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('en-GB', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   const renderCalendar = (
@@ -945,6 +967,73 @@ export const Invoices: React.FC = () => {
     );
   }
 
+  // Error state - show when API fails
+  if (apiError && invoices.length === 0) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              Invoices
+            </h1>
+            <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              Unable to load invoices
+            </p>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        <div className={`p-6 rounded-2xl border text-center ${
+          theme === 'dark' 
+            ? 'bg-red-500/10 border-red-500/30' 
+            : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex flex-col items-center gap-4">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+              theme === 'dark' ? 'bg-red-500/20' : 'bg-red-100'
+            }`}>
+              <XCircle className={`w-8 h-8 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-semibold mb-2 ${
+                theme === 'dark' ? 'text-red-400' : 'text-red-600'
+              }`}>
+                Failed to Load Invoices
+              </h3>
+              <p className={`text-sm mb-4 ${
+                theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+              }`}>
+                {apiError}
+              </p>
+              {apiError.includes('401') || apiError.includes('token') || apiError.includes('Unauthorized') ? (
+                <div className="space-y-3">
+                  <p className={`text-sm ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                    🔐 You need to login first to access invoices
+                  </p>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:opacity-90 transition-opacity"
+                  >
+                    Go to Login
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fetchInvoices(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:opacity-90 transition-opacity mx-auto"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Try Again
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -954,20 +1043,9 @@ export const Invoices: React.FC = () => {
             <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
               Invoices
             </h1>
-            {/* API Status Badge */}
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-              isUsingAPI
-                ? theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
-                : theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-600'
-            }`}>
-              {isUsingAPI ? '🔗 API' : '📦 Mock Data'}
-            </span>
           </div>
           <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             Manage and track all your invoices
-            {apiError && !isUsingAPI && (
-              <span className="text-amber-500 ml-2 text-sm">• Using offline data</span>
-            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1335,13 +1413,21 @@ export const Invoices: React.FC = () => {
                       <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-slate-800/80' : 'bg-slate-50'}`}>
                         <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Issue</p>
                         <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                          {new Date(invoice.date).toLocaleDateString()}
+                          {new Date(invoice.date).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
                         </p>
                       </div>
                       <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-slate-800/80' : 'bg-slate-50'}`}>
                         <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Due</p>
                         <p className={`text-sm font-medium ${new Date(invoice.dueDate) < new Date() && invoice.status !== 'fullpaid' ? 'text-red-400' : theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                          {new Date(invoice.dueDate).toLocaleDateString()}
+                          {new Date(invoice.dueDate).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
                         </p>
                       </div>
                     </div>
@@ -1431,8 +1517,8 @@ export const Invoices: React.FC = () => {
                         </button>
                       </div>
                       
-                      {/* Payment/Status Section - Always takes same space */}
-                      <div className="min-h-[88px] flex flex-col gap-2">
+                      {/* Payment/Status Section - Dynamic Layout */}
+                      <div className="flex flex-col gap-2">
                         {invoice.status !== 'fullpaid' ? (
                           <>
                             {/* Overdue - Record Payment Button */}
@@ -1459,7 +1545,7 @@ export const Invoices: React.FC = () => {
                                   >
                                     <MessageCircle className="w-4 h-4" />
                                     🚨 Send Urgent Reminder
-                                    {invoice.reminderCount && invoice.reminderCount > 0 && (
+                                    {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
                                       <button 
                                         onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
                                         className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-rose-700 cursor-pointer"
@@ -1484,44 +1570,72 @@ export const Invoices: React.FC = () => {
                                 )}
                               </>
                             ) : (
-                              /* Not Overdue - Friendly Reminder */
+                              /* Not Overdue - Payment Pending */
                               <>
-                                <div className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl ${
-                                  theme === 'dark' 
-                                    ? 'bg-amber-500/10 border border-amber-500/20' 
-                                    : 'bg-amber-50 border border-amber-200'
-                                }`}>
-                                  <Clock className="w-4 h-4 text-amber-500" />
-                                  <span className={`text-sm font-medium ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
-                                    💳 Payment Pending
-                                  </span>
-                                </div>
-                                {/* Only show reminder button if WhatsApp reminders are enabled */}
-                                {whatsAppSettings.enabled && (
-                                  <button 
-                                    onClick={() => sendWhatsAppReminder(invoice)}
-                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-emerald-500/25 relative"
-                                    title="Send Payment Reminder via WhatsApp"
-                                  >
-                                    <MessageCircle className="w-4 h-4" />
-                                    💬 Send Reminder
-                                    {invoice.reminderCount && invoice.reminderCount > 0 && (
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
-                                        className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-green-800 cursor-pointer"
-                                        title={`${invoice.reminderCount} reminders sent - Click to view history`}
-                                      >
-                                        {invoice.reminderCount}
-                                      </button>
-                                    )}
-                                  </button>
+                                {whatsAppSettings.enabled ? (
+                                  /* When reminders enabled - show Pending status + Send Reminder button */
+                                  <>
+                                    <div className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl ${
+                                      theme === 'dark' 
+                                        ? 'bg-amber-500/10 border border-amber-500/20' 
+                                        : 'bg-amber-50 border border-amber-200'
+                                    }`}>
+                                      <Clock className="w-4 h-4 text-amber-500" />
+                                      <span className={`text-sm font-medium ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                                        💳 Payment Pending
+                                      </span>
+                                    </div>
+                                    <button 
+                                      onClick={() => sendWhatsAppReminder(invoice)}
+                                      className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-emerald-500/25 relative"
+                                      title="Send Payment Reminder via WhatsApp"
+                                    >
+                                      <MessageCircle className="w-4 h-4" />
+                                      💬 Send Reminder
+                                      {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
+                                        <button 
+                                          onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
+                                          className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-green-800 cursor-pointer"
+                                          title={`${invoice.reminderCount} reminders sent - Click to view history`}
+                                        >
+                                          {invoice.reminderCount}
+                                        </button>
+                                      )}
+                                    </button>
+                                  </>
+                                ) : (
+                                  /* When reminders disabled - show Record Payment button + Pending status */
+                                  <>
+                                    <button 
+                                      onClick={() => handleOpenPaymentModal(invoice)}
+                                      className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                        theme === 'dark' 
+                                          ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25' 
+                                          : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25'
+                                      }`}
+                                      title="Record Payment"
+                                    >
+                                      <DollarSign className="w-4 h-4" />
+                                      💰 Record Payment
+                                    </button>
+                                    <div className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl ${
+                                      theme === 'dark' 
+                                        ? 'bg-amber-500/10 border border-amber-500/20' 
+                                        : 'bg-amber-50 border border-amber-200'
+                                    }`}>
+                                      <Clock className="w-4 h-4 text-amber-500" />
+                                      <span className={`text-sm font-medium ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                                        💳 Payment Pending
+                                      </span>
+                                    </div>
+                                  </>
                                 )}
                               </>
                             )}
                           </>
                         ) : (
                           /* Full Paid - Thank You Design */
-                          <div className={`flex-1 flex flex-col items-center justify-center gap-2 py-3 rounded-xl ${
+                          <div className={`flex flex-col items-center justify-center gap-2 py-4 rounded-xl ${
                             theme === 'dark' 
                               ? 'bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-cyan-500/10 border border-emerald-500/20' 
                               : 'bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-200'
@@ -1741,7 +1855,14 @@ export const Invoices: React.FC = () => {
                         {invoice.customerName}
                       </td>
                       <td className={`px-6 py-4 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {invoice.date}
+                        {new Date(invoice.date).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true,
+                        })}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border ${getStatusStyle(invoice.status)}`}>
@@ -1808,8 +1929,8 @@ export const Invoices: React.FC = () => {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                          {/* WhatsApp Reminder Button for Table View */}
-                          {needsReminder(invoice) && (
+                          {/* WhatsApp Reminder Button for Table View - Only show if reminders enabled */}
+                          {whatsAppSettings.enabled && needsReminder(invoice) && (
                             <button 
                               onClick={() => sendWhatsAppReminder(invoice)}
                               className={`p-2 rounded-xl transition-colors relative ${
@@ -1820,7 +1941,7 @@ export const Invoices: React.FC = () => {
                               title={isOverdue(invoice) ? 'Send Overdue Reminder via WhatsApp' : 'Send Payment Reminder via WhatsApp'}
                             >
                               <MessageCircle className="w-4 h-4" />
-                              {invoice.reminderCount && invoice.reminderCount > 0 && (
+                              {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
                                   className={`absolute -top-1 -right-1 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center hover:scale-110 cursor-pointer ${

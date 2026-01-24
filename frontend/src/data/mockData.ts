@@ -1815,6 +1815,13 @@ export interface Invoice {
   reminders?: InvoiceReminder[];
   reminderCount?: number; // Total reminders sent
   lastReminderDate?: string; // Last reminder date
+  // Customer object (from API) - minimal customer data embedded in invoice
+  customer?: {
+    id: string;
+    name: string;
+    email?: string;
+    phone: string;
+  };
 }
 
 export interface InvoiceReminder {

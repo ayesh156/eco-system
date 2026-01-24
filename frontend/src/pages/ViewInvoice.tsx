@@ -7,10 +7,12 @@ import { toast } from 'sonner';
 import type { Invoice, InvoicePayment, Customer } from '../data/mockData';
 import PrintableInvoice from '../components/PrintableInvoice';
 import { InvoicePaymentModal } from '../components/modals/InvoicePaymentModal';
+import { InvoiceEditModal } from '../components/modals/InvoiceEditModal';
 import {
   invoiceService,
   convertAPIInvoiceToFrontend,
   denormalizePaymentMethod,
+  denormalizeStatus,
 } from '../services/invoiceService';
 import {
   FileText, ArrowLeft, Printer, Edit3, User, Phone,
@@ -25,13 +27,22 @@ export const ViewInvoice: React.FC = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const { settings: whatsAppSettings } = useWhatsAppSettings();
-  const { customers: cachedCustomers, loadCustomers, products: cachedProducts } = useDataCache();
+  const { 
+    customers: cachedCustomers, 
+    loadCustomers, 
+    products: cachedProducts, 
+    loadProducts,
+    setInvoices: setCachedInvoices
+  } = useDataCache();
   
   const [showActions, setShowActions] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   
   // API states
@@ -83,6 +94,13 @@ export const ViewInvoice: React.FC = () => {
       setCustomers(cachedCustomers);
     }
   }, [cachedCustomers]);
+
+  // Load products when modal opens
+  useEffect(() => {
+    if (showEditModal && cachedProducts.length === 0) {
+      loadProducts();
+    }
+  }, [showEditModal, cachedProducts.length, loadProducts]);
 
   // Find the invoice
   const invoice = useMemo(() => {
@@ -144,7 +162,14 @@ export const ViewInvoice: React.FC = () => {
     } else if (daysRemaining <= 30) {
       return { status: 'expiring', message: `Warranty expires in ${daysRemaining} days`, color: 'amber' };
     } else {
-      return { status: 'active', message: `Warranty valid until ${dueDate.toLocaleDateString('en-GB')}`, color: 'emerald' };
+      return { status: 'active', message: `Warranty valid until ${dueDate.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })}`, color: 'emerald' };
     }
   };
   
@@ -208,7 +233,11 @@ export const ViewInvoice: React.FC = () => {
       .replace(/\{\{totalAmount\}\}/g, invoice.total.toLocaleString())
       .replace(/\{\{paidAmount\}\}/g, (invoice.paidAmount || 0).toLocaleString())
       .replace(/\{\{dueAmount\}\}/g, dueAmount.toLocaleString())
-      .replace(/\{\{dueDate\}\}/g, dueDate.toLocaleDateString('en-GB'))
+      .replace(/\{\{dueDate\}\}/g, dueDate.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }))
       .replace(/\{\{daysOverdue\}\}/g, daysOverdue.toString());
 
     // Format phone number (remove dashes and ensure country code)
@@ -247,6 +276,11 @@ export const ViewInvoice: React.FC = () => {
         // Convert and update local state - this updates the invoice prop for the modal
         const convertedInvoice = convertAPIInvoiceToFrontend(updatedInvoice);
         setInvoices([convertedInvoice]);
+        
+        // Update the cached invoices so Invoices page reflects this change
+        setCachedInvoices(prev => 
+          prev.map(inv => inv.id === convertedInvoice.id || inv.apiId === apiInvoiceId ? convertedInvoice : inv)
+        );
         
         toast.success('Payment recorded successfully', {
           description: `Rs. ${amount.toLocaleString()} payment added to invoice #${invoiceId}.`,
@@ -304,6 +338,63 @@ export const ViewInvoice: React.FC = () => {
 
   // Format currency
   const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-LK')}`;
+
+  // Handle invoice save from edit modal
+  const handleSaveEdit = async (updatedInvoice: Invoice): Promise<void> => {
+    setIsSaving(true);
+    try {
+      // If using API, update via API
+      if (isUsingAPI && apiInvoiceId) {
+        try {
+          const apiUpdatedInvoice = await invoiceService.update(apiInvoiceId, {
+            items: updatedInvoice.items.map(item => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              originalPrice: item.originalPrice || item.unitPrice,
+              total: item.quantity * item.unitPrice,
+              warrantyDueDate: item.warrantyDueDate,
+            })),
+            subtotal: updatedInvoice.subtotal,
+            tax: updatedInvoice.tax,
+            total: updatedInvoice.total,
+            dueDate: updatedInvoice.dueDate || invoice?.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            status: denormalizeStatus(updatedInvoice.status),
+          });
+          
+          const convertedInvoice = convertAPIInvoiceToFrontend(apiUpdatedInvoice);
+          setInvoices([convertedInvoice]);
+          
+          // Update the cached invoices so Invoices page reflects this change
+          setCachedInvoices(prev => 
+            prev.map(inv => inv.id === convertedInvoice.id || inv.apiId === apiInvoiceId ? convertedInvoice : inv)
+          );
+          
+          toast.success('Invoice updated successfully', {
+            description: `Invoice #${updatedInvoice.id} has been updated.`,
+          });
+          setShowEditModal(false);
+          return;
+        } catch (error) {
+          console.error('❌ Failed to update invoice via API:', error);
+          toast.error('Failed to update invoice', {
+            description: error instanceof Error ? error.message : 'Please try again.',
+          });
+          throw error;
+        }
+      }
+      
+      // Local update
+      setInvoices([updatedInvoice]);
+      toast.success('Invoice updated locally', {
+        description: `Invoice #${updatedInvoice.id} has been updated.`,
+      });
+      setShowEditModal(false);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Check if invoice needs reminder
   const needsReminder = invoice && invoice.status !== 'fullpaid';
@@ -415,9 +506,12 @@ export const ViewInvoice: React.FC = () => {
                 </button>
               </div>
               <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Created on {new Date(invoice.date).toLocaleDateString('en-GB', { 
-                  weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' 
-                })}
+                Created on {(() => {
+                  const date = new Date(invoice.date);
+                  const timeStr = date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+                  const dateStr = date.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+                  return `${dateStr} at ${timeStr.toUpperCase()}`;
+                })()}
               </p>
             </div>
           </div>
@@ -445,7 +539,10 @@ export const ViewInvoice: React.FC = () => {
             </button>
 
             <button
-              onClick={() => navigate(`/invoices/${id}/edit`)}
+              onClick={() => {
+                setSelectedInvoice(invoice);
+                setShowEditModal(true);
+              }}
               className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20"
             >
               <Edit3 className="w-4 h-4" />
@@ -576,7 +673,7 @@ export const ViewInvoice: React.FC = () => {
                       }`}>Issue Date</p>
                       <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         {new Date(invoice.date).toLocaleDateString('en-GB', { 
-                          day: '2-digit', month: 'short', year: 'numeric' 
+                          day: '2-digit', month: 'short', year: 'numeric'
                         })}
                       </p>
                     </div>
@@ -585,9 +682,11 @@ export const ViewInvoice: React.FC = () => {
                         theme === 'dark' ? 'text-teal-400' : 'text-teal-600'
                       }`}>Due Date</p>
                       <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                        {new Date(invoice.dueDate).toLocaleDateString('en-GB', { 
-                          day: '2-digit', month: 'short', year: 'numeric' 
-                        })}
+                        {(() => {
+                          const date = new Date(invoice.dueDate);
+                          const timeStr = date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+                          return `${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}, ${timeStr.toUpperCase()}`;
+                        })()}
                       </p>
                     </div>
                   </div>
@@ -1045,9 +1144,11 @@ export const ViewInvoice: React.FC = () => {
                     Invoice Created
                   </p>
                   <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                    {new Date(invoice.date).toLocaleDateString('en-GB', { 
-                      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                    })}
+                    {(() => {
+                      const date = new Date(invoice.date);
+                      const timeStr = date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+                      return `${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}, ${timeStr.toUpperCase()}`;
+                    })()}
                   </p>
                 </div>
               </div>
@@ -1082,7 +1183,11 @@ export const ViewInvoice: React.FC = () => {
                       Partial Payment
                     </p>
                     <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                      Due by {new Date(invoice.dueDate).toLocaleDateString('en-GB')}
+                      Due by {(() => {
+                        const date = new Date(invoice.dueDate);
+                        const timeStr = date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+                        return `${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}, ${timeStr.toUpperCase()}`;
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -1100,7 +1205,11 @@ export const ViewInvoice: React.FC = () => {
                       Payment Pending
                     </p>
                     <p className={`text-xs text-red-400`}>
-                      Due by {new Date(invoice.dueDate).toLocaleDateString('en-GB')}
+                      Due by {(() => {
+                        const date = new Date(invoice.dueDate);
+                        const timeStr = date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+                        return `${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}, ${timeStr.toUpperCase()}`;
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -1177,6 +1286,21 @@ export const ViewInvoice: React.FC = () => {
         onClose={() => setShowPaymentModal(false)}
         invoice={invoice}
         onPayment={handlePayment}
+      />
+
+      {/* Invoice Edit Modal */}
+      <InvoiceEditModal
+        isOpen={showEditModal}
+        invoice={selectedInvoice || invoice}
+        products={cachedProducts}
+        onClose={() => {
+          if (!isSaving) {
+            setShowEditModal(false);
+            setSelectedInvoice(null);
+          }
+        }}
+        onSave={handleSaveEdit}
+        isSaving={isSaving}
       />
     </div>
   );

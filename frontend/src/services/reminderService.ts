@@ -1,6 +1,8 @@
 // Reminder Service - API calls for invoice reminders
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Remove /api/v1 suffix if present since we add it in the endpoints
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
 
 export interface InvoiceReminder {
   id: string;
@@ -27,13 +29,12 @@ export interface CreateReminderRequest {
 export interface ReminderListResponse {
   success: boolean;
   data: InvoiceReminder[];
-  meta: { count: number };
 }
 
 export interface CreateReminderResponse {
   success: boolean;
   data: InvoiceReminder;
-  meta: { reminderCount: number };
+  reminderCount: number;
 }
 
 export const reminderService = {
@@ -41,13 +42,19 @@ export const reminderService = {
    * Get all reminders for an invoice
    */
   async getByInvoice(invoiceId: string): Promise<InvoiceReminder[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/invoices/${invoiceId}/reminders`);
+    const url = `${API_BASE_URL}/api/v1/invoices/${invoiceId}/reminders`;
+    console.log('🔍 Fetching reminders from:', url);
+    
+    const response = await fetch(url);
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch reminders: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Failed to fetch reminders:', response.status, errorData);
+      throw new Error(errorData.error || `Failed to fetch reminders: ${response.statusText}`);
     }
     
     const data: ReminderListResponse = await response.json();
+    console.log('✅ Reminders loaded:', data);
     
     if (!data.success) {
       throw new Error('Failed to fetch reminders');
@@ -81,7 +88,7 @@ export const reminderService = {
     
     return {
       reminder: data.data,
-      reminderCount: data.meta.reminderCount,
+      reminderCount: data.reminderCount,
     };
   },
 };

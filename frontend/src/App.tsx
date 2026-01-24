@@ -5,13 +5,17 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { AuthProvider, ProtectedRoute } from './contexts/AuthContext';
 import { WhatsAppSettingsProvider } from './contexts/WhatsAppSettingsContext';
 import { DataCacheProvider } from './contexts/DataCacheContext';
 import { AdminLayout } from './components/AdminLayout';
 import { Toaster } from 'sonner';
 
-// Eager load Dashboard (landing page)
+// Eager load Dashboard (landing page) and Auth pages
 import { Dashboard } from './pages/Dashboard';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+import { ShopSetup } from './pages/ShopSetup';
 
 // Lazy load all other pages
 const Invoices = lazy(() => import('./pages/Invoices').then(m => ({ default: m.Invoices })));
@@ -73,69 +77,86 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <WhatsAppSettingsProvider>
-            <DataCacheProvider>
-              <ThemedToaster />
-              <BrowserRouter
-                future={{
-                  v7_startTransition: true,
-                  v7_relativeSplatPath: true
-                }}
-              >
-                <AdminLayout>
-                  <Suspense fallback={
-                    <div className="flex items-center justify-center h-screen">
-                      <div className="text-emerald-500">Loading...</div>
-                    </div>
-                  }>
-                    <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/invoices" element={<Invoices />} />
-                  <Route path="/invoices/create" element={<CreateInvoice />} />
-                  <Route path="/invoices/:id" element={<ViewInvoice />} />
-                  <Route path="/products" element={<Products />} />
-                  <Route path="/products/add" element={<ProductForm />} />
-                  <Route path="/products/edit/:id" element={<ProductForm />} />
-                  <Route path="/products/labels" element={<ProductLabels />} />
-                  <Route path="/categories" element={<Categories />} />
-                  <Route path="/brands" element={<Brands />} />
-                  <Route path="/customers" element={<Customers />} />
-                  <Route path="/suppliers" element={<Suppliers />} />
-                  <Route path="/grn" element={<GoodsReceived />} />
-                  <Route path="/grn/create" element={<CreateGRN />} />
-                  <Route path="/warranties" element={<Warranties />} />
-                  <Route path="/estimates" element={<Estimates />} />
-                  <Route path="/estimates/create" element={<EstimateForm />} />
-                  <Route path="/estimates/edit/:id" element={<EstimateForm />} />
-                  <Route path="/quotations" element={<Quotations />} />
-                  <Route path="/quotations/create" element={<QuotationForm />} />
-                  <Route path="/quotations/edit/:id" element={<QuotationForm />} />
-                  <Route path="/services" element={<Services />} />
-                  <Route path="/services/add" element={<ServiceForm />} />
-                  <Route path="/services/edit/:id" element={<ServiceForm />} />
-                  <Route path="/service-categories" element={<ServiceCategories />} />
-                  <Route path="/job-notes" element={<JobNotes />} />
-                  <Route path="/job-notes/create" element={<JobNoteForm />} />
-                  <Route path="/job-notes/edit/:id" element={<JobNoteForm />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/cash-management" element={<CashManagement />} />
-                  <Route path="/cash-management/transactions" element={<CashManagement />} />
-                  <Route path="/cash-management/insights" element={<CashManagement />} />
-                  <Route path="/cash-management/accounts" element={<CashManagement />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/help" element={<Help />} />
-                  <Route path="/ai-chat" element={<AIChat />} />
-                  <Route path="/notes" element={<Notes />} />
-                  <Route path="/calendar" element={<Calendar />} />
-                  <Route path="/data-export" element={<DataExport />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-            </AdminLayout>
-          </BrowserRouter>
-            </DataCacheProvider>
-          </WhatsAppSettingsProvider>
+          <AuthProvider>
+            <WhatsAppSettingsProvider>
+              <DataCacheProvider>
+                <ThemedToaster />
+                <BrowserRouter
+                  future={{
+                    v7_startTransition: true,
+                    v7_relativeSplatPath: true
+                  }}
+                >
+                  <Routes>
+                    {/* Public Auth Routes - No Layout */}
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    
+                    {/* Shop Setup Route - Protected but no AdminLayout */}
+                    <Route path="/shop-setup" element={<ShopSetup />} />
+                    
+                    {/* Protected Routes - With Admin Layout */}
+                    <Route path="/*" element={
+                      <ProtectedRoute>
+                        <AdminLayout>
+                          <Suspense fallback={
+                            <div className="flex items-center justify-center h-screen">
+                              <div className="text-emerald-500">Loading...</div>
+                            </div>
+                          }>
+                            <Routes>
+                              <Route path="/" element={<Dashboard />} />
+                              <Route path="/dashboard" element={<Dashboard />} />
+                              <Route path="/invoices" element={<Invoices />} />
+                              <Route path="/invoices/create" element={<CreateInvoice />} />
+                              <Route path="/invoices/:id" element={<ViewInvoice />} />
+                              <Route path="/products" element={<Products />} />
+                              <Route path="/products/add" element={<ProductForm />} />
+                              <Route path="/products/edit/:id" element={<ProductForm />} />
+                              <Route path="/products/labels" element={<ProductLabels />} />
+                              <Route path="/categories" element={<Categories />} />
+                              <Route path="/brands" element={<Brands />} />
+                              <Route path="/customers" element={<Customers />} />
+                              <Route path="/suppliers" element={<Suppliers />} />
+                              <Route path="/grn" element={<GoodsReceived />} />
+                              <Route path="/grn/create" element={<CreateGRN />} />
+                              <Route path="/warranties" element={<Warranties />} />
+                              <Route path="/estimates" element={<Estimates />} />
+                              <Route path="/estimates/create" element={<EstimateForm />} />
+                              <Route path="/estimates/edit/:id" element={<EstimateForm />} />
+                              <Route path="/quotations" element={<Quotations />} />
+                              <Route path="/quotations/create" element={<QuotationForm />} />
+                              <Route path="/quotations/edit/:id" element={<QuotationForm />} />
+                              <Route path="/services" element={<Services />} />
+                              <Route path="/services/add" element={<ServiceForm />} />
+                              <Route path="/services/edit/:id" element={<ServiceForm />} />
+                              <Route path="/service-categories" element={<ServiceCategories />} />
+                              <Route path="/job-notes" element={<JobNotes />} />
+                              <Route path="/job-notes/create" element={<JobNoteForm />} />
+                              <Route path="/job-notes/edit/:id" element={<JobNoteForm />} />
+                              <Route path="/reports" element={<Reports />} />
+                              <Route path="/cash-management" element={<CashManagement />} />
+                              <Route path="/cash-management/transactions" element={<CashManagement />} />
+                              <Route path="/cash-management/insights" element={<CashManagement />} />
+                              <Route path="/cash-management/accounts" element={<CashManagement />} />
+                              <Route path="/settings" element={<Settings />} />
+                              <Route path="/help" element={<Help />} />
+                              <Route path="/ai-chat" element={<AIChat />} />
+                              <Route path="/notes" element={<Notes />} />
+                              <Route path="/calendar" element={<Calendar />} />
+                              <Route path="/data-export" element={<DataExport />} />
+                              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                              <Route path="*" element={<NotFound />} />
+                            </Routes>
+                          </Suspense>
+                        </AdminLayout>
+                      </ProtectedRoute>
+                    } />
+                  </Routes>
+                </BrowserRouter>
+              </DataCacheProvider>
+            </WhatsAppSettingsProvider>
+          </AuthProvider>
         </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>

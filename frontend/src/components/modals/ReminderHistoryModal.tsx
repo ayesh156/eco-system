@@ -42,11 +42,18 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
     setIsLoading(true);
     setError(null);
     try {
+      console.log('🔍 Loading reminders for invoice:', invoiceId);
       const data = await reminderService.getByInvoice(invoiceId);
       setReminders(data);
     } catch (err) {
       console.error('Failed to load reminders:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load reminder history');
+      // Provide more user-friendly error message
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load reminder history';
+      if (errorMessage.includes('Not Found') || errorMessage.includes('Invoice not found')) {
+        setError('No reminder history available for this invoice');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -60,6 +67,7 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      hour12: true,
     });
   };
 

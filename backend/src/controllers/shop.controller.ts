@@ -510,3 +510,141 @@ export const toggleShopStatus = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+// ==========================================
+// CREATE SHOP FOR EXISTING USER (Protected)
+// ==========================================
+
+/**
+ * Create a new shop for an already registered user who doesn't have a shop
+ * This makes the user an ADMIN of the newly created shop
+ */
+export const createShopForUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Get user ID from authenticated request
+    const authReq = req as any;
+    const userId = authReq.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated',
+      });
+    }
+
+    // Check if user exists and doesn't already have a shop
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { shop: true },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    if (existingUser.shopId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User is already associated with a shop',
+      });
+    }
+
+    const {
+      shopName,
+      shopDescription,
+      address,
+      phone,
+      shopEmail,
+      website,
+      businessRegNo,
+      taxId,
+      currency = 'LKR',
+      taxRate = 0,
+    } = req.body;
+
+    // Validate required fields
+    if (!shopName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Shop name is required',
+      });
+    }
+
+    // Generate unique slug for shop
+    let slug = generateSlug(shopName);
+    let slugExists = await prisma.shop.findUnique({ where: { slug } });
+    let counter = 1;
+    while (slugExists) {
+      slug = `${generateSlug(shopName)}-${counter}`;
+      slugExists = await prisma.shop.findUnique({ where: { slug } });
+      counter++;
+    }
+
+    // Check if shop email already exists (if provided)
+    if (shopEmail) {
+      const existingShopEmail = await prisma.shop.findFirst({
+        where: { email: shopEmail },
+      });
+      if (existingShopEmail) {
+        return res.status(400).json({
+          success: false,
+          error: 'A shop with this email already exists',
+        });
+      }
+    }
+
+    // Create shop and update user in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the shop
+      const shop = await tx.shop.create({
+        data: {
+          name: shopName,
+          slug,
+          description: shopDescription,
+          address,
+          phone,
+          email: shopEmail,
+          website,
+          businessRegNo,
+          taxId,
+          currency,
+          taxRate,
+          isActive: true,
+        },
+      });
+
+      // Update the user to be ADMIN of this shop
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          shopId: shop.id,
+          role: 'ADMIN', // Make them admin of their own shop
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          shopId: true,
+        },
+      });
+
+      return { shop, user: updatedUser };
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Shop created successfully! You are now the admin.',
+      data: {
+        shop: result.shop,
+        user: result.user,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

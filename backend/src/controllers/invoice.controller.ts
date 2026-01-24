@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
-import { Prisma, InvoiceStatus, PaymentMethod, SalesChannel } from '@prisma/client';
+import { Prisma, InvoiceStatus, PaymentMethod, SalesChannel, ReminderType } from '@prisma/client';
+// Import centralized type definitions
+import '../types/express.d';
 
 // Helper function to generate invoice number
 const generateInvoiceNumber = async (): Promise<string> => {
@@ -34,13 +36,18 @@ const calculateInvoiceStatus = (total: number, paidAmount: number): InvoiceStatu
 
 // @desc    Get all invoices with filtering and pagination
 // @route   GET /api/v1/invoices
-// @access  Public (will be protected)
+// @access  Private (requires authentication and shop access)
 export const getAllInvoices = async (
-  req: Request,
+  req: Request & { user?: { id: string; shopId: string | null } },
   res: Response,
   next: NextFunction
 ) => {
   try {
+    // 🔒 User must have a shopId
+    if (!req.user?.shopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+
     const {
       page = '1',
       limit = '10',
@@ -53,12 +60,15 @@ export const getAllInvoices = async (
       sortOrder = 'desc',
     } = req.query;
 
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string) || 10)); // Max 100 per page
     const skip = (pageNum - 1) * limitNum;
 
     // Build filter conditions
-    const where: Prisma.InvoiceWhereInput = {};
+    const where: Prisma.InvoiceWhereInput = {
+      // 🔒 CRITICAL: Only show invoices for the user's shop
+      shopId: req.user.shopId,
+    };
 
     if (status && status !== 'all') {
       where.status = status as InvoiceStatus;
@@ -107,6 +117,9 @@ export const getAllInvoices = async (
             }
           },
           payments: true,
+          _count: {
+            select: { reminders: true }
+          },
         },
         orderBy,
         skip,
@@ -115,9 +128,16 @@ export const getAllInvoices = async (
       prisma.invoice.count({ where }),
     ]);
 
+    // Map the response to include reminderCount
+    const mappedInvoices = invoices.map(invoice => ({
+      ...invoice,
+      reminderCount: invoice._count?.reminders || 0,
+      _count: undefined, // Remove the _count object from response
+    }));
+
     res.json({
       success: true,
-      data: invoices,
+      data: mappedInvoices,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -160,6 +180,9 @@ export const getInvoiceById = async (
         updatedBy: {
           select: { id: true, name: true, email: true }
         },
+        _count: {
+          select: { reminders: true }
+        },
       },
     });
 
@@ -188,6 +211,9 @@ export const getInvoiceById = async (
           updatedBy: {
             select: { id: true, name: true, email: true }
           },
+          _count: {
+            select: { reminders: true }
+          },
         },
       });
     }
@@ -196,9 +222,24 @@ export const getInvoiceById = async (
       throw new AppError(`Invoice not found with ID or number: ${id}`, 404);
     }
 
+    // 🔐 SECURITY: Verify invoice belongs to user's shop
+    if (!req.user?.shopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+    if (invoice.shopId !== req.user.shopId) {
+      throw new AppError('You do not have permission to access this invoice', 403);
+    }
+
+    // Map to include reminderCount
+    const mappedInvoice = {
+      ...invoice,
+      reminderCount: invoice._count?.reminders || 0,
+      _count: undefined,
+    };
+
     res.json({
       success: true,
-      data: invoice,
+      data: mappedInvoice,
     });
   } catch (error) {
     next(error);
@@ -238,8 +279,16 @@ export const createInvoice = async (
       throw new AppError(`Customer not found with ID: ${customerId}`, 404);
     }
 
-    // Use customer's shopId if not provided in request
-    const invoiceShopId = shopId || customer.shopId;
+    // 🔐 SECURITY: Verify customer belongs to user's shop
+    if (!req.user?.shopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+    if (customer.shopId !== req.user.shopId) {
+      throw new AppError('Customer does not belong to your shop', 403);
+    }
+
+    // Use customer's shopId (already validated above)
+    const invoiceShopId = customer.shopId;
     if (!invoiceShopId) {
       throw new AppError('Shop ID is required. Customer does not have a shop assigned.', 400);
     }
@@ -435,6 +484,27 @@ export const updateInvoice = async (
       throw new AppError(`Invoice not found with ID or number: ${id}`, 404);
     }
 
+    // 🔐 SECURITY: Verify invoice belongs to user's shop
+    if (!req.user?.shopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+    if (existingInvoice.shopId !== req.user.shopId) {
+      throw new AppError('You do not have permission to modify this invoice', 403);
+    }
+
+    // 🔐 SECURITY: If customer is being changed, verify new customer belongs to user's shop
+    if (customerId && customerId !== existingInvoice.customerId) {
+      const newCustomer = await prisma.customer.findUnique({
+        where: { id: customerId }
+      });
+      if (!newCustomer) {
+        throw new AppError(`Customer not found with ID: ${customerId}`, 404);
+      }
+      if (newCustomer.shopId !== req.user.shopId) {
+        throw new AppError('New customer does not belong to your shop', 403);
+      }
+    }
+
     // Use the actual database ID for updates
     const invoiceId = existingInvoice.id;
 
@@ -577,6 +647,14 @@ export const deleteInvoice = async (
       throw new AppError(`Invoice not found with ID or number: ${id}`, 404);
     }
 
+    // 🔐 SECURITY: Verify invoice belongs to user's shop
+    if (!req.user?.shopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+    if (invoice.shopId !== req.user.shopId) {
+      throw new AppError('You do not have permission to delete this invoice', 403);
+    }
+
     // Use actual database ID
     const invoiceId = invoice.id;
 
@@ -650,6 +728,14 @@ export const addPayment = async (
 
     if (!invoice) {
       throw new AppError(`Invoice not found with ID or number: ${id}`, 404);
+    }
+
+    // 🔐 SECURITY: Verify invoice belongs to user's shop
+    if (!req.user?.shopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+    if (invoice.shopId !== req.user.shopId) {
+      throw new AppError('You do not have permission to add payments to this invoice', 403);
     }
 
     // Use actual database ID
@@ -727,29 +813,37 @@ export const addPayment = async (
 // @route   GET /api/v1/invoices/stats
 // @access  Public (will be protected)
 export const getInvoiceStats = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
+    // 🔐 SECURITY: Filter stats by user's shop
+    if (!req.user?.shopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+    const shopId = req.user.shopId;
+
     const [
       totalInvoices,
       statusCounts,
       revenueStats,
       recentInvoices,
     ] = await Promise.all([
-      // Total invoices count
-      prisma.invoice.count(),
+      // Total invoices count (filtered by shop)
+      prisma.invoice.count({ where: { shopId } }),
       
-      // Count by status
+      // Count by status (filtered by shop)
       prisma.invoice.groupBy({
         by: ['status'],
+        where: { shopId },
         _count: { status: true },
         _sum: { total: true, paidAmount: true, dueAmount: true },
       }),
       
-      // Revenue statistics
+      // Revenue statistics (filtered by shop)
       prisma.invoice.aggregate({
+        where: { shopId },
         _sum: {
           total: true,
           paidAmount: true,
@@ -762,8 +856,9 @@ export const getInvoiceStats = async (
         },
       }),
       
-      // Recent invoices
+      // Recent invoices (filtered by shop)
       prisma.invoice.findMany({
+        where: { shopId },
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -800,6 +895,126 @@ export const getInvoiceStats = async (
         },
         recentInvoices,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+// @desc    Get reminders for an invoice
+// @route   GET /api/v1/invoices/:id/reminders
+// @access  Public (will be protected)
+export const getInvoiceReminders = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    
+    // Try to find invoice by ID first, then by invoice number
+    let invoice = await prisma.invoice.findUnique({
+      where: { id },
+      select: { id: true, shopId: true },
+    });
+
+    // If not found by ID, try by invoice number
+    if (!invoice) {
+      const invoiceNumber = id.startsWith('INV-') ? id : `INV-${id}`;
+      invoice = await prisma.invoice.findFirst({
+        where: { invoiceNumber },
+        select: { id: true, shopId: true },
+      });
+    }
+
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404);
+    }
+
+    // 🔐 SECURITY: Verify invoice belongs to user's shop
+    if (!req.user?.shopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+    if (invoice.shopId !== req.user.shopId) {
+      throw new AppError('You do not have permission to access reminders for this invoice', 403);
+    }
+
+    // Get all reminders for this invoice
+    const reminders = await prisma.invoiceReminder.findMany({
+      where: { invoiceId: invoice.id },
+      orderBy: { sentAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      data: reminders,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create a reminder for an invoice
+// @route   POST /api/v1/invoices/:id/reminders
+// @access  Public (will be protected)
+export const createInvoiceReminder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const { type, channel, message, customerPhone, customerName } = req.body;
+    
+    // Try to find invoice by ID first, then by invoice number
+    let invoice = await prisma.invoice.findUnique({
+      where: { id },
+      select: { id: true, shopId: true },
+    });
+
+    // If not found by ID, try by invoice number
+    if (!invoice) {
+      const invoiceNumber = id.startsWith('INV-') ? id : `INV-${id}`;
+      invoice = await prisma.invoice.findFirst({
+        where: { invoiceNumber },
+        select: { id: true, shopId: true },
+      });
+    }
+
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404);
+    }
+
+    // 🔐 SECURITY: Verify invoice belongs to user's shop
+    if (!req.user?.shopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+    if (invoice.shopId !== req.user.shopId) {
+      throw new AppError('You do not have permission to create reminders for this invoice', 403);
+    }
+
+    // Create the reminder - normalize type to uppercase enum
+    const normalizedType = (type || 'PAYMENT').toUpperCase() as ReminderType;
+    const reminder = await prisma.invoiceReminder.create({
+      data: {
+        invoiceId: invoice.id,
+        shopId: invoice.shopId,
+        type: normalizedType,
+        channel: channel || 'whatsapp',
+        message,
+        customerPhone,
+        customerName,
+      },
+    });
+
+    // Get updated reminder count
+    const reminderCount = await prisma.invoiceReminder.count({
+      where: { invoiceId: invoice.id },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: reminder,
+      reminderCount,
     });
   } catch (error) {
     next(error);
