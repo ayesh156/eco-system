@@ -5,6 +5,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { WhatsAppSettingsProvider } from './contexts/WhatsAppSettingsContext';
+import { DataCacheProvider } from './contexts/DataCacheContext';
 import { AdminLayout } from './components/AdminLayout';
 import { Toaster } from 'sonner';
 
@@ -71,20 +73,22 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <ThemedToaster />
-          <BrowserRouter
-            future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true
-            }}
-          >
-            <AdminLayout>
-              <Suspense fallback={
-                <div className="flex items-center justify-center h-screen">
-                  <div className="text-emerald-500">Loading...</div>
-                </div>
-              }>
-                <Routes>
+          <WhatsAppSettingsProvider>
+            <DataCacheProvider>
+              <ThemedToaster />
+              <BrowserRouter
+                future={{
+                  v7_startTransition: true,
+                  v7_relativeSplatPath: true
+                }}
+              >
+                <AdminLayout>
+                  <Suspense fallback={
+                    <div className="flex items-center justify-center h-screen">
+                      <div className="text-emerald-500">Loading...</div>
+                    </div>
+                  }>
+                    <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/invoices" element={<Invoices />} />
                   <Route path="/invoices/create" element={<CreateInvoice />} />
@@ -130,6 +134,8 @@ function App() {
               </Suspense>
             </AdminLayout>
           </BrowserRouter>
+            </DataCacheProvider>
+          </WhatsAppSettingsProvider>
         </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>

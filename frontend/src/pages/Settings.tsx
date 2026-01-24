@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
+import { toast } from 'sonner';
 import { 
   Bell, Palette, MessageCircle, Info, Copy, Check, 
   Globe, Moon, Sun, Sparkles,
@@ -7,7 +9,6 @@ import {
   RefreshCw, Eye, EyeOff, CheckCircle2, AlertCircle, Clock,
   Smartphone, Laptop, SendHorizontal, Settings2
 } from 'lucide-react';
-import { mockWhatsAppSettings } from '../data/mockData';
 
 interface ReminderPreview {
   customerName: string;
@@ -21,9 +22,8 @@ interface ReminderPreview {
 
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
-  const [whatsappEnabled, setWhatsappEnabled] = useState(mockWhatsAppSettings.enabled);
-  const [paymentTemplate, setPaymentTemplate] = useState(mockWhatsAppSettings.paymentReminderTemplate);
-  const [overdueTemplate, setOverdueTemplate] = useState(mockWhatsAppSettings.overdueReminderTemplate);
+  const { settings: whatsAppSettings, updateSettings, saveSettings, isLoading: isSavingSettings } = useWhatsAppSettings();
+  
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'whatsapp'>('appearance');
   const [showPreview, setShowPreview] = useState(false);
@@ -77,8 +77,16 @@ export const Settings: React.FC = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Simulate API call for other settings
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setIsSaving(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleWhatsAppSave = async () => {
+    setIsSaving(true);
+    await saveSettings();
     setIsSaving(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
@@ -497,19 +505,19 @@ export const Settings: React.FC = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => setWhatsappEnabled(!whatsappEnabled)}
+                    onClick={() => updateSettings({ enabled: !whatsAppSettings.enabled })}
                     className={`relative w-20 h-10 rounded-full transition-all duration-300 ${
-                      whatsappEnabled 
+                      whatsAppSettings.enabled 
                         ? 'bg-white/30' 
                         : 'bg-black/20'
                     }`}
                   >
                     <div className={`absolute top-1 w-8 h-8 rounded-full transition-all duration-300 flex items-center justify-center ${
-                      whatsappEnabled 
+                      whatsAppSettings.enabled 
                         ? 'translate-x-11 bg-white' 
                         : 'translate-x-1 bg-white/60'
                     }`}>
-                      {whatsappEnabled ? (
+                      {whatsAppSettings.enabled ? (
                         <Check className="w-5 h-5 text-green-600" />
                       ) : (
                         <span className="w-5 h-5" />
@@ -519,7 +527,7 @@ export const Settings: React.FC = () => {
                 </div>
               </div>
 
-              {whatsappEnabled && (
+              {whatsAppSettings.enabled && (
                 <div className="p-6 space-y-6">
                   {/* Placeholders Card */}
                   <div className={`rounded-2xl p-4 ${
@@ -615,8 +623,8 @@ export const Settings: React.FC = () => {
                         </button>
                       </div>
                       <textarea
-                        value={previewType === 'payment' ? paymentTemplate : overdueTemplate}
-                        onChange={(e) => previewType === 'payment' ? setPaymentTemplate(e.target.value) : setOverdueTemplate(e.target.value)}
+                        value={previewType === 'payment' ? whatsAppSettings.paymentReminderTemplate : whatsAppSettings.overdueReminderTemplate}
+                        onChange={(e) => updateSettings(previewType === 'payment' ? { paymentReminderTemplate: e.target.value } : { overdueReminderTemplate: e.target.value })}
                         rows={16}
                         className={`w-full px-4 py-3 rounded-xl border font-mono text-sm leading-relaxed transition-all resize-none ${
                           theme === 'dark' 
@@ -662,7 +670,7 @@ export const Settings: React.FC = () => {
                           {/* Message Bubble */}
                           <div className="max-w-[85%] ml-auto">
                             <div className="bg-[#005C4B] rounded-xl rounded-tr-sm px-3 py-2 text-white text-sm whitespace-pre-wrap leading-relaxed">
-                              {generatePreview(previewType === 'payment' ? paymentTemplate : overdueTemplate)}
+                              {generatePreview(previewType === 'payment' ? whatsAppSettings.paymentReminderTemplate : whatsAppSettings.overdueReminderTemplate)}
                               <div className="flex items-center justify-end gap-1 mt-1">
                                 <span className="text-[10px] text-green-200/70">
                                   {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
@@ -689,7 +697,7 @@ export const Settings: React.FC = () => {
                   {/* Save Button */}
                   <div className="flex justify-end pt-4">
                     <button
-                      onClick={handleSave}
+                      onClick={handleWhatsAppSave}
                       disabled={isSaving}
                       className={`relative px-8 py-3 rounded-xl font-semibold text-white transition-all overflow-hidden ${
                         saveSuccess 
@@ -718,7 +726,7 @@ export const Settings: React.FC = () => {
                 </div>
               )}
 
-              {!whatsappEnabled && (
+              {!whatsAppSettings.enabled && (
                 <div className="p-8 text-center">
                   <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
                     theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'

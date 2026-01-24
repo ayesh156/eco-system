@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDataCache } from '../contexts/DataCacheContext';
 import { toast } from 'sonner';
 import { mockCustomers, mockProducts, mockInvoices } from '../data/mockData';
 import type { Customer, Product, Invoice, InvoiceItem } from '../data/mockData';
@@ -12,8 +13,6 @@ import {
   denormalizeSalesChannel,
   convertAPIInvoiceToFrontend,
 } from '../services/invoiceService';
-import { customerService, convertAPICustomerToFrontend } from '../services/customerService';
-import { productService, convertAPIProductToFrontend } from '../services/productService';
 import {
   FileText, User, Package, CheckCircle, ChevronRight, ChevronLeft,
   Search, Plus, Trash2, ArrowLeft, UserX, CreditCard,
@@ -51,13 +50,14 @@ export const CreateInvoice: React.FC = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
+  const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts } = useDataCache();
   
-  // API data states
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [isLoadingData, setIsLoadingData] = useState(true);
+  // API data states - Initialize from cache if available
+  const [customers, setCustomers] = useState<Customer[]>(cachedCustomers.length > 0 ? cachedCustomers : mockCustomers);
+  const [products, setProducts] = useState<Product[]>(cachedProducts.length > 0 ? cachedProducts : mockProducts);
+  const [isLoadingData, setIsLoadingData] = useState(cachedCustomers.length === 0 || cachedProducts.length === 0);
   // Track if using API data (kept for future use)
-  const [, setIsUsingAPI] = useState(false);
+  const [, setIsUsingAPI] = useState(cachedCustomers.length > 0 || cachedProducts.length > 0);
   
   const [step, setStep] = useState<Step>(1);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -70,27 +70,34 @@ export const CreateInvoice: React.FC = () => {
   const [enableTax, setEnableTax] = useState<boolean>(false);
   const taxRate = 15;
   
-  // Fetch customers and products from API
+  // Fetch customers and products from API (using cache context)
   useEffect(() => {
     const fetchData = async () => {
+      // If cache is available, use it
+      if (cachedCustomers.length > 0 && cachedProducts.length > 0) {
+        setCustomers(cachedCustomers);
+        setProducts(cachedProducts);
+        setIsLoadingData(false);
+        setIsUsingAPI(true);
+        console.log('✅ Using cached data - Customers:', cachedCustomers.length, 'Products:', cachedProducts.length);
+        return;
+      }
+      
       setIsLoadingData(true);
       try {
-        // Fetch customers and products in parallel
-        const [customersResult, productsResult] = await Promise.all([
-          customerService.getAll({ limit: 1000 }),
-          productService.getAll({ limit: 1000 }),
+        // Fetch customers and products in parallel using cache context
+        const [loadedCustomers, loadedProducts] = await Promise.all([
+          loadCustomers(false),
+          loadProducts(false),
         ]);
         
-        const apiCustomers = customersResult.customers.map(convertAPICustomerToFrontend);
-        const apiProducts = productsResult.products.map(convertAPIProductToFrontend);
-        
-        if (apiCustomers.length > 0) {
-          setCustomers(apiCustomers);
-          console.log('✅ Loaded customers from API:', apiCustomers.length);
+        if (loadedCustomers.length > 0) {
+          setCustomers(loadedCustomers);
+          console.log('✅ Loaded customers:', loadedCustomers.length);
         }
-        if (apiProducts.length > 0) {
-          setProducts(apiProducts);
-          console.log('✅ Loaded products from API:', apiProducts.length);
+        if (loadedProducts.length > 0) {
+          setProducts(loadedProducts);
+          console.log('✅ Loaded products:', loadedProducts.length);
         }
         setIsUsingAPI(true);
       } catch (error) {
@@ -102,7 +109,20 @@ export const CreateInvoice: React.FC = () => {
     };
     
     fetchData();
-  }, []);
+  }, [cachedCustomers, cachedProducts, loadCustomers, loadProducts]);
+  
+  // Sync with cached data when they change
+  useEffect(() => {
+    if (cachedCustomers.length > 0) {
+      setCustomers(cachedCustomers);
+    }
+  }, [cachedCustomers]);
+  
+  useEffect(() => {
+    if (cachedProducts.length > 0) {
+      setProducts(cachedProducts);
+    }
+  }, [cachedProducts]);
   
   // Quick add product state
   const [showQuickAdd, setShowQuickAdd] = useState(false);

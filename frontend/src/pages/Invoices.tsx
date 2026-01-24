@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDataCache } from '../contexts/DataCacheContext';
+import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
 import { toast } from 'sonner';
 import { 
   mockInvoices as initialMockInvoices, 
   mockCustomers as initialMockCustomers, 
-  mockProducts, 
-  mockWhatsAppSettings 
+  mockProducts,
 } from '../data/mockData';
 import type { Invoice, InvoicePayment, Customer, CustomerPayment } from '../data/mockData';
 import { 
@@ -15,17 +16,19 @@ import {
   denormalizePaymentMethod,
   denormalizeStatus,
 } from '../services/invoiceService';
+import { reminderService } from '../services/reminderService';
 import { 
   FileText, Search, Plus, Eye, Edit, Trash2, 
   CheckCircle, Filter,
   List, SortAsc, SortDesc, RefreshCw, LayoutGrid,
   Calendar, User, Building2, XCircle, CircleDollarSign, DollarSign,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  Shield, AlertTriangle, MessageCircle, Clock
+  Shield, AlertTriangle, MessageCircle, Clock, History
 } from 'lucide-react';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { InvoiceEditModal } from '../components/modals/InvoiceEditModal';
 import { InvoicePaymentModal } from '../components/modals/InvoicePaymentModal';
+import { ReminderHistoryModal } from '../components/modals/ReminderHistoryModal';
 import { SearchableSelect } from '../components/ui/searchable-select';
 
 type ViewMode = 'grid' | 'table';
@@ -33,12 +36,15 @@ type ViewMode = 'grid' | 'table';
 export const Invoices: React.FC = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const [invoices, setInvoices] = useState<Invoice[]>(initialMockInvoices);
-  const [customers, setCustomers] = useState<Customer[]>(initialMockCustomers);
+  const { settings: whatsAppSettings } = useWhatsAppSettings();
+  const { invoices: cachedInvoices, customers: cachedCustomers, loadInvoices, loadCustomers, isLoadingInvoices, isLoadingCustomers } = useDataCache();
+  
+  const [invoices, setInvoices] = useState<Invoice[]>(cachedInvoices.length > 0 ? cachedInvoices : initialMockInvoices);
+  const [customers, setCustomers] = useState<Customer[]>(cachedCustomers.length > 0 ? cachedCustomers : initialMockCustomers);
   const [searchQuery, setSearchQuery] = useState('');
   
   // API states
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(cachedInvoices.length === 0);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isUsingAPI, setIsUsingAPI] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -73,34 +79,34 @@ export const Invoices: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showReminderHistoryModal, setShowReminderHistoryModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   
   // Operation loading states
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Fetch invoices from API
-  const fetchInvoices = useCallback(async (showRefresh = false) => {
-    if (showRefresh) {
+  // Fetch invoices from API (only when explicitly refreshing)
+  const fetchInvoices = useCallback(async (forceRefresh = false) => {
+    if (forceRefresh) {
       setIsRefreshing(true);
+    } else if (cachedInvoices.length > 0) {
+      // Use cached data if available and not forcing refresh
+      setInvoices(cachedInvoices);
+      setIsLoading(false);
+      setIsUsingAPI(true);
+      return;
     } else {
       setIsLoading(true);
     }
     setApiError(null);
 
     try {
-      const { invoices: apiInvoices } = await invoiceService.getAll({
-        page: 1,
-        limit: 1000, // Get all for client-side filtering
-        sortBy: 'date',
-        sortOrder: 'desc',
-      });
-
-      // Convert API invoices to frontend format
-      const convertedInvoices = apiInvoices.map(convertAPIInvoiceToFrontend);
-      setInvoices(convertedInvoices);
+      // Use loadInvoices from context which handles caching
+      const loadedInvoices = await loadInvoices(forceRefresh);
+      setInvoices(loadedInvoices);
       setIsUsingAPI(true);
-      console.log('✅ Loaded invoices from API:', convertedInvoices.length);
+      console.log('✅ Loaded invoices:', loadedInvoices.length, forceRefresh ? '(refreshed)' : '(from cache)');
     } catch (error) {
       console.warn('⚠️ API not available, using mock data:', error);
       setApiError(error instanceof Error ? error.message : 'Failed to load invoices');
@@ -110,12 +116,21 @@ export const Invoices: React.FC = () => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [cachedInvoices, loadInvoices]);
 
-  // Initial load
+  // Initial load - use cache if available
   useEffect(() => {
-    fetchInvoices();
+    fetchInvoices(false); // Don't force refresh on initial load
   }, [fetchInvoices]);
+  
+  // Sync with cached invoices when they change
+  useEffect(() => {
+    if (cachedInvoices.length > 0) {
+      setInvoices(cachedInvoices);
+      setIsLoading(false);
+      setIsUsingAPI(true);
+    }
+  }, [cachedInvoices]);
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -295,10 +310,16 @@ export const Invoices: React.FC = () => {
   const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-LK')}`;
 
   // WhatsApp payment reminder function
-  const sendWhatsAppReminder = (invoice: Invoice) => {
+  const sendWhatsAppReminder = async (invoice: Invoice) => {
     const customer = customers.find(c => c.id === invoice.customerId);
     if (!customer?.phone) {
       toast.error('Customer phone number not found!');
+      return;
+    }
+
+    // Check if WhatsApp reminders are enabled
+    if (!whatsAppSettings.enabled) {
+      toast.error('WhatsApp reminders are disabled. Enable them in Settings.');
       return;
     }
 
@@ -309,10 +330,10 @@ export const Invoices: React.FC = () => {
     const isOverdueNow = dueDate < today && invoice.status !== 'fullpaid';
     const daysOverdue = isOverdueNow ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
-    // Choose template based on overdue status
+    // Choose template based on overdue status - USE CONTEXT SETTINGS
     let message = isOverdueNow 
-      ? mockWhatsAppSettings.overdueReminderTemplate 
-      : mockWhatsAppSettings.paymentReminderTemplate;
+      ? whatsAppSettings.overdueReminderTemplate 
+      : whatsAppSettings.paymentReminderTemplate;
 
     // Replace placeholders
     message = message
@@ -336,6 +357,25 @@ export const Invoices: React.FC = () => {
     }
     phone = phone.replace('+', '');
 
+    // Try to save reminder to database (if using API)
+    let reminderCount = (invoice.reminderCount || 0) + 1;
+    if (isUsingAPI && invoice.apiId) {
+      try {
+        const result = await reminderService.create(invoice.apiId, {
+          type: isOverdueNow ? 'overdue' : 'payment',
+          channel: 'whatsapp',
+          message: message,
+          customerPhone: phone,
+          customerName: invoice.customerName,
+        });
+        reminderCount = result.reminderCount;
+        console.log('✅ Reminder saved to database, count:', reminderCount);
+      } catch (error) {
+        console.warn('⚠️ Could not save reminder to database:', error);
+        // Continue anyway - local tracking will still work
+      }
+    }
+
     // Track the reminder locally
     const newReminder = {
       id: `reminder-${Date.now()}`,
@@ -355,7 +395,7 @@ export const Invoices: React.FC = () => {
         return {
           ...inv,
           reminders: [...existingReminders, newReminder],
-          reminderCount: (inv.reminderCount || 0) + 1,
+          reminderCount: reminderCount,
           lastReminderDate: newReminder.sentAt,
         };
       }
@@ -368,8 +408,14 @@ export const Invoices: React.FC = () => {
 
     // Show success toast
     toast.success(`${isOverdueNow ? 'Overdue' : 'Payment'} reminder sent to ${invoice.customerName}`, {
-      description: `Reminder #${(invoice.reminderCount || 0) + 1} sent via WhatsApp`,
+      description: `Reminder #${reminderCount} sent via WhatsApp`,
     });
+  };
+
+  // Open reminder history modal
+  const handleOpenReminderHistory = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowReminderHistoryModal(true);
   };
 
   // Check if invoice needs reminder (unpaid or halfpay)
@@ -1380,9 +1426,13 @@ export const Invoices: React.FC = () => {
                                   <MessageCircle className="w-4 h-4" />
                                   🚨 Send Urgent Reminder
                                   {invoice.reminderCount && invoice.reminderCount > 0 && (
-                                    <span className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
+                                      className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-rose-700 cursor-pointer"
+                                      title={`${invoice.reminderCount} reminders sent - Click to view history`}
+                                    >
                                       {invoice.reminderCount}
-                                    </span>
+                                    </button>
                                   )}
                                 </button>
                               </>
@@ -1407,9 +1457,13 @@ export const Invoices: React.FC = () => {
                                   <MessageCircle className="w-4 h-4" />
                                   💬 Send Reminder
                                   {invoice.reminderCount && invoice.reminderCount > 0 && (
-                                    <span className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
+                                      className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-green-800 cursor-pointer"
+                                      title={`${invoice.reminderCount} reminders sent - Click to view history`}
+                                    >
                                       {invoice.reminderCount}
-                                    </span>
+                                    </button>
                                   )}
                                 </button>
                               </>
@@ -1717,11 +1771,15 @@ export const Invoices: React.FC = () => {
                             >
                               <MessageCircle className="w-4 h-4" />
                               {invoice.reminderCount && invoice.reminderCount > 0 && (
-                                <span className={`absolute -top-1 -right-1 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center ${
-                                  isOverdue(invoice) ? 'bg-rose-600' : 'bg-green-700'
-                                }`}>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
+                                  className={`absolute -top-1 -right-1 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center hover:scale-110 cursor-pointer ${
+                                    isOverdue(invoice) ? 'bg-rose-600 hover:bg-rose-700' : 'bg-green-700 hover:bg-green-800'
+                                  }`}
+                                  title={`${invoice.reminderCount} reminders sent - Click to view history`}
+                                >
                                   {invoice.reminderCount}
-                                </span>
+                                </button>
                               )}
                             </button>
                           )}
@@ -1938,6 +1996,20 @@ export const Invoices: React.FC = () => {
         }}
         onPayment={handlePayment}
       />
+
+      {/* Reminder History Modal */}
+      {selectedInvoice && (
+        <ReminderHistoryModal
+          isOpen={showReminderHistoryModal}
+          onClose={() => {
+            setShowReminderHistoryModal(false);
+            setSelectedInvoice(null);
+          }}
+          invoiceId={selectedInvoice.apiId || selectedInvoice.id}
+          invoiceNumber={selectedInvoice.id}
+          customerName={selectedInvoice.customerName}
+        />
+      )}
     </div>
   );
 };

@@ -489,6 +489,90 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // ==================== INVOICE REMINDERS ====================
+    // GET reminders for an invoice
+    const reminderGetMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/reminders$/);
+    if (reminderGetMatch && method === 'GET') {
+      const invoiceId = reminderGetMatch[1];
+      
+      // Find invoice by ID or invoice number
+      let existingInvoice = await db.invoice.findUnique({ where: { id: invoiceId } });
+      if (!existingInvoice) {
+        existingInvoice = await db.invoice.findFirst({ where: { invoiceNumber: invoiceId } });
+      }
+      if (!existingInvoice) {
+        const invoiceNum = invoiceId.startsWith('INV-') ? invoiceId : `INV-${invoiceId}`;
+        existingInvoice = await db.invoice.findFirst({ where: { invoiceNumber: invoiceNum } });
+      }
+      if (!existingInvoice) {
+        return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+      
+      const reminders = await db.invoiceReminder.findMany({
+        where: { invoiceId: existingInvoice.id },
+        orderBy: { sentAt: 'desc' },
+      });
+      
+      return res.status(200).json({ 
+        success: true, 
+        data: reminders,
+        meta: { count: reminders.length }
+      });
+    }
+
+    // POST - Create a new reminder for an invoice
+    const reminderPostMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/reminders$/);
+    if (reminderPostMatch && method === 'POST') {
+      const invoiceId = reminderPostMatch[1];
+      const { type, channel, message, customerPhone, customerName, shopId } = body;
+      
+      // Find invoice by ID or invoice number
+      let existingInvoice = await db.invoice.findUnique({ 
+        where: { id: invoiceId },
+        include: { customer: true },
+      });
+      if (!existingInvoice) {
+        existingInvoice = await db.invoice.findFirst({ 
+          where: { invoiceNumber: invoiceId },
+          include: { customer: true },
+        });
+      }
+      if (!existingInvoice) {
+        const invoiceNum = invoiceId.startsWith('INV-') ? invoiceId : `INV-${invoiceId}`;
+        existingInvoice = await db.invoice.findFirst({ 
+          where: { invoiceNumber: invoiceNum },
+          include: { customer: true },
+        });
+      }
+      if (!existingInvoice) {
+        return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+      
+      // Create the reminder
+      const reminder = await db.invoiceReminder.create({
+        data: {
+          invoiceId: existingInvoice.id,
+          shopId: shopId || existingInvoice.shopId,
+          type: type?.toUpperCase() === 'OVERDUE' ? 'OVERDUE' : 'PAYMENT',
+          channel: channel || 'whatsapp',
+          message: message || '',
+          customerPhone: customerPhone || (existingInvoice.customer as any)?.phone || '',
+          customerName: customerName || existingInvoice.customerName,
+        },
+      });
+      
+      // Get updated reminder count for the invoice
+      const reminderCount = await db.invoiceReminder.count({
+        where: { invoiceId: existingInvoice.id },
+      });
+      
+      return res.status(201).json({ 
+        success: true, 
+        data: reminder,
+        meta: { reminderCount }
+      });
+    }
+
     // ==================== CUSTOMERS (cached for 30 seconds) ====================
     if (path === '/api/v1/customers' && method === 'GET') {
       setCacheHeaders(res, 30, 60);
