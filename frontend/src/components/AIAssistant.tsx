@@ -616,33 +616,49 @@ How can I help you today? 😊`,
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 z-50 group"
         aria-label="Open AI Assistant"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.15) rotate(5deg)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+        }}
       >
         <div className="relative">
           {/* Multi-layer animated glow effect - Creative attention grabber */}
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 rounded-full blur-xl opacity-40 group-hover:opacity-70 animate-pulse" />
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full blur-lg opacity-30 animate-spin-slow" 
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 rounded-full blur-xl opacity-40 group-hover:opacity-100 animate-pulse transition-opacity duration-500" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full blur-lg opacity-30 group-hover:opacity-60 animate-spin-slow transition-opacity duration-500" 
                style={{ animationDuration: '8s' }} />
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 rounded-full blur-2xl opacity-0 group-hover:opacity-50 group-hover:animate-spin transition-all duration-700" 
+               style={{ animationDuration: '3s' }} />
           
           {/* Rotating outer ring */}
-          <div className="absolute -inset-2 rounded-full border-2 border-dashed border-emerald-400/30 animate-spin-reverse"
+          <div className="absolute -inset-2 rounded-full border-2 border-dashed border-emerald-400/30 group-hover:border-emerald-400/70 animate-spin-reverse group-hover:scale-110 transition-all duration-500"
                style={{ animationDuration: '12s' }} />
+          <div className="absolute -inset-3 rounded-full border border-dotted border-pink-400/0 group-hover:border-pink-400/50 animate-spin transition-all duration-700"
+               style={{ animationDuration: '6s' }} />
           
           {/* Button with 3D tilt animation */}
-          <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-emerald-500 via-teal-500 to-blue-600 rounded-full shadow-2xl hover:shadow-emerald-500/50 transition-all duration-500 hover:scale-110 animate-float"
+          <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-emerald-500 via-teal-500 to-blue-600 group-hover:from-pink-500 group-hover:via-purple-500 group-hover:to-blue-500 rounded-full shadow-2xl hover:shadow-pink-500/70 transition-all duration-700 hover:scale-110 animate-float group-hover:animate-bounce"
                style={{
                  transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
                  animation: 'float 3s ease-in-out infinite, pulse-glow 2s ease-in-out infinite'
                }}>
             {/* Sparkles icon with continuous rotation */}
-            <Sparkles className="w-6 h-6 text-white animate-spin-slow" 
+            <Sparkles className="w-6 h-6 text-white animate-spin-slow group-hover:animate-spin transition-all duration-500" 
                       style={{ animationDuration: '4s' }} />
             
             {/* Orbiting dots for extra flair */}
-            <div className="absolute inset-0 animate-spin" style={{ animationDuration: '6s' }}>
-              <div className="absolute top-0 left-1/2 w-1.5 h-1.5 -ml-0.75 -mt-0.75 bg-white rounded-full opacity-80" />
+            <div className="absolute inset-0 animate-spin group-hover:animate-spin-fast" style={{ animationDuration: '6s' }}>
+              <div className="absolute top-0 left-1/2 w-1.5 h-1.5 -ml-0.75 -mt-0.75 bg-white rounded-full opacity-80 group-hover:w-2 group-hover:h-2 group-hover:bg-yellow-300 transition-all" />
             </div>
-            <div className="absolute inset-0 animate-spin-reverse" style={{ animationDuration: '5s' }}>
-              <div className="absolute bottom-0 left-1/2 w-1.5 h-1.5 -ml-0.75 -mb-0.75 bg-emerald-300 rounded-full opacity-80" />
+            <div className="absolute inset-0 animate-spin-reverse group-hover:animate-spin" style={{ animationDuration: '5s' }}>
+              <div className="absolute bottom-0 left-1/2 w-1.5 h-1.5 -ml-0.75 -mb-0.75 bg-emerald-300 rounded-full opacity-80 group-hover:w-2 group-hover:h-2 group-hover:bg-pink-300 transition-all" />
+            </div>
+            <div className="absolute inset-0 animate-spin opacity-0 group-hover:opacity-100 transition-opacity" style={{ animationDuration: '4s' }}>
+              <div className="absolute right-0 top-1/2 w-2 h-2 -mr-1 -mt-1 bg-purple-400 rounded-full" />
+            </div>
+            <div className="absolute inset-0 animate-spin-reverse opacity-0 group-hover:opacity-100 transition-opacity" style={{ animationDuration: '3s' }}>
+              <div className="absolute left-0 top-1/2 w-2 h-2 -ml-1 -mt-1 bg-cyan-400 rounded-full" />
             </div>
           </div>
 
@@ -679,11 +695,18 @@ How can I help you today? 😊`,
             from { transform: rotate(360deg); }
             to { transform: rotate(0deg); }
           }
+          @keyframes spin-fast {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
           .animate-spin-slow {
             animation: spin-slow linear infinite;
           }
           .animate-spin-reverse {
             animation: spin-reverse linear infinite;
+          }
+          .animate-spin-fast {
+            animation: spin-fast 1s linear infinite;
           }
           .animate-float {
             animation: float 3s ease-in-out infinite;

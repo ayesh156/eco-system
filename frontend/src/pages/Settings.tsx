@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
+import { useTaxSettings } from '../contexts/TaxSettingsContext';
 import { 
   Bell, Palette, MessageCircle, Info, Copy, Check, 
   Globe, Moon, Sun, Sparkles,
@@ -22,6 +23,7 @@ interface ReminderPreview {
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { settings: whatsAppSettings, updateSettings, saveSettings } = useWhatsAppSettings();
+  const { settings: taxSettings, updateSettings: updateTaxSettings, saveSettings: saveTaxSettings } = useTaxSettings();
   
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'whatsapp'>('appearance');
@@ -29,10 +31,6 @@ export const Settings: React.FC = () => {
   const [previewType, setPreviewType] = useState<'payment' | 'overdue'>('payment');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  
-  // Tax Settings
-  const [taxEnabled, setTaxEnabled] = useState(true);
-  const [defaultTaxPercentage, setDefaultTaxPercentage] = useState(8);
   
   // Profile form states
   const [businessName, setBusinessName] = useState('ECOTEC Computer Solutions');
@@ -332,12 +330,12 @@ export const Settings: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 ${
-                        taxEnabled
+                        taxSettings.enabled
                           ? 'bg-gradient-to-br from-emerald-500/20 to-green-500/20' 
                           : 'bg-gradient-to-br from-slate-500/20 to-slate-600/20'
                       }`}>
                         <CheckCircle2 className={`w-7 h-7 transition-colors ${
-                          taxEnabled ? 'text-emerald-500' : 'text-slate-500'
+                          taxSettings.enabled ? 'text-emerald-500' : 'text-slate-500'
                         }`} />
                       </div>
                       <div>
@@ -345,16 +343,19 @@ export const Settings: React.FC = () => {
                           Enable Tax by Default
                         </p>
                         <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                          {taxEnabled ? 'Tax will be added to all new invoices' : 'Tax disabled for new invoices'}
+                          {taxSettings.enabled ? 'Tax will be added to all new invoices' : 'Tax disabled for new invoices'}
                         </p>
                       </div>
                     </div>
                     
                     {/* Modern Toggle Switch */}
                     <button
-                      onClick={() => setTaxEnabled(!taxEnabled)}
+                      onClick={() => {
+                        updateTaxSettings({ enabled: !taxSettings.enabled });
+                        saveTaxSettings();
+                      }}
                       className={`relative w-20 h-10 rounded-full transition-all duration-500 ${
-                        taxEnabled
+                        taxSettings.enabled
                           ? 'bg-gradient-to-r from-emerald-600 to-green-600' 
                           : 'bg-gradient-to-r from-slate-400 to-slate-500'
                       }`}
@@ -369,7 +370,7 @@ export const Settings: React.FC = () => {
                       }`}
                       style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
                       >
-                        {taxEnabled ? (
+                        {taxSettings.enabled ? (
                           <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                         ) : (
                           <AlertCircle className="w-5 h-5 text-slate-500" />
@@ -380,12 +381,12 @@ export const Settings: React.FC = () => {
 
                   {/* Default Tax Percentage */}
                   <div className={`p-4 rounded-2xl border transition-all ${
-                    taxEnabled
+                    taxSettings.enabled
                       ? theme === 'dark' ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'
                       : theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50 opacity-50' : 'bg-slate-50 border-slate-200 opacity-50'
                   }`}>
                     <label className={`block text-sm font-semibold mb-3 ${
-                      taxEnabled
+                      taxSettings.enabled
                         ? theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'
                         : theme === 'dark' ? 'text-slate-500' : 'text-slate-600'
                     }`}>
@@ -397,11 +398,14 @@ export const Settings: React.FC = () => {
                         min="0"
                         max="30"
                         step="0.5"
-                        value={defaultTaxPercentage}
-                        onChange={(e) => setDefaultTaxPercentage(parseFloat(e.target.value))}
-                        disabled={!taxEnabled}
+                        value={taxSettings.defaultPercentage}
+                        onChange={(e) => {
+                          updateTaxSettings({ defaultPercentage: parseFloat(e.target.value) });
+                          saveTaxSettings();
+                        }}
+                        disabled={!taxSettings.enabled}
                         className={`flex-1 h-3 rounded-full appearance-none cursor-pointer ${
-                          taxEnabled
+                          taxSettings.enabled
                             ? 'accent-emerald-500'
                             : 'opacity-50 cursor-not-allowed'
                         }`}
@@ -412,11 +416,15 @@ export const Settings: React.FC = () => {
                           min="0"
                           max="30"
                           step="0.5"
-                          value={defaultTaxPercentage}
-                          onChange={(e) => setDefaultTaxPercentage(Math.min(30, Math.max(0, parseFloat(e.target.value) || 0)))}
-                          disabled={!taxEnabled}
+                          value={taxSettings.defaultPercentage}
+                          onChange={(e) => {
+                            const value = Math.min(30, Math.max(0, parseFloat(e.target.value) || 0));
+                            updateTaxSettings({ defaultPercentage: value });
+                            saveTaxSettings();
+                          }}
+                          disabled={!taxSettings.enabled}
                           className={`w-20 px-3 py-2 rounded-xl border text-center font-bold transition-all ${
-                            taxEnabled
+                            taxSettings.enabled
                               ? theme === 'dark' 
                                 ? 'bg-slate-800 border-emerald-500/50 text-emerald-400 focus:ring-2 focus:ring-emerald-500/30' 
                                 : 'bg-white border-emerald-300 text-emerald-700 focus:ring-2 focus:ring-emerald-500/30'
@@ -426,7 +434,7 @@ export const Settings: React.FC = () => {
                           }`}
                         />
                         <span className={`font-bold text-2xl ${
-                          taxEnabled
+                          taxSettings.enabled
                             ? theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'
                             : theme === 'dark' ? 'text-slate-600' : 'text-slate-400'
                         }`}>%</span>
@@ -438,11 +446,14 @@ export const Settings: React.FC = () => {
                       {[5, 8, 12, 15, 18].map(percentage => (
                         <button
                           key={percentage}
-                          onClick={() => setDefaultTaxPercentage(percentage)}
-                          disabled={!taxEnabled}
+                          onClick={() => {
+                            updateTaxSettings({ defaultPercentage: percentage });
+                            saveTaxSettings();
+                          }}
+                          disabled={!taxSettings.enabled}
                           className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                            taxEnabled
-                              ? defaultTaxPercentage === percentage
+                            taxSettings.enabled
+                              ? taxSettings.defaultPercentage === percentage
                                 ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/30'
                                 : theme === 'dark'
                                   ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 border border-slate-600'
@@ -456,7 +467,7 @@ export const Settings: React.FC = () => {
                     </div>
 
                     {/* Info Box */}
-                    {taxEnabled && (
+                    {taxSettings.enabled && (
                       <div className={`mt-4 p-3 rounded-xl flex items-start gap-3 ${
                         theme === 'dark' ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'
                       }`}>

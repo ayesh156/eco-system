@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { AuthProvider, ProtectedRoute } from './contexts/AuthContext';
 import { WhatsAppSettingsProvider } from './contexts/WhatsAppSettingsContext';
+import { TaxSettingsProvider } from './contexts/TaxSettingsContext';
 import { DataCacheProvider } from './contexts/DataCacheContext';
 import { AdminLayout } from './components/AdminLayout';
 import { Toaster } from 'sonner';
@@ -79,7 +80,8 @@ function App() {
         <ThemeProvider>
           <AuthProvider>
             <WhatsAppSettingsProvider>
-              <DataCacheProvider>
+              <TaxSettingsProvider>
+                <DataCacheProvider>
                 <ThemedToaster />
                 <BrowserRouter
                   future={{
@@ -154,7 +156,8 @@ function App() {
                     } />
                   </Routes>
                 </BrowserRouter>
-              </DataCacheProvider>
+                </DataCacheProvider>
+              </TaxSettingsProvider>
             </WhatsAppSettingsProvider>
           </AuthProvider>
         </ThemeProvider>
