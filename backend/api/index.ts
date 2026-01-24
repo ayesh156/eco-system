@@ -1,7 +1,7 @@
 // Vercel Serverless API Handler - Complete CRUD with all features
 // Optimized for Vercel Pro with caching and connection pooling
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, InvoiceStatus } from '@prisma/client';
 
 // Global Prisma instance to reuse across requests (prevents cold start issues)
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
@@ -247,10 +247,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const calculatedPaid = paidAmount || 0;
       const calculatedDue = calculatedTotal - calculatedPaid;
       
-      let invoiceStatus = status || 'UNPAID';
+      let invoiceStatus: InvoiceStatus = (status as InvoiceStatus) || InvoiceStatus.UNPAID;
       if (!status) {
-        if (calculatedPaid >= calculatedTotal) invoiceStatus = 'FULLPAID';
-        else if (calculatedPaid > 0) invoiceStatus = 'HALFPAY';
+        if (calculatedPaid >= calculatedTotal) invoiceStatus = InvoiceStatus.FULLPAID;
+        else if (calculatedPaid > 0) invoiceStatus = InvoiceStatus.HALFPAY;
       }
 
       const invoice = await db.invoice.create({
@@ -468,9 +468,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const totalPaid = currentPaid + parseFloat(amount);
       const dueAmount = existingInvoice.total - totalPaid;
       
-      let status = 'UNPAID';
-      if (totalPaid >= existingInvoice.total) status = 'FULLPAID';
-      else if (totalPaid > 0) status = 'HALFPAY';
+      let status: InvoiceStatus = InvoiceStatus.UNPAID;
+      if (totalPaid >= existingInvoice.total) status = InvoiceStatus.FULLPAID;
+      else if (totalPaid > 0) status = InvoiceStatus.HALFPAY;
       
       const updatedInvoice = await db.invoice.update({
         where: { id: existingInvoice.id },
