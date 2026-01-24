@@ -32,7 +32,14 @@ export const Invoices: React.FC = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const { settings: whatsAppSettings } = useWhatsAppSettings();
-  const { invoices: cachedInvoices, loadInvoices, products: cachedProducts } = useDataCache();
+  const { 
+    invoices: cachedInvoices, 
+    loadInvoices, 
+    products: cachedProducts,
+    customers: cachedCustomers,
+    loadCustomers,
+    setInvoices: setCachedInvoices
+  } = useDataCache();
   
   // Start with empty arrays - will load from API
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -93,11 +100,15 @@ export const Invoices: React.FC = () => {
     setApiError(null);
 
     try {
-      // Use loadInvoices from context which handles caching
-      const loadedInvoices = await loadInvoices(forceRefresh);
+      // Load invoices and customers in parallel
+      const [loadedInvoices, loadedCustomers] = await Promise.all([
+        loadInvoices(forceRefresh),
+        loadCustomers(forceRefresh)
+      ]);
       setInvoices(loadedInvoices);
+      setCustomers(loadedCustomers);
       setIsUsingAPI(true);
-      console.log('✅ Loaded invoices:', loadedInvoices.length, forceRefresh ? '(refreshed)' : '(from cache)');
+      console.log('✅ Loaded invoices:', loadedInvoices.length, 'customers:', loadedCustomers.length, forceRefresh ? '(refreshed)' : '(from cache)');
     } catch (error) {
       console.warn('⚠️ API not available:', error);
       setApiError(error instanceof Error ? error.message : 'Failed to load invoices');
@@ -106,7 +117,7 @@ export const Invoices: React.FC = () => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [loadInvoices]);
+  }, [loadInvoices, loadCustomers]);
 
   // Initial load
   useEffect(() => {
@@ -121,6 +132,13 @@ export const Invoices: React.FC = () => {
       setIsUsingAPI(true);
     }
   }, [cachedInvoices]);
+  
+  // Sync with cached customers when they change (for phone numbers)
+  useEffect(() => {
+    if (cachedCustomers.length > 0) {
+      setCustomers(cachedCustomers);
+    }
+  }, [cachedCustomers]);
   
   // Sync with cached products when they change (for edit modal)
   useEffect(() => {
@@ -308,9 +326,12 @@ export const Invoices: React.FC = () => {
 
   // WhatsApp payment reminder function
   const sendWhatsAppReminder = async (invoice: Invoice) => {
+    // Try to get customer phone from cached customers first, then from invoice's customer object
     const customer = customers.find(c => c.id === invoice.customerId);
-    if (!customer?.phone) {
-      toast.error('Customer phone number not found!');
+    const customerPhone = customer?.phone || (invoice as Invoice & { customer?: { phone?: string } }).customer?.phone;
+    
+    if (!customerPhone) {
+      toast.error('Customer phone number not found! Please add a phone number to the customer profile.');
       return;
     }
 
@@ -343,7 +364,7 @@ export const Invoices: React.FC = () => {
       .replace(/\{\{daysOverdue\}\}/g, daysOverdue.toString());
 
     // Format phone number (remove dashes and ensure country code)
-    let phone = customer.phone.replace(/[-\s]/g, '');
+    let phone = customerPhone.replace(/[-\s]/g, '');
     // If starts with 0, replace with Sri Lanka country code
     if (phone.startsWith('0')) {
       phone = '94' + phone.substring(1);
@@ -385,8 +406,8 @@ export const Invoices: React.FC = () => {
       customerName: invoice.customerName,
     };
 
-    // Update invoice with reminder tracking
-    setInvoices(prev => prev.map(inv => {
+    // Update invoice with reminder tracking - update both local and cached invoices
+    const updateWithReminder = (prev: Invoice[]) => prev.map(inv => {
       if (inv.id === invoice.id || inv.apiId === invoice.apiId) {
         const existingReminders = inv.reminders || [];
         return {
@@ -397,7 +418,9 @@ export const Invoices: React.FC = () => {
         };
       }
       return inv;
-    }));
+    });
+    setInvoices(updateWithReminder);
+    setCachedInvoices(updateWithReminder);
 
     // Open WhatsApp with the message using wa.me format
     const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
@@ -618,7 +641,13 @@ export const Invoices: React.FC = () => {
           });
           
           const convertedInvoice = convertAPIInvoiceToFrontend(apiUpdatedInvoice);
-          setInvoices(prevInvoices => prevInvoices.map(inv => inv.id === updatedInvoice.id ? convertedInvoice : inv));
+          
+          // Update both local state and context cache
+          const updateInvoiceList = (prevInvoices: Invoice[]) => 
+            prevInvoices.map(inv => inv.id === updatedInvoice.id ? convertedInvoice : inv);
+          setInvoices(updateInvoiceList);
+          setCachedInvoices(updateInvoiceList);
+          
           toast.success('Invoice updated successfully', {
             description: `Invoice #${updatedInvoice.id} has been updated.`,
           });
@@ -636,8 +665,12 @@ export const Invoices: React.FC = () => {
         }
       }
       
-      // Local update
-      setInvoices(prevInvoices => prevInvoices.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
+      // Local update - update both local state and context cache
+      const updateInvoiceList = (prevInvoices: Invoice[]) => 
+        prevInvoices.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv);
+      setInvoices(updateInvoiceList);
+      setCachedInvoices(updateInvoiceList);
+      
       toast.success('Invoice updated locally', {
         description: `Invoice #${updatedInvoice.id} has been updated.`,
       });
@@ -682,6 +715,7 @@ export const Invoices: React.FC = () => {
       }
       
       setInvoices(prevInvoices => prevInvoices.filter(inv => inv.id !== selectedInvoice.id));
+      setCachedInvoices(prevInvoices => prevInvoices.filter(inv => inv.id !== selectedInvoice.id));
       setShowDeleteModal(false);
       setSelectedInvoice(null);
     } finally {
@@ -710,11 +744,12 @@ export const Invoices: React.FC = () => {
           paymentDate,
         });
         
-        // Convert and update local state
+        // Convert and update both local state and context cache
         const convertedInvoice = convertAPIInvoiceToFrontend(updatedInvoice);
-        setInvoices(prevInvoices =>
-          prevInvoices.map(inv => inv.id === invoiceId ? convertedInvoice : inv)
-        );
+        const updateInvoiceList = (prevInvoices: Invoice[]) =>
+          prevInvoices.map(inv => inv.id === invoiceId ? convertedInvoice : inv);
+        setInvoices(updateInvoiceList);
+        setCachedInvoices(updateInvoiceList);
         
         // Update selectedInvoice so modal shows updated payment history
         setSelectedInvoice(convertedInvoice);
@@ -1415,23 +1450,38 @@ export const Invoices: React.FC = () => {
                                   <DollarSign className="w-4 h-4" />
                                   💰 Record Payment
                                 </button>
-                                <button 
-                                  onClick={() => sendWhatsAppReminder(invoice)}
-                                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25 relative"
-                                  title="Send Urgent Overdue Reminder via WhatsApp"
-                                >
-                                  <MessageCircle className="w-4 h-4" />
-                                  🚨 Send Urgent Reminder
-                                  {invoice.reminderCount && invoice.reminderCount > 0 && (
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
-                                      className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-rose-700 cursor-pointer"
-                                      title={`${invoice.reminderCount} reminders sent - Click to view history`}
-                                    >
-                                      {invoice.reminderCount}
-                                    </button>
-                                  )}
-                                </button>
+                                {/* Only show reminder button if WhatsApp reminders are enabled */}
+                                {whatsAppSettings.enabled ? (
+                                  <button 
+                                    onClick={() => sendWhatsAppReminder(invoice)}
+                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25 relative"
+                                    title="Send Urgent Overdue Reminder via WhatsApp"
+                                  >
+                                    <MessageCircle className="w-4 h-4" />
+                                    🚨 Send Urgent Reminder
+                                    {invoice.reminderCount && invoice.reminderCount > 0 && (
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
+                                        className="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-rose-700 cursor-pointer"
+                                        title={`${invoice.reminderCount} reminders sent - Click to view history`}
+                                      >
+                                        {invoice.reminderCount}
+                                      </button>
+                                    )}
+                                  </button>
+                                ) : (
+                                  /* Overdue Status Indicator when reminders are disabled */
+                                  <div className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl ${
+                                    theme === 'dark' 
+                                      ? 'bg-red-500/10 border border-red-500/20' 
+                                      : 'bg-red-50 border border-red-200'
+                                  }`}>
+                                    <Clock className="w-4 h-4 text-red-500" />
+                                    <span className={`text-sm font-medium ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
+                                      ⏰ Overdue Payment
+                                    </span>
+                                  </div>
+                                )}
                               </>
                             ) : (
                               /* Not Overdue - Friendly Reminder */
@@ -1446,23 +1496,26 @@ export const Invoices: React.FC = () => {
                                     💳 Payment Pending
                                   </span>
                                 </div>
-                                <button 
-                                  onClick={() => sendWhatsAppReminder(invoice)}
-                                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-emerald-500/25 relative"
-                                  title="Send Payment Reminder via WhatsApp"
-                                >
-                                  <MessageCircle className="w-4 h-4" />
-                                  💬 Send Reminder
-                                  {invoice.reminderCount && invoice.reminderCount > 0 && (
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
-                                      className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-green-800 cursor-pointer"
-                                      title={`${invoice.reminderCount} reminders sent - Click to view history`}
-                                    >
-                                      {invoice.reminderCount}
-                                    </button>
-                                  )}
-                                </button>
+                                {/* Only show reminder button if WhatsApp reminders are enabled */}
+                                {whatsAppSettings.enabled && (
+                                  <button 
+                                    onClick={() => sendWhatsAppReminder(invoice)}
+                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-emerald-500/25 relative"
+                                    title="Send Payment Reminder via WhatsApp"
+                                  >
+                                    <MessageCircle className="w-4 h-4" />
+                                    💬 Send Reminder
+                                    {invoice.reminderCount && invoice.reminderCount > 0 && (
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
+                                        className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-green-800 cursor-pointer"
+                                        title={`${invoice.reminderCount} reminders sent - Click to view history`}
+                                      >
+                                        {invoice.reminderCount}
+                                      </button>
+                                    )}
+                                  </button>
+                                )}
                               </>
                             )}
                           </>

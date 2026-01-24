@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
+import { useDataCache } from '../contexts/DataCacheContext';
 import { toast } from 'sonner';
-import { mockInvoices as initialMockInvoices, mockCustomers, mockProducts, mockWhatsAppSettings } from '../data/mockData';
-import type { Invoice, InvoicePayment } from '../data/mockData';
+import type { Invoice, InvoicePayment, Customer } from '../data/mockData';
 import PrintableInvoice from '../components/PrintableInvoice';
 import { InvoicePaymentModal } from '../components/modals/InvoicePaymentModal';
 import {
@@ -23,10 +24,14 @@ export const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { settings: whatsAppSettings } = useWhatsAppSettings();
+  const { customers: cachedCustomers, loadCustomers, products: cachedProducts } = useDataCache();
+  
   const [showActions, setShowActions] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [invoices, setInvoices] = useState<Invoice[]>(initialMockInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const printRef = useRef<HTMLDivElement>(null);
   
   // API states
@@ -41,10 +46,12 @@ export const ViewInvoice: React.FC = () => {
     setIsLoading(true);
     try {
       // First try to fetch by invoice number (the id param is usually the invoice number)
-      const { invoices: apiInvoices } = await invoiceService.getAll({
-        search: id,
-        limit: 1,
-      });
+      const [{ invoices: apiInvoices }, loadedCustomers] = await Promise.all([
+        invoiceService.getAll({ search: id, limit: 1 }),
+        loadCustomers()
+      ]);
+      
+      setCustomers(loadedCustomers);
       
       if (apiInvoices.length > 0) {
         const apiInvoice = apiInvoices[0];
@@ -54,21 +61,28 @@ export const ViewInvoice: React.FC = () => {
         setIsUsingAPI(true);
         console.log('✅ Loaded invoice from API:', convertedInvoice.id);
       } else {
-        // Fallback to mock data
+        // Invoice not found
         setIsUsingAPI(false);
-        console.log('⚠️ Invoice not found in API, using mock data');
+        console.log('⚠️ Invoice not found in API');
       }
     } catch (error) {
-      console.warn('⚠️ API not available, using mock data:', error);
+      console.warn('⚠️ API not available:', error);
       setIsUsingAPI(false);
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, loadCustomers]);
 
   useEffect(() => {
     fetchInvoice();
   }, [fetchInvoice]);
+  
+  // Sync with cached customers
+  useEffect(() => {
+    if (cachedCustomers.length > 0) {
+      setCustomers(cachedCustomers);
+    }
+  }, [cachedCustomers]);
 
   // Find the invoice
   const invoice = useMemo(() => {
@@ -91,12 +105,31 @@ export const ViewInvoice: React.FC = () => {
         creditStatus: 'clear' as const
       };
     }
-    return mockCustomers.find(c => c.id === invoice.customerId) || null;
-  }, [invoice]);
+    // Try to find from cached customers first, then from invoice's embedded customer data
+    const cachedCustomer = customers.find(c => c.id === invoice.customerId);
+    if (cachedCustomer) return cachedCustomer;
+    
+    // Fallback to invoice's embedded customer data if available
+    const invoiceWithCustomer = invoice as Invoice & { customer?: { id: string; name: string; email?: string; phone?: string } };
+    if (invoiceWithCustomer.customer) {
+      return {
+        id: invoiceWithCustomer.customer.id,
+        name: invoiceWithCustomer.customer.name,
+        email: invoiceWithCustomer.customer.email || '',
+        phone: invoiceWithCustomer.customer.phone || '',
+        totalSpent: 0,
+        totalOrders: 0,
+        creditBalance: 0,
+        creditLimit: 0,
+        creditStatus: 'clear' as const
+      };
+    }
+    return null;
+  }, [invoice, customers]);
 
   // Get product details for items
   const getProductDetails = (productId: string) => {
-    return mockProducts.find(p => p.id === productId);
+    return cachedProducts.find(p => p.id === productId);
   };
   
   // Check warranty status
@@ -146,7 +179,13 @@ export const ViewInvoice: React.FC = () => {
   // WhatsApp payment reminder function
   const sendWhatsAppReminder = () => {
     if (!invoice || !customer?.phone) {
-      alert('Customer phone number not found!');
+      toast.error('Customer phone number not found! Please add a phone number to the customer profile.');
+      return;
+    }
+
+    // Check if WhatsApp reminders are enabled
+    if (!whatsAppSettings.enabled) {
+      toast.error('WhatsApp reminders are disabled. Enable them in Settings.');
       return;
     }
 
@@ -157,10 +196,10 @@ export const ViewInvoice: React.FC = () => {
     const isOverdue = dueDate < today && invoice.status !== 'fullpaid';
     const daysOverdue = isOverdue ? Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
-    // Choose template based on overdue status
+    // Choose template based on overdue status - USE CONTEXT SETTINGS
     let message = isOverdue 
-      ? mockWhatsAppSettings.overdueReminderTemplate 
-      : mockWhatsAppSettings.paymentReminderTemplate;
+      ? whatsAppSettings.overdueReminderTemplate 
+      : whatsAppSettings.paymentReminderTemplate;
 
     // Replace placeholders
     message = message
@@ -185,6 +224,10 @@ export const ViewInvoice: React.FC = () => {
     // Open WhatsApp with the message using wa.me format
     const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
+    
+    toast.success('WhatsApp reminder opened', {
+      description: `Reminder for invoice #${invoice.id} prepared for ${invoice.customerName}`,
+    });
   };
 
   // Handle payment for invoice
@@ -409,8 +452,8 @@ export const ViewInvoice: React.FC = () => {
               Edit Invoice
             </button>
 
-            {/* WhatsApp Reminder Button */}
-            {needsReminder && (
+            {/* WhatsApp Reminder Button - Only show when enabled in settings */}
+            {needsReminder && whatsAppSettings.enabled && (
               <button
                 onClick={sendWhatsAppReminder}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all shadow-lg ${
