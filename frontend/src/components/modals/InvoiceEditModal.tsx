@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Invoice, InvoiceItem, Product } from '../../data/mockData';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Plus, Trash2, Search, FileText, Package, Calendar, CheckCircle, XCircle, CircleDollarSign } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, Package, Calendar, CheckCircle, XCircle, CircleDollarSign, CreditCard } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -32,6 +32,9 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   const [productSearch, setProductSearch] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
+  
+  // Payment method for adding products
+  const [addPaymentMethod, setAddPaymentMethod] = useState<'cash' | 'card' | 'bank' | 'cheque' | 'credit'>('credit');
   
   // Tax states
   const [hasTax, setHasTax] = useState(true);
@@ -607,6 +610,45 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
               </div>
             )}
 
+            {/* Payment Method Selector */}
+            <div className="mb-4">
+              <Label className="text-gray-900 dark:text-white flex items-center gap-2 mb-2">
+                <CreditCard className="w-4 h-4 text-blue-500" />
+                Payment Method
+              </Label>
+              <div className="grid grid-cols-5 gap-2">
+                {[
+                  { value: 'cash', label: 'Cash', emoji: '💵', color: 'emerald' },
+                  { value: 'card', label: 'Card', emoji: '💳', color: 'blue' },
+                  { value: 'bank', label: 'Bank', emoji: '🏦', color: 'purple' },
+                  { value: 'cheque', label: 'Cheque', emoji: '📝', color: 'amber' },
+                  { value: 'credit', label: 'Credit', emoji: '⏳', color: 'red' },
+                ].map(({ value, label, emoji, color }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setAddPaymentMethod(value as 'cash' | 'card' | 'bank' | 'cheque' | 'credit')}
+                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
+                      addPaymentMethod === value
+                        ? `scale-105`
+                        : theme === 'dark' 
+                          ? 'border-slate-700 hover:border-slate-600 hover:bg-slate-800/50' 
+                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                    style={addPaymentMethod === value ? {
+                      borderColor: color === 'emerald' ? '#10b981' : color === 'blue' ? '#3b82f6' : color === 'purple' ? '#8b5cf6' : color === 'amber' ? '#f59e0b' : '#ef4444',
+                      backgroundColor: color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : color === 'purple' ? 'rgba(139, 92, 246, 0.1)' : color === 'amber' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+                    } : {}}
+                  >
+                    <span className="text-xl">{emoji}</span>
+                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Quantity & Add */}
             <div className="flex gap-2 items-end">
               <div className="flex-1">
@@ -632,6 +674,24 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                 Add
               </button>
             </div>
+            
+            {/* Selected Payment Method Info */}
+            {addPaymentMethod !== 'credit' && (
+              <div className={`mt-3 p-2 rounded-lg text-sm flex items-center gap-2 ${
+                theme === 'dark' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
+              }`}>
+                <CheckCircle className="w-4 h-4" />
+                <span>Product will be added with <strong>{addPaymentMethod}</strong> payment</span>
+              </div>
+            )}
+            {addPaymentMethod === 'credit' && (
+              <div className={`mt-3 p-2 rounded-lg text-sm flex items-center gap-2 ${
+                theme === 'dark' ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-600'
+              }`}>
+                <CircleDollarSign className="w-4 h-4" />
+                <span>Product will be added as <strong>credit</strong> (unpaid)</span>
+              </div>
+            )}
           </div>
 
           {/* Current Items */}

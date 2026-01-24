@@ -67,7 +67,7 @@ export const CreateInvoice: React.FC = () => {
   const [items, setItems] = useState<ExtendedInvoiceItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
   const [discountType, setDiscountType] = useState('none');
-  const [enableTax, setEnableTax] = useState<boolean>(true);
+  const [enableTax, setEnableTax] = useState<boolean>(false);
   const taxRate = 15;
   
   // Fetch customers and products from API

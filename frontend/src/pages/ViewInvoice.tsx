@@ -16,7 +16,7 @@ import {
   Package, CheckCircle, Clock,
   XCircle, Mail, MapPin,
   Copy, Download, Share2, MoreVertical, TrendingUp, Monitor, X, CircleDollarSign,
-  AlertTriangle, Store, Globe, Shield, MessageCircle, Wallet, History
+  AlertTriangle, Store, Globe, Shield, MessageCircle, Wallet
 } from 'lucide-react';
 
 export const ViewInvoice: React.FC = () => {
@@ -258,12 +258,6 @@ export const ViewInvoice: React.FC = () => {
 
   // Format currency
   const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-LK')}`;
-  
-  // Format date
-  const formatShortDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
 
   // Check if invoice needs reminder
   const needsReminder = invoice && invoice.status !== 'fullpaid';
@@ -979,56 +973,7 @@ export const ViewInvoice: React.FC = () => {
               </div>
             )}
 
-            {/* Payment History */}
-            {invoice.payments && invoice.payments.length > 0 && (
-              <div className="mt-4">
-                <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
-                  theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                }`}>
-                  <History className="w-4 h-4" />
-                  Payment History ({invoice.payments.length})
-                </h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {invoice.payments.map((payment) => (
-                    <div 
-                      key={payment.id}
-                      className={`p-3 rounded-lg flex items-center justify-between ${
-                        theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${
-                          payment.paymentMethod === 'cash' 
-                            ? 'bg-emerald-500/20 text-emerald-500'
-                            : payment.paymentMethod === 'card'
-                              ? 'bg-blue-500/20 text-blue-500'
-                              : payment.paymentMethod === 'bank'
-                                ? 'bg-purple-500/20 text-purple-500'
-                                : 'bg-amber-500/20 text-amber-500'
-                        }`}>
-                          {payment.paymentMethod === 'cash' ? '💵' : 
-                           payment.paymentMethod === 'card' ? '💳' : 
-                           payment.paymentMethod === 'bank' ? '🏦' : '📝'}
-                        </div>
-                        <div>
-                          <p className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                            {formatCurrency(payment.amount)}
-                          </p>
-                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                            {formatShortDate(payment.paymentDate)}
-                          </p>
-                        </div>
-                      </div>
-                      <span className={`text-xs px-2 py-1 rounded-full capitalize ${
-                        theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'
-                      }`}>
-                        {payment.paymentMethod}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Payment History - Now shown in payment modal only */}
           </div>
 
           {/* Timeline / Activity */}
