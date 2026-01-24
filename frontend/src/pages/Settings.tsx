@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
-import { toast } from 'sonner';
 import { 
   Bell, Palette, MessageCircle, Info, Copy, Check, 
   Globe, Moon, Sun, Sparkles,
@@ -22,7 +21,7 @@ interface ReminderPreview {
 
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
-  const { settings: whatsAppSettings, updateSettings, saveSettings, isLoading: isSavingSettings } = useWhatsAppSettings();
+  const { settings: whatsAppSettings, updateSettings, saveSettings } = useWhatsAppSettings();
   
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'whatsapp'>('appearance');

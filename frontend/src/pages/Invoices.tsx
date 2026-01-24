@@ -23,7 +23,7 @@ import {
   List, SortAsc, SortDesc, RefreshCw, LayoutGrid,
   Calendar, User, Building2, XCircle, CircleDollarSign, DollarSign,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  Shield, AlertTriangle, MessageCircle, Clock, History
+  Shield, AlertTriangle, MessageCircle, Clock
 } from 'lucide-react';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { InvoiceEditModal } from '../components/modals/InvoiceEditModal';
@@ -37,7 +37,7 @@ export const Invoices: React.FC = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const { settings: whatsAppSettings } = useWhatsAppSettings();
-  const { invoices: cachedInvoices, customers: cachedCustomers, loadInvoices, loadCustomers, isLoadingInvoices, isLoadingCustomers } = useDataCache();
+  const { invoices: cachedInvoices, customers: cachedCustomers, loadInvoices } = useDataCache();
   
   const [invoices, setInvoices] = useState<Invoice[]>(cachedInvoices.length > 0 ? cachedInvoices : initialMockInvoices);
   const [customers, setCustomers] = useState<Customer[]>(cachedCustomers.length > 0 ? cachedCustomers : initialMockCustomers);
