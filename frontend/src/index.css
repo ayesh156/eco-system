@@ -9,3 +9,13 @@ html, body, #root {
   padding: 0;
   background-color: #111827;
 }
+
+/* Shimmer animation for loading skeletons */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

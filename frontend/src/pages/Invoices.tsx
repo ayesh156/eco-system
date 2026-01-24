@@ -619,9 +619,12 @@ export const Invoices: React.FC = () => {
    * Handle invoice payment with bi-directional customer credit sync
    * When invoice payment is made, it also reduces the customer's credit balance
    */
-  const handlePayment = async (invoiceId: string, amount: number, paymentMethod: string, notes?: string): Promise<void> => {
+  const handlePayment = async (invoiceId: string, amount: number, paymentMethod: string, notes?: string, paymentDateTime?: string): Promise<void> => {
     const invoice = invoices.find(inv => inv.id === invoiceId);
     if (!invoice) throw new Error('Invoice not found');
+
+    // Use provided dateTime or current time
+    const paymentDate = paymentDateTime || new Date().toISOString();
 
     // If using API, add payment via API
     if (isUsingAPI && invoice.apiId) {
@@ -630,6 +633,7 @@ export const Invoices: React.FC = () => {
           amount,
           paymentMethod: denormalizePaymentMethod(paymentMethod),
           notes,
+          paymentDate,
         });
         
         // Convert and update local state
@@ -658,7 +662,7 @@ export const Invoices: React.FC = () => {
       id: `pay-${Date.now()}`,
       invoiceId: invoiceId,
       amount: amount,
-      paymentDate: new Date().toISOString(),
+      paymentDate: paymentDate,
       paymentMethod: paymentMethod as 'cash' | 'card' | 'bank' | 'cheque',
       notes: notes
     };
@@ -742,7 +746,8 @@ export const Invoices: React.FC = () => {
   // Loading state
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in duration-300">
+        {/* Header Skeleton */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
@@ -752,13 +757,77 @@ export const Invoices: React.FC = () => {
               Loading invoices...
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-10 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div className={`w-36 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+          </div>
         </div>
-        <div className={`flex items-center justify-center py-20 rounded-2xl border ${
-          theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
-        }`}>
-          <div className="text-center">
-            <RefreshCw className={`w-10 h-10 mx-auto mb-4 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
-            <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Loading invoices...</p>
+
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className="flex-1 space-y-2">
+                  <div className={`h-6 w-16 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-3 w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter Bar Skeleton */}
+        <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className={`h-10 w-64 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div className={`h-10 w-32 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div className={`h-10 w-32 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+          </div>
+        </div>
+
+        {/* Invoice Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className={`relative p-5 rounded-2xl border overflow-hidden ${
+              theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
+            }`}>
+              {/* Shimmer Effect */}
+              <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+              
+              <div className="flex items-start justify-between mb-4">
+                <div className="space-y-2">
+                  <div className={`h-4 w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-6 w-32 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+                <div className={`h-6 w-16 rounded-full animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              </div>
+              
+              <div className="space-y-3 mb-4">
+                <div className={`h-4 w-full rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`h-4 w-3/4 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              </div>
+              
+              <div className="flex items-center justify-between pt-4 border-t border-slate-700/30">
+                <div className={`h-8 w-24 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className="flex gap-2">
+                  <div className={`h-8 w-8 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-8 w-8 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-8 w-8 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Loading Indicator */}
+        <div className="flex items-center justify-center py-4">
+          <div className="flex items-center gap-3">
+            <RefreshCw className={`w-5 h-5 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+            <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              Fetching invoices from server...
+            </span>
           </div>
         </div>
       </div>

@@ -33,6 +33,11 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
   
+  // Tax states
+  const [hasTax, setHasTax] = useState(true);
+  const [taxPercentage, setTaxPercentage] = useState(15);
+  const [originalHadTax, setOriginalHadTax] = useState(true);
+  
   // Calendar states
   const [showIssueDatePicker, setShowIssueDatePicker] = useState(false);
   const [showDueDatePicker, setShowDueDatePicker] = useState(false);
@@ -45,6 +50,19 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
       setIssueDate(invoice.date);
       setDueDate(invoice.dueDate);
       setStatus(invoice.status);
+      
+      // Check if invoice originally had tax
+      const invoiceHadTax = invoice.tax > 0;
+      setOriginalHadTax(invoiceHadTax);
+      setHasTax(invoiceHadTax);
+      
+      // Calculate tax percentage from original invoice
+      if (invoiceHadTax && invoice.subtotal > 0) {
+        const calculatedPercentage = (invoice.tax / invoice.subtotal) * 100;
+        setTaxPercentage(Math.round(calculatedPercentage));
+      } else {
+        setTaxPercentage(15);
+      }
     }
   }, [invoice]);
 
@@ -166,7 +184,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-  const tax = subtotal * 0.15;
+  const tax = hasTax ? subtotal * (taxPercentage / 100) : 0;
   const total = subtotal + tax;
 
   const handleSave = async () => {
@@ -180,7 +198,12 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
       total: Math.round(total * 100) / 100,
       date: issueDate,
       dueDate,
-      status,
+      // Preserve status if it was halfpay or if paid amount > 0 but < total
+      status: invoice.paidAmount && invoice.paidAmount > 0 && invoice.paidAmount < total 
+        ? 'halfpay' 
+        : invoice.paidAmount && invoice.paidAmount >= total 
+          ? 'fullpaid' 
+          : status,
     };
 
     await onSave(updatedInvoice);
@@ -407,20 +430,100 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
             <div>
               <Label className="text-gray-900 dark:text-white">Status</Label>
               <div className="mt-1">
-                <SearchableSelect
-                  value={status}
-                  onValueChange={(value) => setStatus(value as 'unpaid' | 'fullpaid' | 'halfpay')}
-                  placeholder="Select status"
-                  searchPlaceholder="Search status..."
-                  emptyMessage="No status found"
-                  theme={theme}
-                  options={[
-                    { value: 'unpaid', label: 'Unpaid', icon: <XCircle className="w-4 h-4 text-red-500" /> },
-                    { value: 'halfpay', label: 'Half Pay', icon: <CircleDollarSign className="w-4 h-4 text-amber-500" /> },
-                    { value: 'fullpaid', label: 'Full Paid', icon: <CheckCircle className="w-4 h-4 text-emerald-500" /> },
-                  ]}
-                />
+                {invoice.paidAmount && invoice.paidAmount > 0 ? (
+                  // Show read-only status for invoices with payments
+                  <div className={`px-4 py-2 border rounded-xl flex items-center gap-2 ${
+                    theme === 'dark' 
+                      ? 'border-slate-700 bg-slate-800/30 text-slate-400' 
+                      : 'border-slate-300 bg-slate-100 text-slate-500'
+                  }`}>
+                    {invoice.paidAmount >= invoice.total ? (
+                      <>
+                        <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        <span>Full Paid</span>
+                      </>
+                    ) : (
+                      <>
+                        <CircleDollarSign className="w-4 h-4 text-amber-500" />
+                        <span>Half Pay (Rs. {(invoice.paidAmount || 0).toLocaleString()} paid)</span>
+                      </>
+                    )}
+                    <span className="ml-auto text-xs opacity-60">Auto-calculated</span>
+                  </div>
+                ) : (
+                  <SearchableSelect
+                    value={status}
+                    onValueChange={(value) => setStatus(value as 'unpaid' | 'fullpaid' | 'halfpay')}
+                    placeholder="Select status"
+                    searchPlaceholder="Search status..."
+                    emptyMessage="No status found"
+                    theme={theme}
+                    options={[
+                      { value: 'unpaid', label: 'Unpaid', icon: <XCircle className="w-4 h-4 text-red-500" /> },
+                      { value: 'halfpay', label: 'Half Pay', icon: <CircleDollarSign className="w-4 h-4 text-amber-500" /> },
+                      { value: 'fullpaid', label: 'Full Paid', icon: <CheckCircle className="w-4 h-4 text-emerald-500" /> },
+                    ]}
+                  />
+                )}
               </div>
+            </div>
+          </div>
+
+          {/* Tax Settings */}
+          <div className={`p-4 rounded-xl border ${
+            theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <span className="text-purple-400 text-sm font-bold">%</span>
+                </div>
+                <div>
+                  <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    Tax Settings
+                  </h3>
+                  <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {originalHadTax ? 'This invoice includes tax' : 'This invoice was created without tax'}
+                  </p>
+                </div>
+              </div>
+              {originalHadTax && (
+                <div className="flex items-center gap-3">
+                  <label className={`flex items-center gap-2 cursor-pointer ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <input
+                      type="checkbox"
+                      checked={hasTax}
+                      onChange={(e) => setHasTax(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
+                    />
+                    <span className="text-sm">Include Tax</span>
+                  </label>
+                  {hasTax && (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={taxPercentage}
+                        onChange={(e) => setTaxPercentage(Math.max(0, Math.min(100, Number(e.target.value))))}
+                        min={0}
+                        max={100}
+                        className={`w-16 px-2 py-1 text-sm border rounded-lg text-center ${
+                          theme === 'dark'
+                            ? 'border-slate-700 bg-slate-800 text-white'
+                            : 'border-slate-300 bg-white text-slate-900'
+                        }`}
+                      />
+                      <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>%</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!originalHadTax && (
+                <div className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                  theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'
+                }`}>
+                  Tax disabled for this invoice
+                </div>
+              )}
             </div>
           </div>
 
@@ -578,10 +681,18 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
               <span>Subtotal:</span>
               <span>Rs. {subtotal.toLocaleString()}</span>
             </div>
-            <div className={`flex justify-between ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-              <span>Tax (15%):</span>
-              <span>Rs. {Math.round(tax).toLocaleString()}</span>
-            </div>
+            {hasTax && (
+              <div className={`flex justify-between ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                <span>Tax ({taxPercentage}%):</span>
+                <span>Rs. {Math.round(tax).toLocaleString()}</span>
+              </div>
+            )}
+            {!hasTax && (
+              <div className={`flex justify-between ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                <span>Tax:</span>
+                <span className="italic">No tax</span>
+              </div>
+            )}
             <div className={`flex justify-between font-bold text-lg pt-2 border-t ${
               theme === 'dark' ? 'border-slate-700 text-white' : 'border-slate-200 text-slate-900'
             }`}>
@@ -590,6 +701,23 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                 Rs. {Math.round(total).toLocaleString()}
               </span>
             </div>
+            {/* Show paid amount if any */}
+            {invoice.paidAmount && invoice.paidAmount > 0 && (
+              <div className={`flex justify-between text-sm pt-2 border-t ${
+                theme === 'dark' ? 'border-slate-700 text-emerald-400' : 'border-slate-200 text-emerald-600'
+              }`}>
+                <span>Paid Amount:</span>
+                <span>Rs. {invoice.paidAmount.toLocaleString()}</span>
+              </div>
+            )}
+            {invoice.paidAmount && invoice.paidAmount > 0 && (
+              <div className={`flex justify-between text-sm ${
+                theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
+              }`}>
+                <span>Remaining:</span>
+                <span>Rs. {Math.max(0, Math.round(total) - invoice.paidAmount).toLocaleString()}</span>
+              </div>
+            )}
           </div>
         </div>
 

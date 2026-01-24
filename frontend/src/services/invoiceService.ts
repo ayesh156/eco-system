@@ -140,6 +140,7 @@ export interface AddPaymentData {
   paymentMethod: PaymentMethod;
   notes?: string;
   reference?: string;
+  paymentDate?: string;
 }
 
 // ===================================

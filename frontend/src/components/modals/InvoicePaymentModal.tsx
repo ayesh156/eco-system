@@ -5,14 +5,14 @@ import {
   X, CheckCircle, AlertTriangle, Sparkles, Calculator, Calendar,
   CreditCard, FileCheck, Receipt,
   Clock, TrendingUp, History, User,
-  DollarSign, Percent, Zap
+  DollarSign, Percent, Zap, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface InvoicePaymentModalProps {
   isOpen: boolean;
   invoice: Invoice | null;
   onClose: () => void;
-  onPayment: (invoiceId: string, amount: number, paymentMethod: string, notes?: string) => Promise<void> | void;
+  onPayment: (invoiceId: string, amount: number, paymentMethod: string, notes?: string, paymentDateTime?: string) => Promise<void> | void;
   paymentHistory?: CustomerPayment[];
   isProcessing?: boolean;
 }
@@ -32,6 +32,12 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'payment' | 'history'>('payment');
+  
+  // Date/Time picker states
+  const [paymentDate, setPaymentDate] = useState<string>('');
+  const [paymentTime, setPaymentTime] = useState<string>('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   const remainingAmount = invoice ? invoice.total - (invoice.paidAmount || 0) : 0;
 
@@ -39,6 +45,11 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     if (invoice) {
       setPaymentAmount(remainingAmount);
       setPaymentNotes('');
+      // Set current date and time as default
+      const now = new Date();
+      setPaymentDate(formatDateForInput(now));
+      setPaymentTime(formatTimeForInput(now));
+      setCalendarMonth(now);
     }
     setShowSuccess(false);
     setIsProcessing(false);
@@ -52,14 +63,92 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const dateFormatted = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeFormatted = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return { date: dateFormatted, time: timeFormatted };
+  };
+
+  const formatDateForInput = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatTimeForInput = (date: Date): string => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const formatDateDisplay = (dateString: string): string => {
+    if (!dateString) return 'Select date';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  const formatTimeDisplay = (timeString: string): string => {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+    return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+  };
+
+  // Calendar helper functions
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    const days: (Date | null)[] = [];
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i));
+    }
+    return days;
+  };
+
+  const isSelectedDate = (date: Date, selectedDateStr: string) => {
+    if (!selectedDateStr || !date) return false;
+    const selected = new Date(selectedDateStr);
+    return date.getDate() === selected.getDate() &&
+           date.getMonth() === selected.getMonth() &&
+           date.getFullYear() === selected.getFullYear();
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
+
+  const handleDateSelect = (date: Date) => {
+    setPaymentDate(formatDateForInput(date));
+    setShowDatePicker(false);
+  };
+
   const handlePayment = async () => {
     if (!invoice || paymentAmount <= 0 || isProcessing || externalProcessing) return;
     
     setIsProcessing(true);
     
     try {
+      // Combine date and time into ISO string
+      const paymentDateTime = paymentDate && paymentTime 
+        ? new Date(`${paymentDate}T${paymentTime}:00`).toISOString()
+        : new Date().toISOString();
+      
       // Call the parent handler and wait for it to complete
-      await onPayment(invoice.id, paymentAmount, paymentMethod, paymentNotes);
+      await onPayment(invoice.id, paymentAmount, paymentMethod, paymentNotes, paymentDateTime);
       setShowSuccess(true);
       
       // Wait a moment to show success animation then close
@@ -93,6 +182,22 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     { value: 'bank', label: 'Bank', emoji: '🏦', color: 'purple' },
     { value: 'cheque', label: 'Cheque', emoji: '📝', color: 'amber' },
   ];
+
+  // Payment method colors for history
+  const getPaymentMethodColors = (method: string) => {
+    switch (method) {
+      case 'cash':
+        return { bg: 'from-emerald-500/20 to-green-500/20', border: 'border-emerald-500/30', icon: 'bg-gradient-to-br from-emerald-500 to-green-600', text: 'text-emerald-400' };
+      case 'card':
+        return { bg: 'from-blue-500/20 to-cyan-500/20', border: 'border-blue-500/30', icon: 'bg-gradient-to-br from-blue-500 to-cyan-600', text: 'text-blue-400' };
+      case 'bank':
+        return { bg: 'from-violet-500/20 to-purple-500/20', border: 'border-violet-500/30', icon: 'bg-gradient-to-br from-violet-500 to-purple-600', text: 'text-violet-400' };
+      case 'cheque':
+        return { bg: 'from-amber-500/20 to-orange-500/20', border: 'border-amber-500/30', icon: 'bg-gradient-to-br from-amber-500 to-orange-600', text: 'text-amber-400' };
+      default:
+        return { bg: 'from-slate-500/20 to-gray-500/20', border: 'border-slate-500/30', icon: 'bg-gradient-to-br from-slate-500 to-gray-600', text: 'text-slate-400' };
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -404,6 +509,137 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                 />
               </div>
 
+              {/* Payment Date & Time */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Date Picker */}
+                <div className="relative">
+                  <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <Calendar className="w-4 h-4 text-cyan-500" />
+                    Payment Date
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className={`w-full px-4 py-3 rounded-xl border text-left flex items-center justify-between transition-all ${
+                      theme === 'dark'
+                        ? 'bg-slate-800/50 border-slate-700 text-white hover:bg-slate-800'
+                        : 'bg-white border-slate-200 text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{formatDateDisplay(paymentDate)}</span>
+                    <Calendar className="w-4 h-4 opacity-50" />
+                  </button>
+                  
+                  {/* Calendar Dropdown */}
+                  {showDatePicker && (
+                    <div className={`absolute top-full left-0 right-0 mt-2 p-3 rounded-xl border shadow-xl z-50 ${
+                      theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                    }`}>
+                      {/* Calendar Header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {/* Calendar Grid */}
+                      <div className="grid grid-cols-7 gap-1">
+                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
+                          <div key={day} className={`text-center text-xs font-medium py-1.5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {day}
+                          </div>
+                        ))}
+                        {getDaysInMonth(calendarMonth).map((date, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => date && handleDateSelect(date)}
+                            disabled={!date}
+                            className={`text-xs py-1.5 rounded-lg transition-all ${
+                              !date ? 'invisible' :
+                              isSelectedDate(date, paymentDate)
+                                ? 'bg-gradient-to-br from-cyan-500 to-blue-500 text-white font-semibold'
+                                : isToday(date)
+                                  ? theme === 'dark' 
+                                    ? 'bg-cyan-500/20 text-cyan-400 font-medium' 
+                                    : 'bg-cyan-100 text-cyan-600 font-medium'
+                                  : theme === 'dark'
+                                    ? 'hover:bg-slate-700 text-slate-300'
+                                    : 'hover:bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {date?.getDate()}
+                          </button>
+                        ))}
+                      </div>
+                      {/* Quick Actions */}
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700/50">
+                        <button
+                          type="button"
+                          onClick={() => handleDateSelect(new Date())}
+                          className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                            theme === 'dark' ? 'hover:bg-slate-700 text-cyan-400' : 'hover:bg-slate-100 text-cyan-600'
+                          }`}
+                        >
+                          Today
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowDatePicker(false)}
+                          className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                            theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-800'
+                          }`}
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Time Picker */}
+                <div>
+                  <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <Clock className="w-4 h-4 text-pink-500" />
+                    Payment Time
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="time"
+                      value={paymentTime}
+                      onChange={(e) => setPaymentTime(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-xl border transition-all ${
+                        theme === 'dark'
+                          ? 'bg-slate-800/50 border-slate-700 text-white focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20'
+                          : 'bg-white border-slate-200 text-slate-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20'
+                      }`}
+                    />
+                    <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium px-2 py-1 rounded ${
+                      theme === 'dark' ? 'bg-pink-500/20 text-pink-400' : 'bg-pink-100 text-pink-600'
+                    }`}>
+                      {formatTimeDisplay(paymentTime)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* After Payment Preview */}
               <div className={`p-4 rounded-xl border-2 border-dashed ${
                 newRemainingAfterPayment === 0 
@@ -453,67 +689,90 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {paymentHistory.map((payment, index) => (
-                    <div 
-                      key={payment.id}
-                      className={`p-4 rounded-xl border transition-all hover:scale-[1.01] ${
-                        theme === 'dark' 
-                          ? 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600' 
-                          : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                            payment.paymentMethod === 'cash' 
-                              ? 'bg-emerald-500/10 text-emerald-500'
-                              : payment.paymentMethod === 'card'
-                                ? 'bg-blue-500/10 text-blue-500'
-                                : payment.paymentMethod === 'bank'
-                                  ? 'bg-purple-500/10 text-purple-500'
-                                  : 'bg-amber-500/10 text-amber-500'
-                          }`}>
-                            {payment.paymentMethod === 'cash' ? '💵' : 
-                             payment.paymentMethod === 'card' ? '💳' : 
-                             payment.paymentMethod === 'bank' ? '🏦' : '📝'}
-                          </div>
-                          <div>
-                            <div className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                              {formatCurrency(payment.amount)}
+                  {paymentHistory.map((payment, index) => {
+                    const methodColors = getPaymentMethodColors(payment.paymentMethod);
+                    const { date: formattedDate, time: formattedTime } = formatDateTime(payment.paymentDate);
+                    
+                    return (
+                      <div 
+                        key={payment.id}
+                        className={`relative p-4 rounded-2xl border overflow-hidden transition-all hover:scale-[1.01] ${
+                          theme === 'dark' 
+                            ? `bg-gradient-to-r ${methodColors.bg} ${methodColors.border}` 
+                            : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
+                        }`}
+                      >
+                        {/* Decorative accent */}
+                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${methodColors.icon}`} />
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-lg ${methodColors.icon}`}>
+                              {payment.paymentMethod === 'cash' ? '💵' : 
+                               payment.paymentMethod === 'card' ? '💳' : 
+                               payment.paymentMethod === 'bank' ? '🏦' : '📝'}
                             </div>
-                            <div className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              {payment.paymentMethod.charAt(0).toUpperCase() + payment.paymentMethod.slice(1)}
+                            <div>
+                              <div className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                {formatCurrency(payment.amount)}
+                              </div>
+                              <div className={`flex items-center gap-2 text-xs ${methodColors.text}`}>
+                                <span className="font-medium">
+                                  {payment.paymentMethod.charAt(0).toUpperCase() + payment.paymentMethod.slice(1)}
+                                </span>
+                                <span className="opacity-50">•</span>
+                                <span className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  Payment #{index + 1}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`flex items-center gap-1.5 text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                              <Calendar className="w-3.5 h-3.5 opacity-60" />
+                              {formattedDate}
+                            </div>
+                            <div className={`flex items-center gap-1.5 text-xs mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              <Clock className="w-3 h-3 opacity-60" />
+                              {formattedTime}
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {formatShortDate(payment.paymentDate)}
+                        {payment.notes && (
+                          <div className={`mt-3 pt-3 border-t text-sm flex items-start gap-2 ${
+                            theme === 'dark' ? 'border-white/10 text-slate-300' : 'border-slate-100 text-slate-600'
+                          }`}>
+                            <span className="text-base">📝</span>
+                            <span className="italic">{payment.notes}</span>
                           </div>
-                          <div className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                            #{index + 1}
+                        )}
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Total Paid Summary */}
+                  <div className={`mt-4 p-5 rounded-2xl ${
+                    theme === 'dark' 
+                      ? 'bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 border border-emerald-500/30' 
+                      : 'bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          theme === 'dark' ? 'bg-emerald-500/30' : 'bg-emerald-100'
+                        }`}>
+                          <CheckCircle className={`w-5 h-5 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                        </div>
+                        <div>
+                          <span className={`text-sm font-medium ${theme === 'dark' ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                            Total Paid
+                          </span>
+                          <div className={`text-xs ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600/70'}`}>
+                            {paymentHistory.length} payment{paymentHistory.length !== 1 ? 's' : ''} recorded
                           </div>
                         </div>
                       </div>
-                      {payment.notes && (
-                        <div className={`mt-2 pt-2 border-t text-sm ${
-                          theme === 'dark' ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-500'
-                        }`}>
-                          📝 {payment.notes}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  
-                  {/* Total Paid Summary */}
-                  <div className={`mt-4 p-4 rounded-xl ${
-                    theme === 'dark' ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'
-                  }`}>
-                    <div className="flex items-center justify-between">
-                      <span className={`font-medium ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                        Total Paid ({paymentHistory.length} payments)
-                      </span>
-                      <span className={`text-xl font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                      <span className={`text-2xl font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
                         {formatCurrency(paymentHistory.reduce((sum, p) => sum + p.amount, 0))}
                       </span>
                     </div>
