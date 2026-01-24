@@ -618,16 +618,36 @@ How can I help you today? 😊`,
         aria-label="Open AI Assistant"
       >
         <div className="relative">
-          {/* Animated glow effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full blur-lg opacity-50 group-hover:opacity-75 animate-pulse" />
+          {/* Multi-layer animated glow effect - Creative attention grabber */}
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 rounded-full blur-xl opacity-40 group-hover:opacity-70 animate-pulse" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full blur-lg opacity-30 animate-spin-slow" 
+               style={{ animationDuration: '8s' }} />
           
-          {/* Button */}
-          <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-r from-emerald-500 to-blue-600 rounded-full shadow-2xl hover:shadow-emerald-500/50 transition-all duration-300 hover:scale-110">
-            <Sparkles className="w-6 h-6 text-white" />
+          {/* Rotating outer ring */}
+          <div className="absolute -inset-2 rounded-full border-2 border-dashed border-emerald-400/30 animate-spin-reverse"
+               style={{ animationDuration: '12s' }} />
+          
+          {/* Button with 3D tilt animation */}
+          <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-emerald-500 via-teal-500 to-blue-600 rounded-full shadow-2xl hover:shadow-emerald-500/50 transition-all duration-500 hover:scale-110 animate-float"
+               style={{
+                 transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
+                 animation: 'float 3s ease-in-out infinite, pulse-glow 2s ease-in-out infinite'
+               }}>
+            {/* Sparkles icon with continuous rotation */}
+            <Sparkles className="w-6 h-6 text-white animate-spin-slow" 
+                      style={{ animationDuration: '4s' }} />
+            
+            {/* Orbiting dots for extra flair */}
+            <div className="absolute inset-0 animate-spin" style={{ animationDuration: '6s' }}>
+              <div className="absolute top-0 left-1/2 w-1.5 h-1.5 -ml-0.75 -mt-0.75 bg-white rounded-full opacity-80" />
+            </div>
+            <div className="absolute inset-0 animate-spin-reverse" style={{ animationDuration: '5s' }}>
+              <div className="absolute bottom-0 left-1/2 w-1.5 h-1.5 -ml-0.75 -mb-0.75 bg-emerald-300 rounded-full opacity-80" />
+            </div>
           </div>
 
-          {/* Notification badge */}
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center shadow-lg">
+          {/* Notification badge with pulse */}
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center shadow-lg animate-bounce">
             <span className="text-[10px] font-bold text-white">AI</span>
           </div>
         </div>
@@ -640,6 +660,35 @@ How can I help you today? 😊`,
         }`}>
           ECOTEC AI Assistant
         </div>
+        
+        {/* Add custom keyframe animations to the document */}
+        <style>{`
+          @keyframes float {
+            0%, 100% { transform: translateY(0px) perspective(1000px) rotateX(0deg); }
+            50% { transform: translateY(-10px) perspective(1000px) rotateX(5deg); }
+          }
+          @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.8), 0 0 60px rgba(59, 130, 246, 0.4); }
+          }
+          @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          @keyframes spin-reverse {
+            from { transform: rotate(360deg); }
+            to { transform: rotate(0deg); }
+          }
+          .animate-spin-slow {
+            animation: spin-slow linear infinite;
+          }
+          .animate-spin-reverse {
+            animation: spin-reverse linear infinite;
+          }
+          .animate-float {
+            animation: float 3s ease-in-out infinite;
+          }
+        `}</style>
       </button>
     );
   }
