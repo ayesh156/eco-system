@@ -193,18 +193,24 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   const handleSave = async () => {
     if (!invoice || items.length === 0 || isSaving) return;
 
+    // Calculate the new due amount based on existing paid amount
+    const newTotal = Math.round(total * 100) / 100;
+    const paidAmount = invoice.paidAmount || 0;
+    const dueAmount = Math.max(0, newTotal - paidAmount);
+
     const updatedInvoice: Invoice = {
       ...invoice,
       items,
       subtotal: Math.round(subtotal * 100) / 100,
       tax: Math.round(tax * 100) / 100,
-      total: Math.round(total * 100) / 100,
+      total: newTotal,
+      dueAmount, // ← ADD dueAmount calculation
       date: issueDate,
       dueDate,
       // Preserve status if it was halfpay or if paid amount > 0 but < total
-      status: invoice.paidAmount && invoice.paidAmount > 0 && invoice.paidAmount < total 
+      status: paidAmount && paidAmount > 0 && paidAmount < newTotal 
         ? 'halfpay' 
-        : invoice.paidAmount && invoice.paidAmount >= total 
+        : paidAmount && paidAmount >= newTotal 
           ? 'fullpaid' 
           : status,
     };

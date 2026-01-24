@@ -656,6 +656,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Recalculate dueAmount
         const newPaidAmount = paidAmount !== undefined ? paidAmount : existingInvoice.paidAmount;
         updateData.dueAmount = updateData.total - newPaidAmount;
+        
+        // Auto-recalculate status if not explicitly provided
+        if (!updateData.status) {
+          if (newPaidAmount >= updateData.total) {
+            updateData.status = 'FULLPAID';
+          } else if (newPaidAmount > 0) {
+            updateData.status = 'HALFPAY';
+          } else {
+            updateData.status = 'UNPAID';
+          }
+        }
       } else if (total !== undefined) {
         updateData.total = total;
       }
