@@ -2,8 +2,7 @@
   "version": 2,
   "framework": null,
   "installCommand": "npm install && npx prisma generate",
-  "buildCommand": null,
-  "outputDirectory": null,
+  "buildCommand": "",
   "functions": {
     "api/**/*.ts": {
       "memory": 1024,
