@@ -2,6 +2,8 @@
 // Optimized for Vercel Pro with caching and connection pooling
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient, InvoiceStatus } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 // Global Prisma instance to reuse across requests (prevents cold start issues)
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
@@ -17,6 +19,12 @@ const prisma = globalForPrisma.prisma || new PrismaClient({
 
 // Always reuse prisma instance in production (Vercel Pro)
 globalForPrisma.prisma = prisma;
+
+// JWT Configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-change-in-production';
+const ACCESS_TOKEN_EXPIRES_IN = '15m';
+const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 // Cache headers for Vercel Edge Network (Pro feature)
 function setCacheHeaders(res: VercelResponse, maxAge: number = 10, staleWhileRevalidate: number = 59) {
@@ -90,6 +98,218 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Use global prisma instance (no await needed)
     const db = prisma;
+
+    // ==================== AUTH ROUTES ====================
+    
+    // Login
+    if (path === '/api/v1/auth/login' && method === 'POST') {
+      const { email, password } = body;
+
+      if (!email || !password) {
+        return res.status(400).json({ success: false, message: 'Email and password are required' });
+      }
+
+      const user = await db.user.findUnique({
+        where: { email: email.toLowerCase() },
+        include: { shop: { select: { id: true, name: true, slug: true } } },
+      });
+
+      if (!user) {
+        return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      }
+
+      const tokenPayload = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        shopId: user.shopId,
+      };
+
+      const accessToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
+      const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+
+      // Set refresh token cookie
+      res.setHeader('Set-Cookie', `refreshToken=${refreshToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            shop: user.shop,
+          },
+          accessToken,
+        },
+      });
+    }
+
+    // Register
+    if (path === '/api/v1/auth/register' && method === 'POST') {
+      const { email, password, name, shopSlug } = body;
+
+      if (!email || !password || !name) {
+        return res.status(400).json({ success: false, message: 'Email, password, and name are required' });
+      }
+
+      const existingUser = await db.user.findUnique({
+        where: { email: email.toLowerCase() },
+      });
+
+      if (existingUser) {
+        return res.status(409).json({ success: false, message: 'User with this email already exists' });
+      }
+
+      let shopId: string | null = null;
+      if (shopSlug) {
+        const shop = await db.shop.findUnique({ where: { slug: shopSlug } });
+        if (!shop) {
+          return res.status(404).json({ success: false, message: 'Shop not found' });
+        }
+        shopId = shop.id;
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      const user = await db.user.create({
+        data: {
+          email: email.toLowerCase(),
+          password: hashedPassword,
+          name,
+          shopId,
+          role: 'STAFF',
+        },
+        include: { shop: { select: { id: true, name: true, slug: true } } },
+      });
+
+      const tokenPayload = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        shopId: user.shopId,
+      };
+
+      const accessToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
+      const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+
+      res.setHeader('Set-Cookie', `refreshToken=${refreshToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
+
+      return res.status(201).json({
+        success: true,
+        message: 'User registered successfully',
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            shop: user.shop,
+          },
+          accessToken,
+        },
+      });
+    }
+
+    // Refresh Token
+    if (path === '/api/v1/auth/refresh' && method === 'POST') {
+      const cookies = req.headers.cookie || '';
+      const refreshToken = cookies.split(';').find(c => c.trim().startsWith('refreshToken='))?.split('=')[1];
+
+      if (!refreshToken) {
+        return res.status(401).json({ success: false, message: 'No refresh token provided' });
+      }
+
+      try {
+        const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as { id: string };
+        
+        const user = await db.user.findUnique({
+          where: { id: decoded.id },
+          include: { shop: { select: { id: true, name: true, slug: true } } },
+        });
+
+        if (!user) {
+          return res.status(401).json({ success: false, message: 'User not found' });
+        }
+
+        const tokenPayload = {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          shopId: user.shopId,
+        };
+
+        const newAccessToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
+        const newRefreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+
+        res.setHeader('Set-Cookie', `refreshToken=${newRefreshToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              shop: user.shop,
+            },
+            accessToken: newAccessToken,
+          },
+        });
+      } catch (err) {
+        return res.status(401).json({ success: false, message: 'Invalid refresh token' });
+      }
+    }
+
+    // Logout
+    if (path === '/api/v1/auth/logout' && method === 'POST') {
+      res.setHeader('Set-Cookie', `refreshToken=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0`);
+      return res.status(200).json({ success: true, message: 'Logged out successfully' });
+    }
+
+    // Get current user
+    if (path === '/api/v1/auth/me' && method === 'GET') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, message: 'No token provided' });
+      }
+
+      const token = authHeader.substring(7);
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
+        const user = await db.user.findUnique({
+          where: { id: decoded.id },
+          include: { shop: { select: { id: true, name: true, slug: true } } },
+        });
+
+        if (!user) {
+          return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+              shop: user.shop,
+            },
+          },
+        });
+      } catch (err) {
+        return res.status(401).json({ success: false, message: 'Invalid token' });
+      }
+    }
 
     // ==================== INVOICE STATS (cached for 30 seconds) ====================
     if (path === '/api/v1/invoices/stats' && method === 'GET') {
