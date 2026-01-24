@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react';
 import type { Customer, Product, Invoice } from '../data/mockData';
-import { mockCustomers, mockProducts, mockInvoices as initialMockInvoices } from '../data/mockData';
 import { customerService, convertAPICustomerToFrontend } from '../services/customerService';
 import { productService, convertAPIProductToFrontend } from '../services/productService';
 import { invoiceService, convertAPIInvoiceToFrontend } from '../services/invoiceService';
@@ -46,19 +45,19 @@ const CACHE_EXPIRY = 5 * 60 * 1000;
 
 export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Customers state
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [customersLoaded, setCustomersLoaded] = useState(false);
   const lastCustomersUpdateRef = useRef<number | null>(null);
   
   // Products state
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
   const lastProductsUpdateRef = useRef<number | null>(null);
   
   // Invoices state
-  const [invoices, setInvoices] = useState<Invoice[]>(initialMockInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
   const [invoicesLoaded, setInvoicesLoaded] = useState(false);
   const lastInvoicesUpdateRef = useRef<number | null>(null);
@@ -92,10 +91,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       return customers;
     } catch (error) {
       console.warn('⚠️ Failed to load customers from API:', error);
-      if (!customersLoaded) {
-        setCustomers(mockCustomers);
-      }
-      return customers;
+      throw error; // Re-throw so caller can handle
     } finally {
       setCustomersLoading(false);
     }
@@ -128,10 +124,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       return products;
     } catch (error) {
       console.warn('⚠️ Failed to load products from API:', error);
-      if (!productsLoaded) {
-        setProducts(mockProducts);
-      }
-      return products;
+      throw error; // Re-throw so caller can handle
     } finally {
       setProductsLoading(false);
     }
@@ -166,10 +159,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       return converted;
     } catch (error) {
       console.warn('⚠️ Failed to load invoices from API:', error);
-      if (!invoicesLoaded) {
-        setInvoices(initialMockInvoices);
-      }
-      return invoices;
+      throw error; // Re-throw so caller can handle
     } finally {
       setInvoicesLoading(false);
     }

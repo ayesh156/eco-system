@@ -4,12 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useDataCache } from '../contexts/DataCacheContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
 import { toast } from 'sonner';
-import { 
-  mockInvoices as initialMockInvoices, 
-  mockCustomers as initialMockCustomers, 
-  mockProducts,
-} from '../data/mockData';
-import type { Invoice, InvoicePayment, Customer, CustomerPayment } from '../data/mockData';
+import type { Invoice, InvoicePayment, Customer, CustomerPayment, Product } from '../data/mockData';
 import { 
   invoiceService, 
   convertAPIInvoiceToFrontend, 
@@ -37,14 +32,16 @@ export const Invoices: React.FC = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const { settings: whatsAppSettings } = useWhatsAppSettings();
-  const { invoices: cachedInvoices, customers: cachedCustomers, loadInvoices } = useDataCache();
+  const { invoices: cachedInvoices, loadInvoices, products: cachedProducts } = useDataCache();
   
-  const [invoices, setInvoices] = useState<Invoice[]>(cachedInvoices.length > 0 ? cachedInvoices : initialMockInvoices);
-  const [customers, setCustomers] = useState<Customer[]>(cachedCustomers.length > 0 ? cachedCustomers : initialMockCustomers);
+  // Start with empty arrays - will load from API
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   
   // API states
-  const [isLoading, setIsLoading] = useState(cachedInvoices.length === 0);
+  const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isUsingAPI, setIsUsingAPI] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -90,12 +87,6 @@ export const Invoices: React.FC = () => {
   const fetchInvoices = useCallback(async (forceRefresh = false) => {
     if (forceRefresh) {
       setIsRefreshing(true);
-    } else if (cachedInvoices.length > 0) {
-      // Use cached data if available and not forcing refresh
-      setInvoices(cachedInvoices);
-      setIsLoading(false);
-      setIsUsingAPI(true);
-      return;
     } else {
       setIsLoading(true);
     }
@@ -108,19 +99,18 @@ export const Invoices: React.FC = () => {
       setIsUsingAPI(true);
       console.log('✅ Loaded invoices:', loadedInvoices.length, forceRefresh ? '(refreshed)' : '(from cache)');
     } catch (error) {
-      console.warn('⚠️ API not available, using mock data:', error);
+      console.warn('⚠️ API not available:', error);
       setApiError(error instanceof Error ? error.message : 'Failed to load invoices');
-      setInvoices(initialMockInvoices);
       setIsUsingAPI(false);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [cachedInvoices, loadInvoices]);
+  }, [loadInvoices]);
 
-  // Initial load - use cache if available
+  // Initial load
   useEffect(() => {
-    fetchInvoices(false); // Don't force refresh on initial load
+    fetchInvoices(false);
   }, [fetchInvoices]);
   
   // Sync with cached invoices when they change
@@ -131,6 +121,13 @@ export const Invoices: React.FC = () => {
       setIsUsingAPI(true);
     }
   }, [cachedInvoices]);
+  
+  // Sync with cached products when they change (for edit modal)
+  useEffect(() => {
+    if (cachedProducts.length > 0) {
+      setProducts(cachedProducts);
+    }
+  }, [cachedProducts]);
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -1961,7 +1958,7 @@ export const Invoices: React.FC = () => {
       <InvoiceEditModal
         isOpen={showEditModal}
         invoice={selectedInvoice}
-        products={mockProducts}
+        products={products}
         onClose={() => {
           if (!isSaving) {
             setShowEditModal(false);

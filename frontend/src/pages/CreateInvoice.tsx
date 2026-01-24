@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDataCache } from '../contexts/DataCacheContext';
 import { toast } from 'sonner';
-import { mockCustomers, mockProducts, mockInvoices } from '../data/mockData';
+import { mockInvoices } from '../data/mockData';
 import type { Customer, Product, Invoice, InvoiceItem } from '../data/mockData';
 import PrintableInvoice from '../components/PrintableInvoice';
 import { SearchableSelect } from '../components/ui/searchable-select';
@@ -52,12 +52,12 @@ export const CreateInvoice: React.FC = () => {
   const printRef = useRef<HTMLDivElement>(null);
   const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts } = useDataCache();
   
-  // API data states - Initialize from cache if available
-  const [customers, setCustomers] = useState<Customer[]>(cachedCustomers.length > 0 ? cachedCustomers : mockCustomers);
-  const [products, setProducts] = useState<Product[]>(cachedProducts.length > 0 ? cachedProducts : mockProducts);
-  const [isLoadingData, setIsLoadingData] = useState(cachedCustomers.length === 0 || cachedProducts.length === 0);
+  // API data states - Start with empty arrays, will load from API
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   // Track if using API data (kept for future use)
-  const [, setIsUsingAPI] = useState(cachedCustomers.length > 0 || cachedProducts.length > 0);
+  const [, setIsUsingAPI] = useState(false);
   
   const [step, setStep] = useState<Step>(1);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -73,16 +73,6 @@ export const CreateInvoice: React.FC = () => {
   // Fetch customers and products from API (using cache context)
   useEffect(() => {
     const fetchData = async () => {
-      // If cache is available, use it
-      if (cachedCustomers.length > 0 && cachedProducts.length > 0) {
-        setCustomers(cachedCustomers);
-        setProducts(cachedProducts);
-        setIsLoadingData(false);
-        setIsUsingAPI(true);
-        console.log('✅ Using cached data - Customers:', cachedCustomers.length, 'Products:', cachedProducts.length);
-        return;
-      }
-      
       setIsLoadingData(true);
       try {
         // Fetch customers and products in parallel using cache context
@@ -101,7 +91,7 @@ export const CreateInvoice: React.FC = () => {
         }
         setIsUsingAPI(true);
       } catch (error) {
-        console.warn('⚠️ API not available, using mock data:', error);
+        console.warn('⚠️ API not available:', error);
         setIsUsingAPI(false);
       } finally {
         setIsLoadingData(false);
@@ -109,7 +99,7 @@ export const CreateInvoice: React.FC = () => {
     };
     
     fetchData();
-  }, [cachedCustomers, cachedProducts, loadCustomers, loadProducts]);
+  }, [loadCustomers, loadProducts]);
   
   // Sync with cached data when they change
   useEffect(() => {
@@ -441,9 +431,9 @@ export const CreateInvoice: React.FC = () => {
     
     // Update product stock - decrease stock for sold items
     items.forEach(item => {
-      const productIndex = mockProducts.findIndex(p => p.id === item.productId);
+      const productIndex = products.findIndex((p: Product) => p.id === item.productId);
       if (productIndex !== -1) {
-        const product = mockProducts[productIndex];
+        const product = products[productIndex];
         
         // Decrease stock
         product.stock = Math.max(0, (product.stock || 0) - item.quantity);
