@@ -1359,6 +1359,219 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ success: true, message: 'Password reset successfully' });
     }
 
+    // ========================================
+    // SHOP ROUTES (for branding, etc.)
+    // ========================================
+    
+    // Get Shop by ID (for branding)
+    const shopByIdMatch = path.match(/^\/api\/v1\/shops\/([^/]+)$/);
+    if (shopByIdMatch && method === 'GET') {
+      const shopIdParam = shopByIdMatch[1];
+      
+      const shop = await db.shop.findUnique({
+        where: { id: shopIdParam },
+        select: {
+          id: true,
+          name: true,
+          subName: true,
+          tagline: true,
+          slug: true,
+          logo: true,
+          address: true,
+          phone: true,
+          email: true,
+          website: true,
+          isActive: true,
+        },
+      });
+
+      if (!shop) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
+      }
+
+      return res.status(200).json({ success: true, data: shop });
+    }
+
+    // Update Shop (branding)
+    if (shopByIdMatch && (method === 'PUT' || method === 'PATCH')) {
+      const shopId = getShopIdFromToken(req);
+      const shopIdParam = shopByIdMatch[1];
+      
+      // Verify user owns this shop or is SUPER_ADMIN
+      const userRole = getUserRoleFromToken(req);
+      if (shopId !== shopIdParam && userRole !== 'SUPER_ADMIN') {
+        return res.status(403).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const { name, subName, tagline, logo, address, phone, email, website } = body;
+
+      const updatedShop = await db.shop.update({
+        where: { id: shopIdParam },
+        data: {
+          ...(name && { name }),
+          ...(subName !== undefined && { subName }),
+          ...(tagline !== undefined && { tagline }),
+          ...(logo !== undefined && { logo }),
+          ...(address !== undefined && { address }),
+          ...(phone !== undefined && { phone }),
+          ...(email !== undefined && { email }),
+          ...(website !== undefined && { website }),
+        },
+      });
+
+      return res.status(200).json({ success: true, data: updatedShop });
+    }
+
+    // ========================================
+    // SHOP ADMIN ROUTES
+    // ========================================
+
+    // Shop Admin Stats
+    if (path === '/api/v1/shop-admin/stats' && method === 'GET') {
+      const shopId = getShopIdFromToken(req);
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const [totalUsers, totalInvoices, totalCustomers, totalProducts] = await Promise.all([
+        db.user.count({ where: { shopId } }),
+        db.invoice.count({ where: { shopId } }),
+        db.customer.count({ where: { shopId } }),
+        db.product.count({ where: { shopId } }),
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          totalUsers,
+          totalInvoices,
+          totalCustomers,
+          totalProducts,
+        },
+      });
+    }
+
+    // Shop Admin Users List
+    if (path === '/api/v1/shop-admin/users' && method === 'GET') {
+      const shopId = getShopIdFromToken(req);
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const users = await db.user.findMany({
+        where: { shopId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return res.status(200).json({ success: true, data: users });
+    }
+
+    // Shop Admin Create User
+    if (path === '/api/v1/shop-admin/users' && method === 'POST') {
+      const shopId = getShopIdFromToken(req);
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const { email, password, name, role } = body;
+
+      // Check if email already exists
+      const existingUser = await db.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ success: false, message: 'Email already exists' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const newUser = await db.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name,
+          role: role || 'STAFF',
+          shopId,
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+
+      return res.status(201).json({ success: true, data: newUser });
+    }
+
+    // Shop Admin Update/Delete User
+    const shopAdminUserMatch = path.match(/^\/api\/v1\/shop-admin\/users\/([^/]+)$/);
+    if (shopAdminUserMatch && (method === 'PUT' || method === 'PATCH')) {
+      const shopId = getShopIdFromToken(req);
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const userId = shopAdminUserMatch[1];
+      const { name, email, role, password } = body;
+
+      // Verify user belongs to this shop
+      const existingUser = await db.user.findFirst({
+        where: { id: userId, shopId },
+      });
+      if (!existingUser) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      const updateData: Record<string, unknown> = {};
+      if (name) updateData.name = name;
+      if (email) updateData.email = email;
+      if (role) updateData.role = role;
+      if (password) updateData.password = await bcrypt.hash(password, 12);
+
+      const updatedUser = await db.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      return res.status(200).json({ success: true, data: updatedUser });
+    }
+
+    if (shopAdminUserMatch && method === 'DELETE') {
+      const shopId = getShopIdFromToken(req);
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const userId = shopAdminUserMatch[1];
+
+      // Verify user belongs to this shop
+      const existingUser = await db.user.findFirst({
+        where: { id: userId, shopId },
+      });
+      if (!existingUser) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      await db.user.delete({ where: { id: userId } });
+
+      return res.status(200).json({ success: true, message: 'User deleted successfully' });
+    }
+
     // Admin Toggle Shop Status
     const shopToggleMatch = path.match(/^\/api\/v1\/admin\/shops\/([^/]+)$/);
     if (shopToggleMatch && method === 'PUT') {
