@@ -17,6 +17,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { ShopSetup } from './pages/ShopSetup';
+import { ForgotPassword } from './pages/ForgotPassword';
 
 // Lazy load all other pages
 const Invoices = lazy(() => import('./pages/Invoices').then(m => ({ default: m.Invoices })));
@@ -49,6 +50,8 @@ const AIChat = lazy(() => import('./pages/AIChat').then(m => ({ default: m.AICha
 const Notes = lazy(() => import('./pages/Notes').then(m => ({ default: m.Notes })));
 const Calendar = lazy(() => import('./pages/Calendar').then(m => ({ default: m.Calendar })));
 const DataExport = lazy(() => import('./pages/DataExport').then(m => ({ default: m.DataExport })));
+const AdminDashboard = lazy(() => import('./pages/admin').then(m => ({ default: m.AdminDashboard })));
+const ShopAdminPanel = lazy(() => import('./pages/admin').then(m => ({ default: m.ShopAdminPanel })));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -93,6 +96,7 @@ function App() {
                     {/* Public Auth Routes - No Layout */}
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
                     
                     {/* Shop Setup Route - Protected but no AdminLayout */}
                     <Route path="/shop-setup" element={<ShopSetup />} />
@@ -147,6 +151,10 @@ function App() {
                               <Route path="/notes" element={<Notes />} />
                               <Route path="/calendar" element={<Calendar />} />
                               <Route path="/data-export" element={<DataExport />} />
+                              <Route path="/admin" element={<AdminDashboard />} />
+                              <Route path="/admin/shops" element={<AdminDashboard />} />
+                              <Route path="/admin/users" element={<AdminDashboard />} />
+                              <Route path="/shop-admin" element={<ShopAdminPanel />} />
                               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                               <Route path="*" element={<NotFound />} />
                             </Routes>

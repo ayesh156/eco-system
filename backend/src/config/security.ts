@@ -141,6 +141,10 @@ export const jwtConfig = {
     sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax' | 'strict',
     maxAge: 7 * 24 * 60 * 60 * 1000,        // 7 days in milliseconds
     path: '/',
+    // In development, don't set domain to allow cross-port cookies on localhost
+    ...(process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN 
+      ? { domain: process.env.COOKIE_DOMAIN } 
+      : {}),
   }),
 };
 

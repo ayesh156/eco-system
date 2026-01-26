@@ -47,3 +47,4 @@ next-env.d.ts
 
 # Prisma
 backend/prisma/migrations/*_migration_lock.toml
+.env*.local

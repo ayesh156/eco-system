@@ -33,7 +33,7 @@ interface AdminLayoutProps {
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { theme, toggleTheme, aiAutoFillEnabled, toggleAiAutoFill } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, isViewingShop, viewingShop, exitViewingShop } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -49,6 +49,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const mobileSidebarNavRef = useRef<HTMLElement>(null);
   const sidebarScrollPositionRef = useRef<number>(0);
   const mobileSidebarScrollPositionRef = useRef<number>(0);
+
+  // Handle exit viewing shop
+  const handleExitViewingShop = () => {
+    exitViewingShop();
+    navigate('/admin');
+  };
 
   // Handle logout
   const handleLogout = async () => {
@@ -146,7 +152,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     );
   };
 
-  const navItems: NavItem[] = [
+  // Super Admin navigation - Only admin-related sections
+  const superAdminNavItems: NavItem[] = [
+    { path: '/admin', icon: LayoutDashboard, label: 'Overview', badge: null },
+    { path: '/admin/shops', icon: Building, label: 'Shops', badge: null },
+    { path: '/admin/users', icon: Users, label: 'Users', badge: null },
+  ];
+
+  // Regular shop navigation - for ADMIN, MANAGER, STAFF
+  const shopNavItems: NavItem[] = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard', badge: null },
     { path: '/invoices', icon: FileText, label: 'Invoices', badge: '12' },
     { path: '/job-notes', icon: ClipboardList, label: 'Job Notes', badge: '4' },
@@ -209,11 +223,24 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     },
   ];
 
-  const bottomNavItems = [
-    { path: '/data-export', icon: Database, label: 'Data Export' },
-    { path: '/settings', icon: Settings, label: 'Settings' },
-    { path: '/help', icon: HelpCircle, label: 'Help Center' },
-  ];
+  // Select navigation based on user role and viewing state
+  // SUPER_ADMIN viewing a shop should see shop navigation
+  const navItems: NavItem[] = (user?.role === 'SUPER_ADMIN' && !isViewingShop) 
+    ? superAdminNavItems 
+    : shopNavItems;
+
+  // Bottom nav items - different for SUPER_ADMIN (when not viewing shop)
+  const bottomNavItems: NavItem[] = (user?.role === 'SUPER_ADMIN' && !isViewingShop)
+    ? [
+        { path: '/settings', icon: Settings, label: 'Settings', badge: null },
+        { path: '/help', icon: HelpCircle, label: 'Help Center', badge: null },
+      ]
+    : [
+        ...(user?.role === 'ADMIN' ? [{ path: '/shop-admin', icon: Shield, label: 'Shop Admin', badge: null }] : []),
+        { path: '/data-export', icon: Database, label: 'Data Export', badge: null },
+        { path: '/settings', icon: Settings, label: 'Settings', badge: null },
+        { path: '/help', icon: HelpCircle, label: 'Help Center', badge: null },
+      ];
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
   const isExactActive = (path: string) => location.pathname === path;
@@ -867,6 +894,28 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </div>
           </div>
         </header>
+
+        {/* Viewing Shop Banner for SUPER_ADMIN */}
+        {isViewingShop && viewingShop && (
+          <div className="sticky top-16 z-30 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2.5 shadow-lg">
+            <div className="flex items-center justify-between max-w-screen-2xl mx-auto">
+              <div className="flex items-center gap-3">
+                <Shield className="w-5 h-5" />
+                <span className="font-medium">
+                  Viewing as Super Admin: <span className="font-bold">{viewingShop.name}</span>
+                </span>
+                <span className="text-purple-200 text-sm">(@{viewingShop.slug})</span>
+              </div>
+              <button
+                onClick={handleExitViewingShop}
+                className="flex items-center gap-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-all"
+              >
+                <X className="w-4 h-4" />
+                Exit View
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Page Content */}
         <main className="p-4 lg:p-6">

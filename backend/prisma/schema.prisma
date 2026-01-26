@@ -92,6 +92,24 @@ enum UserRole {
 }
 
 // ==========================================
+// PASSWORD RESET OTP TOKENS
+// ==========================================
+
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  email       String
+  otp         String    // 6-digit OTP code
+  expiresAt   DateTime  // OTP valid for 10 minutes
+  used        Boolean   @default(false)
+  attempts    Int       @default(0) // Track failed verification attempts
+  createdAt   DateTime  @default(now())
+  
+  @@index([email])
+  @@index([otp])
+  @@map("password_reset_tokens")
+}
+
+// ==========================================
 // CUSTOMER MANAGEMENT
 // ==========================================
 

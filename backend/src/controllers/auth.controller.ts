@@ -182,6 +182,7 @@ export const register = async (
           shop: user.shop,
         },
         accessToken,
+        refreshToken, // Also send in body for environments where cookies don't work
       },
     });
   } catch (error) {
@@ -266,6 +267,7 @@ export const login = async (
           shop: user.shop,
         },
         accessToken,
+        refreshToken, // Also send in body for environments where cookies don't work
       },
     });
   } catch (error) {
@@ -284,8 +286,13 @@ export const refresh = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Get refresh token from cookie
-    const refreshToken = req.cookies[REFRESH_TOKEN_COOKIE_NAME];
+    // Get refresh token from cookie first, then fallback to body (for development/mobile)
+    let refreshToken = req.cookies[REFRESH_TOKEN_COOKIE_NAME];
+    
+    // Fallback: Check request body (for environments where cookies don't work)
+    if (!refreshToken && req.body?.refreshToken) {
+      refreshToken = req.body.refreshToken;
+    }
 
     if (!refreshToken) {
       throw new AppError('No refresh token provided', 401);
@@ -356,6 +363,7 @@ export const refresh = async (
           shop: user.shop,
         },
         accessToken: newAccessToken,
+        refreshToken: newRefreshToken, // Also send in body for environments where cookies don't work
       },
     });
   } catch (error) {

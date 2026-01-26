@@ -82,13 +82,14 @@ export const productService = {
   /**
    * Get all products with optional filtering and pagination
    */
-  async getAll(params: { page?: number; limit?: number; search?: string; categoryId?: string } = {}): Promise<{ products: APIProduct[]; pagination: PaginationInfo }> {
+  async getAll(params: { page?: number; limit?: number; search?: string; categoryId?: string; shopId?: string } = {}): Promise<{ products: APIProduct[]; pagination: PaginationInfo }> {
     const queryParams = new URLSearchParams();
     
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.limit) queryParams.append('limit', params.limit.toString());
     if (params.search) queryParams.append('search', params.search);
     if (params.categoryId) queryParams.append('categoryId', params.categoryId);
+    if (params.shopId) queryParams.append('shopId', params.shopId);
 
     const url = `${API_BASE_URL}/products?${queryParams.toString()}`;
     console.log('📝 Fetching products from:', url);
@@ -107,8 +108,11 @@ export const productService = {
   /**
    * Get a single product by ID
    */
-  async getById(id: string): Promise<APIProduct> {
-    const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+  async getById(id: string, shopId?: string): Promise<APIProduct> {
+    const queryParams = new URLSearchParams();
+    if (shopId) queryParams.append('shopId', shopId);
+    const url = `${API_BASE_URL}/products/${id}${shopId ? `?${queryParams.toString()}` : ''}`;
+    const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APIProduct>>(response);

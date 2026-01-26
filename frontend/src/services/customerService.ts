@@ -75,12 +75,13 @@ export const customerService = {
   /**
    * Get all customers with optional filtering and pagination
    */
-  async getAll(params: { page?: number; limit?: number; search?: string } = {}): Promise<{ customers: APICustomer[]; pagination: PaginationInfo }> {
+  async getAll(params: { page?: number; limit?: number; search?: string; shopId?: string } = {}): Promise<{ customers: APICustomer[]; pagination: PaginationInfo }> {
     const queryParams = new URLSearchParams();
     
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.limit) queryParams.append('limit', params.limit.toString());
     if (params.search) queryParams.append('search', params.search);
+    if (params.shopId) queryParams.append('shopId', params.shopId);
 
     const url = `${API_BASE_URL}/customers?${queryParams.toString()}`;
     console.log('📝 Fetching customers from:', url);
@@ -99,8 +100,11 @@ export const customerService = {
   /**
    * Get a single customer by ID
    */
-  async getById(id: string): Promise<APICustomer> {
-    const response = await fetch(`${API_BASE_URL}/customers/${id}`, {
+  async getById(id: string, shopId?: string): Promise<APICustomer> {
+    const queryParams = new URLSearchParams();
+    if (shopId) queryParams.append('shopId', shopId);
+    const url = `${API_BASE_URL}/customers/${id}${shopId ? `?${queryParams.toString()}` : ''}`;
+    const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APICustomer>>(response);

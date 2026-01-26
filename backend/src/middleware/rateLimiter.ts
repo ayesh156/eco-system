@@ -11,6 +11,11 @@ import { Request, Response } from 'express';
 // Rate Limit Configuration
 // ===================================
 
+// Check if we should skip rate limiting (development/test mode)
+const shouldSkipRateLimit = (): boolean => {
+  return process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
+};
+
 // Standard error response format
 const createRateLimitResponse = (message: string, retryAfter: number) => ({
   success: false,
@@ -39,10 +44,7 @@ export const authRateLimiter = rateLimit({
       15 * 60
     ));
   },
-  skip: (req: Request) => {
-    // Skip rate limiting in test environment
-    return process.env.NODE_ENV === 'test';
-  },
+  skip: () => shouldSkipRateLimit(),
 });
 
 // ===================================
@@ -67,6 +69,7 @@ export const loginRateLimiter = rateLimit({
     ));
   },
   skipSuccessfulRequests: true, // Only count failed attempts
+  skip: () => shouldSkipRateLimit(),
 });
 
 // ===================================
@@ -88,6 +91,7 @@ export const apiRateLimiter = rateLimit({
       60
     ));
   },
+  skip: () => shouldSkipRateLimit(),
 });
 
 // ===================================
@@ -110,6 +114,7 @@ export const sensitiveRateLimiter = rateLimit({
       15 * 60
     ));
   },
+  skip: () => shouldSkipRateLimit(),
 });
 
 // ===================================
@@ -132,4 +137,5 @@ export const shopRegistrationRateLimiter = rateLimit({
       24 * 60 * 60
     ));
   },
+  skip: () => shouldSkipRateLimit(),
 });

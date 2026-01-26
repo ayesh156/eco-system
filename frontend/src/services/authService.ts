@@ -31,6 +31,7 @@ export interface AuthResponse {
   data: {
     user: User;
     accessToken: string;
+    refreshToken?: string; // Also returned in body for cookie fallback
   };
 }
 
@@ -40,6 +41,7 @@ export interface RefreshResponse {
   data: {
     user: User;
     accessToken: string;
+    refreshToken?: string; // Also returned in body for cookie fallback
   };
 }
 
@@ -68,6 +70,9 @@ export interface ApiError {
 // Store access token in memory only (more secure than localStorage)
 let accessToken: string | null = null;
 
+// Refresh token fallback storage key (for environments where cookies don't work)
+const REFRESH_TOKEN_KEY = 'eco_refresh_token';
+
 // Callback to notify when token changes (for React state sync)
 let tokenChangeCallback: ((token: string | null) => void) | null = null;
 
@@ -79,6 +84,19 @@ export const setAccessToken = (token: string | null): void => {
 };
 
 export const getAccessToken = (): string | null => accessToken;
+
+// Refresh token fallback for development/mobile
+export const setRefreshToken = (token: string | null): void => {
+  if (token) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  }
+};
+
+export const getRefreshToken = (): string | null => {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+};
 
 export const onTokenChange = (callback: (token: string | null) => void): void => {
   tokenChangeCallback = callback;
@@ -210,8 +228,9 @@ export const authService = {
    */
   register: async (data: RegisterData): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/register', data);
-    const { accessToken: token } = response.data.data;
+    const { accessToken: token, refreshToken } = response.data.data;
     setAccessToken(token);
+    if (refreshToken) setRefreshToken(refreshToken);
     return response.data;
   },
 
@@ -220,18 +239,24 @@ export const authService = {
    */
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
-    const { accessToken: token } = response.data.data;
+    const { accessToken: token, refreshToken } = response.data.data;
     setAccessToken(token);
+    if (refreshToken) setRefreshToken(refreshToken);
     return response.data;
   },
 
   /**
-   * Refresh access token using refresh token cookie
+   * Refresh access token using refresh token cookie (with localStorage fallback)
    */
   refresh: async (): Promise<RefreshResponse> => {
-    const response = await apiClient.post<RefreshResponse>('/auth/refresh');
-    const { accessToken: token } = response.data.data;
+    // Send refresh token in body as fallback for cookie issues
+    const storedRefreshToken = getRefreshToken();
+    const response = await apiClient.post<RefreshResponse>('/auth/refresh', {
+      refreshToken: storedRefreshToken,
+    });
+    const { accessToken: token, refreshToken } = response.data.data;
     setAccessToken(token);
+    if (refreshToken) setRefreshToken(refreshToken);
     return response.data;
   },
 
@@ -243,6 +268,7 @@ export const authService = {
       await apiClient.post('/auth/logout');
     } finally {
       setAccessToken(null);
+      setRefreshToken(null);
     }
   },
 
@@ -254,6 +280,7 @@ export const authService = {
       await apiClient.post('/auth/logout-all');
     } finally {
       setAccessToken(null);
+      setRefreshToken(null);
     }
   },
 

@@ -16,6 +16,13 @@ import type {
 // Type Definitions
 // ===================================
 
+// Shop info for viewing mode
+interface ViewingShop {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface AuthContextType {
   // State
   user: User | null;
@@ -23,6 +30,10 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   hasShop: boolean; // Whether user has an associated shop
+  
+  // Shop Viewing (SUPER_ADMIN only)
+  viewingShop: ViewingShop | null; // The shop being viewed by SUPER_ADMIN
+  isViewingShop: boolean; // Whether SUPER_ADMIN is viewing another shop
   
   // Actions
   login: (credentials: LoginCredentials) => Promise<void>;
@@ -34,6 +45,10 @@ interface AuthContextType {
   clearError: () => void;
   refreshUser: () => Promise<void>;
   getAccessToken: () => string | null;
+  
+  // Shop Viewing Actions (SUPER_ADMIN only)
+  setViewingShop: (shop: ViewingShop | null) => void;
+  exitViewingShop: () => void;
 }
 
 interface AuthProviderProps {
@@ -54,10 +69,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Start true for initial session check
   const [error, setError] = useState<string | null>(null);
+  const [viewingShop, setViewingShopState] = useState<ViewingShop | null>(null);
 
   // Computed property
   const isAuthenticated = user !== null && getAccessToken() !== null;
   const hasShop = user?.shop !== null && user?.shop !== undefined;
+  const isViewingShop = viewingShop !== null && user?.role === 'SUPER_ADMIN';
+
+  // Set viewing shop (SUPER_ADMIN only)
+  const setViewingShop = useCallback((shop: ViewingShop | null) => {
+    if (user?.role === 'SUPER_ADMIN') {
+      setViewingShopState(shop);
+      if (shop) {
+        // Store in sessionStorage so it persists during navigation
+        sessionStorage.setItem('viewingShop', JSON.stringify(shop));
+      } else {
+        sessionStorage.removeItem('viewingShop');
+      }
+    }
+  }, [user?.role]);
+
+  // Exit viewing shop mode
+  const exitViewingShop = useCallback(() => {
+    setViewingShopState(null);
+    sessionStorage.removeItem('viewingShop');
+  }, []);
 
   // Clear error
   const clearError = useCallback(() => {
@@ -97,6 +133,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (restoredUser) {
           setUser(restoredUser);
           console.log('✅ Session restored for:', restoredUser.email);
+          
+          // Restore viewing shop for SUPER_ADMIN
+          if (restoredUser.role === 'SUPER_ADMIN') {
+            const savedViewingShop = sessionStorage.getItem('viewingShop');
+            if (savedViewingShop) {
+              try {
+                setViewingShopState(JSON.parse(savedViewingShop));
+                console.log('✅ Viewing shop restored');
+              } catch {
+                sessionStorage.removeItem('viewingShop');
+              }
+            }
+          }
         } else {
           console.log('ℹ️ No active session');
         }
@@ -154,6 +203,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Logout error:', err);
     } finally {
       setUser(null);
+      setViewingShopState(null);
+      sessionStorage.removeItem('viewingShop');
       setIsLoading(false);
     }
   }, []);
@@ -168,6 +219,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Logout all error:', err);
     } finally {
       setUser(null);
+      setViewingShopState(null);
+      sessionStorage.removeItem('viewingShop');
       setIsLoading(false);
     }
   }, []);
@@ -216,6 +269,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     error,
     hasShop,
+    viewingShop,
+    isViewingShop,
     login,
     register,
     logout,
@@ -225,6 +280,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     clearError,
     refreshUser,
     getAccessToken,
+    setViewingShop,
+    exitViewingShop,
   };
 
   return (

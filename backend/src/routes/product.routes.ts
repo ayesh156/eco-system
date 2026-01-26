@@ -35,6 +35,12 @@ router.get('/:id', async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
     const shopId = authReq.user?.shopId;
+    const { id } = req.params;
+
+    // Validate ID format
+    if (!id || !/^[a-z0-9]+$/.test(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid product ID format' });
+    }
 
     const product = await prisma.product.findUnique({
       where: { id: req.params.id },

@@ -69,6 +69,31 @@ async function main() {
   console.log(`🏪 Created shop: ${ecotechShop.name} (${ecotechShop.slug})`);
 
   // ==========================================
+  // SUPER ADMIN - Platform-wide administrator
+  // ==========================================
+  const superAdminPassword = await bcrypt.hash('SuperAdmin@123', 10);
+  
+  const superAdmin = await prisma.user.upsert({
+    where: { email: 'sdachathuranga@gmail.com' },
+    update: {
+      name: 'Sachitha Chathuranga',
+      password: superAdminPassword,
+      role: UserRole.SUPER_ADMIN,
+      isActive: true,
+    },
+    create: {
+      email: 'sdachathuranga@gmail.com',
+      password: superAdminPassword,
+      name: 'Sachitha Chathuranga',
+      role: UserRole.SUPER_ADMIN,
+      isActive: true,
+      lastLogin: new Date(),
+      shopId: null, // Super admin is not tied to any shop
+    },
+  });
+  console.log(`🛡️  Created SUPER ADMIN: ${superAdmin.name} (${superAdmin.email})`);
+
+  // ==========================================
   // USERS - Create shop admin and staff
   // ==========================================
   const hashedPassword = await bcrypt.hash('ecotech123', 10);
@@ -571,6 +596,11 @@ async function main() {
   console.log('🔑 LOGIN CREDENTIALS');
   console.log('═══════════════════════════════════════════════════');
   console.log('');
+  console.log('   🛡️ SUPER ADMIN (Platform Access)');
+  console.log('   Email    : sdachathuranga@gmail.com');
+  console.log('   Password : SuperAdmin@123');
+  console.log('');
+  console.log('   📦 SHOP USERS (EcoTech)');
   console.log('   Role      │ Email                │ Password');
   console.log('   ──────────┼──────────────────────┼───────────');
   console.log('   Admin     │ ecotech@ecotech.lk   │ ecotech123');

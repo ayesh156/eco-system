@@ -109,6 +109,7 @@ export interface GetInvoicesParams {
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  shopId?: string; // For SUPER_ADMIN viewing a specific shop
 }
 
 export interface CreateInvoiceData {
@@ -259,6 +260,7 @@ export const invoiceService = {
     if (params.search) queryParams.append('search', params.search);
     if (params.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    if (params.shopId) queryParams.append('shopId', params.shopId);
 
     const url = `${API_BASE_URL}/invoices?${queryParams.toString()}`;
     const response = await fetch(url, {

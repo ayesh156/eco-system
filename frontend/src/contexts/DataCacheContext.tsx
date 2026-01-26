@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import type { Customer, Product, Invoice } from '../data/mockData';
 import { customerService, convertAPICustomerToFrontend } from '../services/customerService';
 import { productService, convertAPIProductToFrontend } from '../services/productService';
 import { invoiceService, convertAPIInvoiceToFrontend } from '../services/invoiceService';
+import { useAuth } from './AuthContext';
 
 interface DataCacheContextType {
   // Customers
@@ -44,6 +45,12 @@ const DataCacheContext = createContext<DataCacheContextType | undefined>(undefin
 const CACHE_EXPIRY = 5 * 60 * 1000;
 
 export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Get viewing shop context for SUPER_ADMIN
+  const { viewingShop, isViewingShop, user } = useAuth();
+  
+  // Track the current shop ID for cache invalidation
+  const currentShopIdRef = useRef<string | null>(null);
+  
   // Customers state
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
@@ -63,6 +70,32 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   const lastInvoicesUpdateRef = useRef<number | null>(null);
   
   const [isUsingAPI, setIsUsingAPI] = useState(false);
+  
+  // Get the effective shop ID (viewing shop for SUPER_ADMIN, own shop otherwise)
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : user?.shop?.id;
+  
+  // Clear cache when switching shops (SUPER_ADMIN viewing different shops)
+  useEffect(() => {
+    const newShopId = effectiveShopId || null;
+    
+    if (currentShopIdRef.current !== null && currentShopIdRef.current !== newShopId) {
+      console.log('🔄 Shop changed, clearing data cache');
+      // Clear all cached data
+      setCustomers([]);
+      setCustomersLoaded(false);
+      lastCustomersUpdateRef.current = null;
+      
+      setProducts([]);
+      setProductsLoaded(false);
+      lastProductsUpdateRef.current = null;
+      
+      setInvoices([]);
+      setInvoicesLoaded(false);
+      lastInvoicesUpdateRef.current = null;
+    }
+    
+    currentShopIdRef.current = newShopId;
+  }, [effectiveShopId]);
 
   // Load customers with caching
   const loadCustomers = useCallback(async (forceRefresh = false): Promise<Customer[]> => {
@@ -78,12 +111,14 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     
     setCustomersLoading(true);
     try {
-      const { customers: apiCustomers } = await customerService.getAll({ limit: 1000 });
+      // Pass shopId for SUPER_ADMIN viewing a specific shop
+      const shopIdParam = isViewingShop && viewingShop ? viewingShop.id : undefined;
+      const { customers: apiCustomers } = await customerService.getAll({ limit: 1000, shopId: shopIdParam });
       const converted = apiCustomers.map(convertAPICustomerToFrontend);
       if (converted.length > 0) {
         setCustomers(converted);
         setIsUsingAPI(true);
-        console.log('✅ Loaded customers from API:', converted.length);
+        console.log('✅ Loaded customers from API:', converted.length, shopIdParam ? `(shop: ${viewingShop?.name})` : '');
         setCustomersLoaded(true);
         lastCustomersUpdateRef.current = now;
         return converted;
@@ -95,7 +130,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     } finally {
       setCustomersLoading(false);
     }
-  }, [customersLoaded, customers]);
+  }, [customersLoaded, customers, isViewingShop, viewingShop]);
 
   // Load products with caching
   const loadProducts = useCallback(async (forceRefresh = false): Promise<Product[]> => {
@@ -111,12 +146,14 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     
     setProductsLoading(true);
     try {
-      const { products: apiProducts } = await productService.getAll({ limit: 1000 });
+      // Pass shopId for SUPER_ADMIN viewing a specific shop
+      const shopIdParam = isViewingShop && viewingShop ? viewingShop.id : undefined;
+      const { products: apiProducts } = await productService.getAll({ limit: 1000, shopId: shopIdParam });
       const converted = apiProducts.map(convertAPIProductToFrontend);
       if (converted.length > 0) {
         setProducts(converted);
         setIsUsingAPI(true);
-        console.log('✅ Loaded products from API:', converted.length);
+        console.log('✅ Loaded products from API:', converted.length, shopIdParam ? `(shop: ${viewingShop?.name})` : '');
         setProductsLoaded(true);
         lastProductsUpdateRef.current = now;
         return converted;
@@ -128,7 +165,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     } finally {
       setProductsLoading(false);
     }
-  }, [productsLoaded, products]);
+  }, [productsLoaded, products, isViewingShop, viewingShop]);
 
   // Load invoices with caching
   const loadInvoices = useCallback(async (forceRefresh = false): Promise<Invoice[]> => {
@@ -144,16 +181,19 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     
     setInvoicesLoading(true);
     try {
+      // Pass shopId for SUPER_ADMIN viewing a specific shop
+      const shopIdParam = isViewingShop && viewingShop ? viewingShop.id : undefined;
       const { invoices: apiInvoices } = await invoiceService.getAll({
         page: 1,
         limit: 1000,
         sortBy: 'date',
         sortOrder: 'desc',
+        shopId: shopIdParam,
       });
       const converted = apiInvoices.map(convertAPIInvoiceToFrontend);
       setInvoices(converted);
       setIsUsingAPI(true);
-      console.log('✅ Loaded invoices from API:', converted.length);
+      console.log('✅ Loaded invoices from API:', converted.length, shopIdParam ? `(shop: ${viewingShop?.name})` : '');
       setInvoicesLoaded(true);
       lastInvoicesUpdateRef.current = now;
       return converted;
@@ -163,7 +203,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     } finally {
       setInvoicesLoading(false);
     }
-  }, [invoicesLoaded, invoices]);
+  }, [invoicesLoaded, invoices, isViewingShop, viewingShop]);
 
   return (
     <DataCacheContext.Provider value={{

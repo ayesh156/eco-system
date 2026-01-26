@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { mockInvoices, mockProducts, mockCustomers } from '../data/mockData';
 import { AIMonthlyAnalysis } from '../components/AIMonthlyAnalysis';
 import { 
@@ -11,7 +12,24 @@ import {
 
 export const Dashboard: React.FC = () => {
   const { theme } = useTheme();
+  const { user, isViewingShop, viewingShop } = useAuth();
+  const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState('7d');
+
+  // Redirect SUPER_ADMIN to admin dashboard (only if not viewing a shop)
+  useEffect(() => {
+    if (user?.role === 'SUPER_ADMIN' && !isViewingShop) {
+      navigate('/admin', { replace: true });
+    }
+  }, [user, isViewingShop, navigate]);
+
+  // If SUPER_ADMIN and not viewing a shop, show nothing while redirecting
+  if (user?.role === 'SUPER_ADMIN' && !isViewingShop) {
+    return null;
+  }
+
+  // Determine which shop name to display
+  const shopName = isViewingShop && viewingShop ? viewingShop.name : user?.shop?.name || 'Your Shop';
 
   // Calculate statistics
   const fullpaidInvoices = mockInvoices.filter((inv) => inv.status === 'fullpaid').length;
@@ -57,10 +75,13 @@ export const Dashboard: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-            Dashboard
+            {isViewingShop ? `${shopName} Dashboard` : 'Dashboard'}
           </h1>
           <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            Welcome back! Here's what's happening with your store today.
+            {isViewingShop 
+              ? `Viewing ${shopName}'s data as Super Admin`
+              : "Welcome back! Here's what's happening with your store today."
+            }
           </p>
         </div>
         <div className="flex items-center gap-3">

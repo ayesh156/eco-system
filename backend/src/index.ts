@@ -36,6 +36,8 @@ import invoiceRoutes from './routes/invoice.routes';
 import customerRoutes from './routes/customer.routes';
 import productRoutes from './routes/product.routes';
 import shopRoutes from './routes/shop.routes';
+import adminRoutes from './routes/admin.routes';
+import shopAdminRoutes from './routes/shopAdmin.routes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -389,6 +391,8 @@ app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
 app.use(`${API_PREFIX}/customers`, customerRoutes);
 app.use(`${API_PREFIX}/products`, productRoutes);
 app.use(`${API_PREFIX}/shops`, shopRoutes);
+app.use(`${API_PREFIX}/admin`, adminRoutes);
+app.use(`${API_PREFIX}/shop-admin`, shopAdminRoutes);
 
 // Error handling
 app.use(notFound);
