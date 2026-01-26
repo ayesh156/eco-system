@@ -23,7 +23,6 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
     // Use branding values with fallbacks
     const shopName = branding?.name || 'ECOTEC';
     const shopLogo = branding?.logo || defaultLogo;
-    const shopTagline = branding?.tagline || 'Computer Solutions';
     const shopPhone = branding?.phone || '011-2345678';
     const shopEmail = branding?.email || 'info@ecotec.lk';
 
@@ -166,12 +165,6 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
 
           .company-info h1 span {
             color: #000;
-          }
-
-          .company-info .tagline {
-            font-size: 8pt;
-            color: #000;
-            margin-top: 2px;
           }
 
           .company-info .contact {
@@ -574,7 +567,6 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
             <img src={shopLogo} alt="Logo" className="company-logo" />
             <div className="company-info">
               <h1>{shopName.includes(' ') ? shopName : <>{shopName.substring(0, 3)}<span>{shopName.substring(3)}</span></>}</h1>
-              <div className="tagline">{shopTagline}</div>
               <div className="contact">{shopPhone} | {shopEmail}</div>
             </div>
           </div>

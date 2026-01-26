@@ -41,7 +41,6 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
     const shopAddress = branding?.address || 'No.14, Mulatiyana junction, Mulatiyana, Matara.';
     const shopPhone = branding?.phone || '0711453111';
     const shopEmail = branding?.email || 'ecoteccomputersolutions@gmail.com';
-    const shopTagline = branding?.tagline || '';
 
     const formatCurrency = (amount: number) => {
       return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
@@ -121,19 +120,6 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
             border-bottom: 2px solid #000;
           }
 
-          .tagline-banner {
-            text-align: center;
-            padding: 6px 0;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #ccc;
-          }
-
-          .tagline-banner span {
-            font-size: 8pt;
-            font-style: italic;
-            color: #555;
-            letter-spacing: 0.5px;
-          }
 
           .company-section {
             display: flex;
@@ -543,13 +529,6 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
             </div>
           </div>
         </div>
-
-        {/* Tagline Banner */}
-        {shopTagline && (
-          <div className="tagline-banner">
-            <span>✨ {shopTagline} ✨</span>
-          </div>
-        )}
 
         {/* Invoice Title Section */}
         <div className="invoice-title-section">

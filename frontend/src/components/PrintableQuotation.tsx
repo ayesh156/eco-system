@@ -129,14 +129,6 @@ export const PrintableQuotation = forwardRef<HTMLDivElement, PrintableQuotationP
             margin: 0;
           }
 
-          .company-info .tagline {
-            font-size: 8pt;
-            color: #000;
-            margin-top: 2px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-          }
-
           .company-info .contact {
             font-size: 7pt;
             color: #000;
@@ -529,7 +521,6 @@ export const PrintableQuotation = forwardRef<HTMLDivElement, PrintableQuotationP
             <img src={logo} alt="Logo" className="company-logo" />
             <div className="company-info">
               <h1>ECOTEC</h1>
-              <div className="tagline">Computer Solutions</div>
               <div className="contact">Tel: 011-2345678 | 077-1234567 | Email: info@ecotec.lk</div>
             </div>
           </div>
