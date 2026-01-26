@@ -9,11 +9,25 @@ const router = Router();
 // 🔒 All customer routes require authentication and shop
 router.use(protect, requireShop);
 
+// Helper function to get effective shopId for SuperAdmin shop viewing
+const getEffectiveShopId = (authReq: AuthRequest): string | null => {
+  const { shopId: queryShopId } = authReq.query;
+  const userRole = authReq.user?.role;
+  const userShopId = authReq.user?.shopId;
+  
+  // SuperAdmin can view any shop by passing shopId query parameter
+  if (userRole === 'SUPER_ADMIN' && queryShopId && typeof queryShopId === 'string') {
+    return queryShopId;
+  }
+  
+  return userShopId || null;
+};
+
 // Get all customers (filtered by shop)
 router.get('/', async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
-    const shopId = authReq.user?.shopId;
+    const shopId = getEffectiveShopId(authReq);
     
     if (!shopId) {
       return res.status(403).json({ success: false, message: 'Shop access required' });
@@ -33,7 +47,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const authReq = req as AuthRequest;
-    const shopId = authReq.user?.shopId;
+    const shopId = getEffectiveShopId(authReq);
     const { id } = req.params;
 
     // Validate ID format

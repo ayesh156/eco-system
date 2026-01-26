@@ -5,6 +5,20 @@ import { Prisma, InvoiceStatus, PaymentMethod, SalesChannel, ReminderType } from
 // Import centralized type definitions
 import '../types/express.d';
 
+// Helper function to get effective shopId for SuperAdmin shop viewing
+const getEffectiveShopId = (req: Request & { user?: { id: string; role?: string; shopId: string | null } }): string | null => {
+  const { shopId: queryShopId } = req.query;
+  const userRole = req.user?.role;
+  const userShopId = req.user?.shopId;
+  
+  // SuperAdmin can view any shop by passing shopId query parameter
+  if (userRole === 'SUPER_ADMIN' && queryShopId && typeof queryShopId === 'string') {
+    return queryShopId;
+  }
+  
+  return userShopId || null;
+};
+
 // Helper function to generate invoice number
 const generateInvoiceNumber = async (): Promise<string> => {
   const year = new Date().getFullYear();
@@ -38,13 +52,15 @@ const calculateInvoiceStatus = (total: number, paidAmount: number): InvoiceStatu
 // @route   GET /api/v1/invoices
 // @access  Private (requires authentication and shop access)
 export const getAllInvoices = async (
-  req: Request & { user?: { id: string; shopId: string | null } },
+  req: Request & { user?: { id: string; role?: string; shopId: string | null } },
   res: Response,
   next: NextFunction
 ) => {
   try {
-    // 🔒 User must have a shopId
-    if (!req.user?.shopId) {
+    // 🔒 Get effective shopId (supports SuperAdmin shop viewing)
+    const shopId = getEffectiveShopId(req);
+    
+    if (!shopId) {
       throw new AppError('User is not associated with any shop', 403);
     }
 
@@ -66,8 +82,8 @@ export const getAllInvoices = async (
 
     // Build filter conditions
     const where: Prisma.InvoiceWhereInput = {
-      // 🔒 CRITICAL: Only show invoices for the user's shop
-      shopId: req.user.shopId,
+      // 🔒 CRITICAL: Only show invoices for the effective shop
+      shopId,
     };
 
     if (status && status !== 'all') {
@@ -222,11 +238,12 @@ export const getInvoiceById = async (
       throw new AppError(`Invoice not found with ID or number: ${id}`, 404);
     }
 
-    // 🔐 SECURITY: Verify invoice belongs to user's shop
-    if (!req.user?.shopId) {
+    // 🔐 SECURITY: Verify invoice belongs to user's shop or SuperAdmin viewing shop
+    const effectiveShopId = getEffectiveShopId(req as Request & { user?: { id: string; role?: string; shopId: string | null } });
+    if (!effectiveShopId) {
       throw new AppError('User is not associated with any shop', 403);
     }
-    if (invoice.shopId !== req.user.shopId) {
+    if (invoice.shopId !== effectiveShopId) {
       throw new AppError('You do not have permission to access this invoice', 403);
     }
 
@@ -818,11 +835,11 @@ export const getInvoiceStats = async (
   next: NextFunction
 ) => {
   try {
-    // 🔐 SECURITY: Filter stats by user's shop
-    if (!req.user?.shopId) {
+    // 🔐 SECURITY: Filter stats by user's shop (or SuperAdmin viewing shop)
+    const shopId = getEffectiveShopId(req as Request & { user?: { id: string; role?: string; shopId: string | null } });
+    if (!shopId) {
       throw new AppError('User is not associated with any shop', 403);
     }
-    const shopId = req.user.shopId;
 
     const [
       totalInvoices,
@@ -930,11 +947,12 @@ export const getInvoiceReminders = async (
       throw new AppError('Invoice not found', 404);
     }
 
-    // 🔐 SECURITY: Verify invoice belongs to user's shop
-    if (!req.user?.shopId) {
+    // 🔐 SECURITY: Verify invoice belongs to user's shop (or SuperAdmin viewing shop)
+    const effectiveShopId = getEffectiveShopId(req as Request & { user?: { id: string; role?: string; shopId: string | null } });
+    if (!effectiveShopId) {
       throw new AppError('User is not associated with any shop', 403);
     }
-    if (invoice.shopId !== req.user.shopId) {
+    if (invoice.shopId !== effectiveShopId) {
       throw new AppError('You do not have permission to access reminders for this invoice', 403);
     }
 

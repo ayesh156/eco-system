@@ -61,6 +61,9 @@ export const CreateInvoice: React.FC = () => {
   // Track if using API data (kept for future use)
   const [, setIsUsingAPI] = useState(false);
   
+  // Track if initial load has happened
+  const initialLoadRef = useRef(false);
+  
   const [step, setStep] = useState<Step>(1);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [isWalkIn, setIsWalkIn] = useState(false);
@@ -72,8 +75,11 @@ export const CreateInvoice: React.FC = () => {
   const [enableTax, setEnableTax] = useState<boolean>(taxSettings.enabled);
   const taxRate = taxSettings.defaultPercentage;
   
-  // Fetch customers and products from API (using cache context)
+  // Fetch customers and products from API (using cache context) - only once
   useEffect(() => {
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
+    
     const fetchData = async () => {
       setIsLoadingData(true);
       try {
@@ -101,18 +107,22 @@ export const CreateInvoice: React.FC = () => {
     };
     
     fetchData();
-  }, [loadCustomers, loadProducts]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
-  // Sync with cached data when they change
+  // Sync with cached data when they change (handles shop switching)
   useEffect(() => {
     if (cachedCustomers.length > 0) {
       setCustomers(cachedCustomers);
+    } else if (initialLoadRef.current) {
+      setCustomers([]);
     }
   }, [cachedCustomers]);
   
   useEffect(() => {
     if (cachedProducts.length > 0) {
       setProducts(cachedProducts);
+    } else if (initialLoadRef.current) {
+      setProducts([]);
     }
   }, [cachedProducts]);
   

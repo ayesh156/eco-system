@@ -4,14 +4,15 @@
   "outputDirectory": "frontend/dist",
   "framework": "vite",
   "functions": {
-    "backend/api/**/*.ts": {
-      "maxDuration": 30
+    "api/**/*.ts": {
+      "maxDuration": 30,
+      "memory": 512
     }
   },
   "rewrites": [
     {
       "source": "/api/v1/:path*",
-      "destination": "/backend/api/index.ts"
+      "destination": "/api/index.ts"
     },
     {
       "source": "/((?!assets/|api/).*)",

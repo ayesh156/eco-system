@@ -90,6 +90,9 @@ export const Invoices: React.FC = () => {
   // Operation loading states
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Track if initial load has happened
+  const initialLoadRef = useRef(false);
 
   // Fetch invoices from API (only when explicitly refreshing)
   const fetchInvoices = useCallback(async (forceRefresh = false) => {
@@ -120,24 +123,34 @@ export const Invoices: React.FC = () => {
     }
   }, [loadInvoices, loadCustomers]);
 
-  // Initial load
+  // Initial load - only run once
   useEffect(() => {
-    fetchInvoices(false);
-  }, [fetchInvoices]);
+    if (!initialLoadRef.current) {
+      initialLoadRef.current = true;
+      fetchInvoices(false);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
-  // Sync with cached invoices when they change
+  // Sync with cached invoices when they change (from cache context)
+  // This handles shop switching for SuperAdmin
   useEffect(() => {
-    if (cachedInvoices.length > 0) {
+    // Only sync if we have data and are past initial load
+    if (cachedInvoices.length > 0 && initialLoadRef.current) {
       setInvoices(cachedInvoices);
       setIsLoading(false);
       setIsUsingAPI(true);
+    } else if (cachedInvoices.length === 0 && initialLoadRef.current && !isLoading) {
+      // Cache was cleared (shop switch) - need to reload
+      setInvoices([]);
     }
-  }, [cachedInvoices]);
+  }, [cachedInvoices]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Sync with cached customers when they change (for phone numbers)
   useEffect(() => {
     if (cachedCustomers.length > 0) {
       setCustomers(cachedCustomers);
+    } else {
+      setCustomers([]);
     }
   }, [cachedCustomers]);
   
@@ -145,12 +158,14 @@ export const Invoices: React.FC = () => {
   useEffect(() => {
     if (cachedProducts.length > 0) {
       setProducts(cachedProducts);
+    } else {
+      setProducts([]);
     }
   }, [cachedProducts]);
   
   // Load products for edit modal when page mounts
   useEffect(() => {
-    if (cachedProducts.length === 0) {
+    if (cachedProducts.length === 0 && initialLoadRef.current) {
       loadProducts();
     }
   }, [cachedProducts.length, loadProducts]);
