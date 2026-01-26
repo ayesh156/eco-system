@@ -115,8 +115,12 @@ function getEffectiveShopId(req: VercelRequest, query: Record<string, string>): 
   const userShopId = getShopIdFromToken(req);
   const queryShopId = query.shopId;
   
+  // Debug logging for production troubleshooting
+  console.log('🔍 getEffectiveShopId:', { userRole, userShopId, queryShopId });
+  
   // SuperAdmin can view any shop by passing shopId query parameter
   if (userRole === 'SUPER_ADMIN' && queryShopId) {
+    console.log('✅ SuperAdmin viewing shop:', queryShopId);
     return queryShopId;
   }
   
@@ -130,9 +134,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
-  const { path, query } = parseUrl(req.url || '/');
+  const { path, query: parsedQuery } = parseUrl(req.url || '/');
   const method = req.method || 'GET';
   const body = req.body || {};
+  
+  // Merge Vercel's req.query with parsed query for compatibility
+  // Vercel provides query params in req.query as string | string[] | undefined
+  const query: Record<string, string> = { ...parsedQuery };
+  if (req.query) {
+    Object.entries(req.query).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        query[key] = value;
+      } else if (Array.isArray(value) && value.length > 0) {
+        query[key] = value[0];
+      }
+    });
+  }
   
   // Get shopId from authenticated user's token
   const shopId = getShopIdFromToken(req);

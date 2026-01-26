@@ -92,6 +92,41 @@ function getShopIdFromToken(req: VercelRequest): string | null {
   }
 }
 
+// Get user role from JWT token
+function getUserRoleFromToken(req: VercelRequest): string | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  const token = authHeader.substring(7);
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { role?: string };
+    return decoded.role || null;
+  } catch {
+    return null;
+  }
+}
+
+// Get effective shopId for SuperAdmin shop viewing
+// SuperAdmin can view any shop by passing shopId query parameter
+function getEffectiveShopId(req: VercelRequest, query: Record<string, string>): string | null {
+  const userRole = getUserRoleFromToken(req);
+  const userShopId = getShopIdFromToken(req);
+  const queryShopId = query.shopId;
+  
+  // Debug logging for production troubleshooting
+  console.log('🔍 getEffectiveShopId:', { userRole, userShopId, queryShopId });
+  
+  // SuperAdmin can view any shop by passing shopId query parameter
+  if (userRole === 'SUPER_ADMIN' && queryShopId) {
+    console.log('✅ SuperAdmin viewing shop:', queryShopId);
+    return queryShopId;
+  }
+  
+  return userShopId;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res);
 
@@ -99,9 +134,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
-  const { path, query } = parseUrl(req.url || '/');
+  const { path, query: parsedQuery } = parseUrl(req.url || '/');
   const method = req.method || 'GET';
   const body = req.body || {};
+  
+  // Merge Vercel's req.query with parsed query for compatibility
+  // Vercel provides query params in req.query as string | string[] | undefined
+  const query: Record<string, string> = { ...parsedQuery };
+  if (req.query) {
+    Object.entries(req.query).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        query[key] = value;
+      } else if (Array.isArray(value) && value.length > 0) {
+        query[key] = value[0];
+      }
+    });
+  }
   
   // Get shopId from authenticated user's token
   const shopId = getShopIdFromToken(req);
@@ -333,8 +381,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== INVOICE STATS (cached for 30 seconds) ====================
     if (path === '/api/v1/invoices/stats' && method === 'GET') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Get effective shopId (supports SuperAdmin shop viewing)
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
@@ -342,7 +391,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       setCacheHeaders(res, 30, 60);
       
       const invoices = await db.invoice.findMany({
-        where: { shopId }, // CRITICAL: Filter by shopId
+        where: { shopId: effectiveShopId }, // CRITICAL: Filter by effectiveShopId
         include: { payments: true },
       });
       
@@ -385,8 +434,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== INVOICES LIST ====================
     if (path === '/api/v1/invoices' && method === 'GET') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Get effective shopId (supports SuperAdmin shop viewing)
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
@@ -398,7 +448,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const sortBy = query.sortBy || 'date';
       const sortOrder = (query.sortOrder || 'desc') as 'asc' | 'desc';
 
-      const where: any = { shopId }; // CRITICAL: Always filter by shopId
+      const where: any = { shopId: effectiveShopId }; // CRITICAL: Always filter by effectiveShopId
       if (status && status !== 'all') {
         where.status = status.toUpperCase();
       }
@@ -447,8 +497,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ==================== GET SINGLE INVOICE (with caching) ====================
     const invoiceGetMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)$/);
     if (invoiceGetMatch && method === 'GET') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Get effective shopId (supports SuperAdmin shop viewing)
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
@@ -493,8 +544,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
-      // CRITICAL: Verify ownership before returning data
-      if (invoice.shopId !== shopId) {
+      // CRITICAL: Verify ownership before returning data (use effectiveShopId for SuperAdmin viewing)
+      if (invoice.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
       }
       
@@ -920,13 +971,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== CUSTOMERS (cached for 30 seconds) ====================
     if (path === '/api/v1/customers' && method === 'GET') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Get effective shopId (supports SuperAdmin shop viewing)
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       setCacheHeaders(res, 30, 60);
       const customers = await db.customer.findMany({ 
-        where: { shopId }, // CRITICAL: Filter by shopId
+        where: { shopId: effectiveShopId }, // CRITICAL: Filter by effectiveShopId
         orderBy: { name: 'asc' } 
       });
       return res.status(200).json({ success: true, data: customers });
@@ -937,14 +989,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       const customer = await db.customer.create({ 
-        data: { ...body, shopId } // CRITICAL: Set shopId from token
+        data: { ...body, shopId } // CRITICAL: Set shopId from token (not query)
       });
       return res.status(201).json({ success: true, data: customer });
     }
 
     const customerMatch = path.match(/^\/api\/v1\/customers\/([^/]+)$/);
     if (customerMatch && method === 'GET') {
-      if (!shopId) {
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       const customer = await db.customer.findUnique({ where: { id: customerMatch[1] } });
@@ -990,13 +1043,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== PRODUCTS (cached for 60 seconds) ====================
     if (path === '/api/v1/products' && method === 'GET') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Get effective shopId (supports SuperAdmin shop viewing)
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       setCacheHeaders(res, 60, 120); // Products don't change often
       const products = await db.product.findMany({
-        where: { shopId }, // CRITICAL: Filter by shopId
+        where: { shopId: effectiveShopId }, // CRITICAL: Filter by effectiveShopId
         include: { category: true, brand: true },
         orderBy: { name: 'asc' },
       });
@@ -1008,7 +1062,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       const product = await db.product.create({ 
-        data: { ...body, shopId }, // CRITICAL: Set shopId from token
+        data: { ...body, shopId }, // CRITICAL: Set shopId from token (not query)
         include: { category: true, brand: true },
       });
       return res.status(201).json({ success: true, data: product });
@@ -1016,7 +1070,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const productMatch = path.match(/^\/api\/v1\/products\/([^/]+)$/);
     if (productMatch && method === 'GET') {
-      if (!shopId) {
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       const product = await db.product.findUnique({ 
