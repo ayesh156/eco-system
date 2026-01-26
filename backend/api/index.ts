@@ -41,7 +41,8 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   // Allowed origins - add your Vercel frontend URLs here
   const allowedOrigins = [
     process.env.FRONTEND_URL,
-    'https://eco-system-hdt8.vercel.app',  // Main frontend
+    'https://eco-system-brown.vercel.app',  // Main production frontend
+    'https://eco-system-hdt8.vercel.app',  // Legacy frontend
     'http://localhost:5173',
     'http://localhost:5174',
     'http://localhost:3000',
@@ -1073,6 +1074,251 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/api/v1/brands' && method === 'GET') {
       const brands = await db.brand.findMany({ orderBy: { name: 'asc' } });
       return res.status(200).json({ success: true, data: brands });
+    }
+
+    // ==================== ADMIN ROUTES (Super Admin Only) ====================
+    
+    // Helper to verify SUPER_ADMIN role
+    const verifySuperAdmin = async (): Promise<{ user: any; error?: string }> => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+        return { user: null, error: 'No token provided' };
+      }
+      const token = authHeader.substring(7);
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
+        if (decoded.role !== 'SUPER_ADMIN') {
+          return { user: null, error: 'Super Admin access required' };
+        }
+        const user = await db.user.findUnique({ where: { id: decoded.id } });
+        if (!user || !user.isActive) {
+          return { user: null, error: 'User not found or inactive' };
+        }
+        return { user };
+      } catch {
+        return { user: null, error: 'Invalid token' };
+      }
+    };
+
+    // Admin Stats
+    if (path === '/api/v1/admin/stats' && method === 'GET') {
+      const { user, error } = await verifySuperAdmin();
+      if (error) return res.status(403).json({ success: false, message: error });
+
+      const [totalShops, totalUsers, activeShops, totalInvoices, totalCustomers, totalProducts] = await Promise.all([
+        db.shop.count(),
+        db.user.count(),
+        db.shop.count({ where: { isActive: true } }),
+        db.invoice.count(),
+        db.customer.count(),
+        db.product.count(),
+      ]);
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const [recentShops, recentUsers] = await Promise.all([
+        db.shop.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+        db.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          totalShops,
+          totalUsers,
+          activeShops,
+          inactiveShops: totalShops - activeShops,
+          totalInvoices,
+          totalCustomers,
+          totalProducts,
+          recentShops,
+          recentUsers,
+        },
+      });
+    }
+
+    // Admin Shops List
+    if (path === '/api/v1/admin/shops' && method === 'GET') {
+      const { user, error } = await verifySuperAdmin();
+      if (error) return res.status(403).json({ success: false, message: error });
+
+      const shops = await db.shop.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: { users: true, customers: true, products: true, invoices: true },
+          },
+        },
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: shops.map(shop => ({
+          id: shop.id,
+          name: shop.name,
+          slug: shop.slug,
+          email: shop.email,
+          phone: shop.phone,
+          address: shop.address,
+          logo: shop.logo,
+          isActive: shop.isActive,
+          currency: shop.currency,
+          taxRate: shop.taxRate,
+          businessRegNo: shop.businessRegNo,
+          createdAt: shop.createdAt,
+          updatedAt: shop.updatedAt,
+          userCount: shop._count.users,
+          customerCount: shop._count.customers,
+          productCount: shop._count.products,
+          invoiceCount: shop._count.invoices,
+        })),
+      });
+    }
+
+    // Admin Users List
+    if (path === '/api/v1/admin/users' && method === 'GET') {
+      const { user, error } = await verifySuperAdmin();
+      if (error) return res.status(403).json({ success: false, message: error });
+
+      const users = await db.user.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: { shop: { select: { id: true, name: true, slug: true } } },
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: users.map(u => ({
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          isActive: u.isActive,
+          createdAt: u.createdAt,
+          updatedAt: u.updatedAt,
+          lastLogin: u.lastLogin,
+          shopId: u.shopId,
+          shop: u.shop,
+        })),
+      });
+    }
+
+    // Admin Update User
+    const adminUserMatch = path.match(/^\/api\/v1\/admin\/users\/([^/]+)$/);
+    if (adminUserMatch && method === 'PUT') {
+      const { user, error } = await verifySuperAdmin();
+      if (error) return res.status(403).json({ success: false, message: error });
+
+      const userId = adminUserMatch[1];
+      const { name, email, role, isActive, shopId: newShopId } = body;
+
+      const updatedUser = await db.user.update({
+        where: { id: userId },
+        data: {
+          ...(name && { name }),
+          ...(email && { email: email.toLowerCase() }),
+          ...(role && { role }),
+          ...(typeof isActive === 'boolean' && { isActive }),
+          ...(newShopId !== undefined && { shopId: newShopId || null }),
+        },
+        include: { shop: { select: { id: true, name: true, slug: true } } },
+      });
+
+      return res.status(200).json({ success: true, data: updatedUser });
+    }
+
+    // Admin Delete User
+    if (adminUserMatch && method === 'DELETE') {
+      const { user, error } = await verifySuperAdmin();
+      if (error) return res.status(403).json({ success: false, message: error });
+
+      const userId = adminUserMatch[1];
+      await db.user.delete({ where: { id: userId } });
+
+      return res.status(200).json({ success: true, message: 'User deleted successfully' });
+    }
+
+    // Admin Create User
+    if (path === '/api/v1/admin/users' && method === 'POST') {
+      const { user, error } = await verifySuperAdmin();
+      if (error) return res.status(403).json({ success: false, message: error });
+
+      const { email, password, name, role, shopId: userShopId, isActive = true } = body;
+
+      if (!email || !password || !name) {
+        return res.status(400).json({ success: false, message: 'Email, password, and name are required' });
+      }
+
+      const existingUser = await db.user.findUnique({ where: { email: email.toLowerCase() } });
+      if (existingUser) {
+        return res.status(409).json({ success: false, message: 'Email already in use' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      const newUser = await db.user.create({
+        data: {
+          email: email.toLowerCase(),
+          password: hashedPassword,
+          name,
+          role: role || 'STAFF',
+          isActive,
+          shopId: userShopId || null,
+        },
+        include: { shop: { select: { id: true, name: true, slug: true } } },
+      });
+
+      return res.status(201).json({
+        success: true,
+        data: {
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+          isActive: newUser.isActive,
+          shopId: newUser.shopId,
+          shop: newUser.shop,
+        },
+      });
+    }
+
+    // Admin Reset User Password
+    const adminResetPwMatch = path.match(/^\/api\/v1\/admin\/users\/([^/]+)\/reset-password$/);
+    if (adminResetPwMatch && method === 'POST') {
+      const { user, error } = await verifySuperAdmin();
+      if (error) return res.status(403).json({ success: false, message: error });
+
+      const userId = adminResetPwMatch[1];
+      const { newPassword } = body;
+
+      if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      await db.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+      });
+
+      return res.status(200).json({ success: true, message: 'Password reset successfully' });
+    }
+
+    // Admin Toggle Shop Status
+    const shopToggleMatch = path.match(/^\/api\/v1\/admin\/shops\/([^/]+)$/);
+    if (shopToggleMatch && method === 'PUT') {
+      const { user, error } = await verifySuperAdmin();
+      if (error) return res.status(403).json({ success: false, message: error });
+
+      const shopIdParam = shopToggleMatch[1];
+      const { isActive } = body;
+
+      const shop = await db.shop.update({
+        where: { id: shopIdParam },
+        data: { isActive },
+      });
+
+      return res.status(200).json({ success: true, data: shop });
     }
 
     // 404

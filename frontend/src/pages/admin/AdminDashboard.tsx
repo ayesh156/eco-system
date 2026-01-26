@@ -35,11 +35,6 @@ import {
 // API URL from environment
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
-// Log API configuration for debugging
-if (typeof window !== 'undefined') {
-  console.log('🔌 Admin Dashboard API URL:', API_URL);
-}
-
 // ===================================
 // Types
 // ===================================
@@ -172,13 +167,7 @@ export const AdminDashboard: React.FC = () => {
       ]);
 
       if (!statsRes.ok || !shopsRes.ok || !usersRes.ok) {
-        console.error('API Errors:', {
-          stats: { ok: statsRes.ok, status: statsRes.status },
-          shops: { ok: shopsRes.ok, status: shopsRes.status },
-          users: { ok: usersRes.ok, status: usersRes.status },
-          apiUrl: API_URL,
-        });
-        throw new Error(`Failed to fetch admin data. API URL: ${API_URL}`);
+        throw new Error('Failed to fetch admin data');
       }
 
       const [statsData, shopsData, usersData] = await Promise.all([
