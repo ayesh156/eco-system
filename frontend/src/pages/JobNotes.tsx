@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import { mockJobNotes } from '../data/mockData';
 import type { JobNote, JobNoteStatus, JobNotePriority, DeviceType } from '../data/mockData';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
@@ -46,6 +47,7 @@ const deviceIcons: Record<DeviceType, React.ReactNode> = {
 
 export const JobNotes: React.FC = () => {
   const { theme } = useTheme();
+  const { branding } = useShopBranding();
   const navigate = useNavigate();
   const [jobNotes, setJobNotes] = useState<JobNote[]>(mockJobNotes);
   const [searchQuery, setSearchQuery] = useState('');
@@ -625,7 +627,7 @@ export const JobNotes: React.FC = () => {
       )}
 
       <DeleteConfirmationModal isOpen={isDeleteModalOpen} onCancel={() => setIsDeleteModalOpen(false)} onConfirm={confirmDelete} title="Delete Job Note" message={`Delete job note "${jobToDelete?.jobNumber}"?`} itemName={jobToDelete?.jobNumber || ''} />
-      <div style={{ display: 'none' }}>{jobToPrint && <PrintableJobNote ref={printRef} jobNote={jobToPrint} />}</div>
+      <div style={{ display: 'none' }}>{jobToPrint && <PrintableJobNote ref={printRef} jobNote={jobToPrint} branding={branding} />}</div>
     </div>
   );
 };

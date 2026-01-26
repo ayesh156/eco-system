@@ -18,6 +18,8 @@ model Shop {
   id            String    @id @default(cuid())
   name          String    
   slug          String    @unique  // URL-friendly name e.g., "ecotech"
+  subName       String?             // Secondary name e.g., "SOLUTIONS"
+  tagline       String?             // Tagline e.g., "Computer Solutions"
   description   String?
   logo          String?
   address       String?

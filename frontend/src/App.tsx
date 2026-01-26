@@ -9,6 +9,7 @@ import { AuthProvider, ProtectedRoute } from './contexts/AuthContext';
 import { WhatsAppSettingsProvider } from './contexts/WhatsAppSettingsContext';
 import { TaxSettingsProvider } from './contexts/TaxSettingsContext';
 import { DataCacheProvider } from './contexts/DataCacheContext';
+import { ShopBrandingProvider } from './contexts/ShopBrandingContext';
 import { AdminLayout } from './components/AdminLayout';
 import { Toaster } from 'sonner';
 
@@ -85,6 +86,7 @@ function App() {
             <WhatsAppSettingsProvider>
               <TaxSettingsProvider>
                 <DataCacheProvider>
+                <ShopBrandingProvider>
                 <ThemedToaster />
                 <BrowserRouter
                   future={{
@@ -155,6 +157,8 @@ function App() {
                               <Route path="/admin/shops" element={<AdminDashboard />} />
                               <Route path="/admin/users" element={<AdminDashboard />} />
                               <Route path="/shop-admin" element={<ShopAdminPanel />} />
+                              <Route path="/shop-admin/users" element={<ShopAdminPanel />} />
+                              <Route path="/shop-admin/branding" element={<ShopAdminPanel />} />
                               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                               <Route path="*" element={<NotFound />} />
                             </Routes>
@@ -164,6 +168,7 @@ function App() {
                     } />
                   </Routes>
                 </BrowserRouter>
+                </ShopBrandingProvider>
                 </DataCacheProvider>
               </TaxSettingsProvider>
             </WhatsAppSettingsProvider>

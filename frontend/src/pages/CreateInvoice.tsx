@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTaxSettings } from '../contexts/TaxSettingsContext';
 import { useDataCache } from '../contexts/DataCacheContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import { toast } from 'sonner';
 import { mockInvoices } from '../data/mockData';
 import type { Customer, Product, Invoice, InvoiceItem } from '../data/mockData';
@@ -53,6 +54,7 @@ export const CreateInvoice: React.FC = () => {
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts } = useDataCache();
+  const { branding } = useShopBranding();
   
   // API data states - Start with empty arrays, will load from API
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -707,7 +709,7 @@ export const CreateInvoice: React.FC = () => {
           {/* Print Preview */}
           <div className="overflow-auto max-h-[calc(95vh-80px)] bg-gray-100 p-4">
             <div ref={printRef} className="print-area">
-              <PrintableInvoice invoice={createdInvoice as any} customer={printCustomer} />
+              <PrintableInvoice invoice={createdInvoice as any} customer={printCustomer} branding={branding} />
             </div>
           </div>
         </div>

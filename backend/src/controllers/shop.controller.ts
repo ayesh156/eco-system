@@ -207,6 +207,8 @@ export const updateShop = async (req: Request, res: Response, next: NextFunction
     const { id } = req.params;
     const {
       name,
+      subName,
+      tagline,
       description,
       logo,
       address,
@@ -236,6 +238,8 @@ export const updateShop = async (req: Request, res: Response, next: NextFunction
       where: { id },
       data: {
         name: name ?? undefined,
+        subName: subName ?? undefined,
+        tagline: tagline ?? undefined,
         description: description ?? undefined,
         logo: logo ?? undefined,
         address: address ?? undefined,

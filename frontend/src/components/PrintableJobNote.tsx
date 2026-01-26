@@ -1,13 +1,32 @@
 import { forwardRef } from 'react';
 import type { JobNote } from '../data/mockData';
-import logo from '../assets/logo.jpg';
+import defaultLogo from '../assets/logo.png';
+
+// Branding settings for PDF header
+export interface JobNoteBranding {
+  name?: string;
+  subName?: string;
+  logo?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  tagline?: string;
+}
 
 interface PrintableJobNoteProps {
   jobNote: JobNote;
+  branding?: JobNoteBranding;
 }
 
 export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps>(
-  ({ jobNote }, ref) => {
+  ({ jobNote, branding }, ref) => {
+    // Use branding values with fallbacks
+    const shopName = branding?.name || 'ECOTEC';
+    const shopLogo = branding?.logo || defaultLogo;
+    const shopTagline = branding?.tagline || 'Computer Solutions';
+    const shopPhone = branding?.phone || '011-2345678';
+    const shopEmail = branding?.email || 'info@ecotec.lk';
+
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString('en-GB', {
         year: 'numeric',
@@ -135,9 +154,7 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
           .company-logo {
             width: 55px;
             height: 55px;
-            border-radius: 8px;
-            object-fit: cover;
-            border: 2px solid #000;
+            object-fit: contain;
           }
 
           .company-info h1 {
@@ -554,11 +571,11 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
         {/* Header */}
         <div className="job-header">
           <div className="company-section">
-            <img src={logo} alt="Logo" className="company-logo" />
+            <img src={shopLogo} alt="Logo" className="company-logo" />
             <div className="company-info">
-              <h1>ECO<span>TEC</span></h1>
-              <div className="tagline">Computer Solutions</div>
-              <div className="contact">011-2345678 | 077-1234567 | info@ecotec.lk</div>
+              <h1>{shopName.includes(' ') ? shopName : <>{shopName.substring(0, 3)}<span>{shopName.substring(3)}</span></>}</h1>
+              <div className="tagline">{shopTagline}</div>
+              <div className="contact">{shopPhone} | {shopEmail}</div>
             </div>
           </div>
           <div className="job-number-box">

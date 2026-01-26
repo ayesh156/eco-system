@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import type { GoodsReceivedNote, Supplier } from '../data/mockData';
-import logo from '../assets/logo.jpg';
+import logo from '../assets/logo.png';
 
 interface PrintableGRNProps {
   grn: GoodsReceivedNote;
@@ -648,7 +648,7 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
         <div className="grn-header">
           <div className="company-section">
             <div className="company-logo">
-              <img src={logo} alt="ECOTEC Logo" style={{ width: 40, height: 40, borderRadius: '50%' }} />
+              <img src={logo} alt="ECOTEC Logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
             </div>
             <div className="company-info">
               <h1>ECOTEC COMPUTER</h1>

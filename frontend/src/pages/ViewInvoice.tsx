@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
 import { useDataCache } from '../contexts/DataCacheContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import { toast } from 'sonner';
 import type { Invoice, InvoicePayment, Customer } from '../data/mockData';
 import PrintableInvoice from '../components/PrintableInvoice';
@@ -28,6 +29,7 @@ export const ViewInvoice: React.FC = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const { settings: whatsAppSettings } = useWhatsAppSettings();
+  const { branding } = useShopBranding();
   const { 
     customers: cachedCustomers, 
     loadCustomers, 
@@ -1312,7 +1314,7 @@ export const ViewInvoice: React.FC = () => {
             {/* Print Preview */}
             <div className="overflow-auto max-h-[calc(95vh-80px)] bg-gray-100 p-4">
               <div ref={printRef} className="print-area">
-                <PrintableInvoice invoice={invoice} customer={customer} />
+                <PrintableInvoice invoice={invoice} customer={customer} branding={branding} />
               </div>
             </div>
           </div>

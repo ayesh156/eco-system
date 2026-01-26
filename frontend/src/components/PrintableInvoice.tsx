@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import type { Invoice, Customer } from '../data/mockData';
-import logo from '../assets/logo.jpg';
+import defaultLogo from '../assets/logo.png';
 
 interface InvoiceItemWithWarranty {
   productId: string;
@@ -12,16 +12,37 @@ interface InvoiceItemWithWarranty {
   warrantyDueDate?: string;
 }
 
+// Branding settings for PDF header
+export interface InvoiceBranding {
+  name?: string;
+  subName?: string;
+  logo?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  tagline?: string;
+}
+
 interface PrintableInvoiceProps {
   invoice: Invoice & {
     buyingDate?: string;
     items: InvoiceItemWithWarranty[];
   };
   customer?: Customer | null;
+  branding?: InvoiceBranding;
 }
 
 export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps>(
-  ({ invoice, customer }, ref) => {
+  ({ invoice, customer, branding }, ref) => {
+    // Use branding values with fallbacks
+    const shopName = branding?.name || 'ECOTEC COMPUTER';
+    const shopSubName = branding?.subName || 'SOLUTIONS';
+    const shopLogo = branding?.logo || defaultLogo;
+    const shopAddress = branding?.address || 'No.14, Mulatiyana junction, Mulatiyana, Matara.';
+    const shopPhone = branding?.phone || '0711453111';
+    const shopEmail = branding?.email || 'ecoteccomputersolutions@gmail.com';
+    const shopTagline = branding?.tagline || '';
+
     const formatCurrency = (amount: number) => {
       return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
     };
@@ -94,28 +115,52 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
           .invoice-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 20px;
+            align-items: stretch;
+            margin-bottom: 8px;
             padding-bottom: 15px;
             border-bottom: 2px solid #000;
           }
 
+          .tagline-banner {
+            text-align: center;
+            padding: 6px 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ccc;
+          }
+
+          .tagline-banner span {
+            font-size: 8pt;
+            font-style: italic;
+            color: #555;
+            letter-spacing: 0.5px;
+          }
+
           .company-section {
             display: flex;
-            align-items: flex-start;
+            align-items: stretch;
             gap: 12px;
           }
 
           .company-logo {
-            width: 50px;
-            height: 50px;
-            border: 2px solid #000;
-            border-radius: 50%;
+            width: auto;
+            height: auto;
+            max-width: 120px;
+            max-height: 80px;
+            align-self: center;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: white;
+            background: transparent;
             flex-shrink: 0;
+            overflow: visible;
+          }
+
+          .company-logo img {
+            width: auto;
+            height: auto;
+            max-width: 120px;
+            max-height: 80px;
+            object-fit: contain;
           }
 
           .company-logo svg {
@@ -475,31 +520,42 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
         <div className="invoice-header">
           <div className="company-section">
             <div className="company-logo">
-              <img src={logo} alt="ECOTEC Logo" style={{ width: 40, height: 40, borderRadius: '50%' }} />
+              <img src={shopLogo} alt="Shop Logo" />
             </div>
             <div className="company-info">
-              <h1>ECOTEC COMPUTER</h1>
-              <div className="sub-name">SOLUTIONS</div>
+              <h1>{shopName}</h1>
+              {shopSubName && <div className="sub-name">{shopSubName}</div>}
               <div className="details">
-                No.14, Mulatiyana junction,<br />
-                Mulatiyana, Matara.
+                {shopAddress.split(',').map((line, i, arr) => (
+                  <span key={i}>
+                    {line.trim()}
+                    {i < arr.length - 1 && <br />}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
           <div className="contact-box">
             <h3>Contact information</h3>
             <div className="info">
-              ecoteccomputersolutions@gmail.com<br />
-              0711453111
+              {shopEmail}<br />
+              {shopPhone}
             </div>
           </div>
         </div>
 
+        {/* Tagline Banner */}
+        {shopTagline && (
+          <div className="tagline-banner">
+            <span>✨ {shopTagline} ✨</span>
+          </div>
+        )}
+
         {/* Invoice Title Section */}
         <div className="invoice-title-section">
           <div className="invoice-title">
-            <h2>ECOTEC INVOICE</h2>
-            <div className="company-label">ECOTEC COMPUTER SOLUTIONS</div>
+            <h2>{shopName.split(' ')[0]} INVOICE</h2>
+            <div className="company-label">{shopName} {shopSubName}</div>
           </div>
           <div className="amount-due">
             <label>Amount Due (LKR)</label>

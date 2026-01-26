@@ -2,15 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import {
   Package, FileText, Users, LayoutDashboard, Settings, Database,
   Moon, Sun, Menu, X, ChevronLeft, ChevronRight, Bell, Search,
   User, HelpCircle, ChevronDown, Sparkles, TrendingUp,
   FolderTree, Building, Shield, Truck, ClipboardCheck, Wrench, Layers, ClipboardList,
-  Calculator, FileCheck, Wallet, Brain, Zap, StickyNote, CalendarDays, Lightbulb, LogOut
+  Calculator, FileCheck, Wallet, Brain, Zap, StickyNote, CalendarDays, Lightbulb, LogOut, Image
 } from 'lucide-react';
 import { useIsMobile } from '../hooks/use-mobile';
-import logoImage from '../assets/logo.jpg';
+import ecosystemLogo from '../assets/logo.png';
 import { AIAssistant } from './AIAssistant';
 
 interface SubNavItem {
@@ -34,6 +35,7 @@ interface AdminLayoutProps {
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { theme, toggleTheme, aiAutoFillEnabled, toggleAiAutoFill } = useTheme();
   const { user, logout, isViewingShop, viewingShop, exitViewingShop } = useAuth();
+  const { branding } = useShopBranding();
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -236,7 +238,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         { path: '/help', icon: HelpCircle, label: 'Help Center', badge: null },
       ]
     : [
-        ...(user?.role === 'ADMIN' ? [{ path: '/shop-admin', icon: Shield, label: 'Shop Admin', badge: null }] : []),
+        ...(user?.role === 'ADMIN' ? [
+          { 
+            path: '/shop-admin', 
+            icon: Shield, 
+            label: 'Shop Admin', 
+            badge: null,
+            subItems: [
+              { path: '/shop-admin/users', icon: Users, label: 'Users' },
+              { path: '/shop-admin/branding', icon: Image, label: 'Branding' },
+            ]
+          },
+        ] : []),
         { path: '/data-export', icon: Database, label: 'Data Export', badge: null },
         { path: '/settings', icon: Settings, label: 'Settings', badge: null },
         { path: '/help', icon: HelpCircle, label: 'Help Center', badge: null },
@@ -260,23 +273,51 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           : 'bg-gradient-to-b from-white via-white to-slate-50 border-r border-slate-200 shadow-xl'
         }`}
     >
-      {/* Logo Section */}
+      {/* Logo Section - Shop Branding */}
       <div className={`flex items-center h-16 px-4 border-b ${theme === 'dark' ? 'border-slate-800/50' : 'border-slate-200'}`}>
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="relative flex-shrink-0">
-            <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-lg">
-              <img src={logoImage} alt="ECOTEC Logo" className="w-full h-full object-cover" />
-            </div>
-          </div>
-          {!sidebarCollapsed && (
-            <div className="flex flex-col overflow-hidden">
-              <span className={`text-lg font-bold whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                <span className="text-emerald-500">ECO</span>TEC
-              </span>
-              <span className={`text-[10px] -mt-0.5 tracking-wider uppercase whitespace-nowrap ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                Computer Solutions
-              </span>
-            </div>
+          {user?.role === 'SUPER_ADMIN' ? (
+            // SUPER_ADMIN: Show Ecosystem branding
+            <>
+              <div className="relative flex-shrink-0">
+                <img src={ecosystemLogo} alt="Eco System" className="w-10 h-10 object-contain" />
+              </div>
+              {!sidebarCollapsed && (
+                <div className="flex flex-col overflow-hidden">
+                  <span className={`text-base font-bold whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    Eco System
+                  </span>
+                  <span className={`text-[9px] -mt-0.5 tracking-wider uppercase whitespace-nowrap ${theme === 'dark' ? 'text-white/70' : 'text-slate-600'}`}>
+                    NEBULAINFINITE
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            // Regular users: Show Shop branding
+            <>
+              <div className="relative flex-shrink-0">
+                {branding.logo ? (
+                  <img src={branding.logo} alt="Shop Logo" className="w-10 h-10 object-contain" />
+                ) : (
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center">
+                    <Building className="w-6 h-6 text-white" />
+                  </div>
+                )}
+              </div>
+              {!sidebarCollapsed && (
+                <div className="flex flex-col overflow-hidden">
+                  <span className={`text-base font-bold whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    {branding.name || 'ECOTEC'}
+                  </span>
+                  {branding.subName && (
+                    <span className={`text-[9px] -mt-0.5 tracking-wider uppercase whitespace-nowrap ${theme === 'dark' ? 'text-white/70' : 'text-slate-600'}`}>
+                      {branding.subName.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </Link>
       </div>
@@ -498,34 +539,151 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <div className="mt-2 space-y-1">
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
-              const active = isActive(item.path);
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 ${active
-                      ? theme === 'dark'
-                        ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10'
-                        : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10'
-                      : theme === 'dark'
-                        ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
-                  title={sidebarCollapsed ? item.label : undefined}
-                >
-                  {active && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
-                  )}
-                  <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${active ? 'text-emerald-500' : ''}`} />
-                  {!sidebarCollapsed && <span>{item.label}</span>}
+              const hasSubItems = item.subItems && item.subItems.length > 0;
+              const isExpanded = expandedMenus.includes(item.path);
+              const parentActive = isParentActive(item);
+              const exactActive = isExactActive(item.path);
 
-                  {sidebarCollapsed && (
-                    <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 ${theme === 'dark' ? 'bg-slate-800 text-white shadow-xl' : 'bg-slate-900 text-white shadow-xl'
-                      }`}>
-                      {item.label}
+              return (
+                <div key={item.path} className="relative">
+                  {hasSubItems ? (
+                    <div
+                      data-menu-id={item.path}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (sidebarCollapsed) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setPopoverPosition(rect.top);
+                          setCollapsedPopover(collapsedPopover === item.path ? null : item.path);
+                        } else {
+                          toggleMenu(item.path);
+                        }
+                      }}
+                      className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 cursor-pointer ${parentActive
+                          ? theme === 'dark'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10'
+                          : theme === 'dark'
+                            ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                      title={sidebarCollapsed ? item.label : undefined}
+                    >
+                      {parentActive && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                      )}
+
+                      <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${parentActive ? 'text-emerald-500' : ''}`} />
+
+                      {!sidebarCollapsed && (
+                        <>
+                          <span className="flex-1">{item.label}</span>
+                          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''} ${parentActive ? 'text-emerald-500' : ''}`} />
+                        </>
+                      )}
+
+                      {/* Click-based Popover for collapsed sidebar with sub-items */}
+                      {sidebarCollapsed && collapsedPopover === item.path && (
+                        <div
+                          ref={popoverRef}
+                          className={`fixed left-[84px] px-0 py-2 rounded-xl text-sm font-medium whitespace-nowrap z-[100] min-w-[200px] shadow-2xl animate-in fade-in slide-in-from-left-2 zoom-in-95 duration-200 ${theme === 'dark' ? 'bg-slate-800/95 backdrop-blur-xl text-white border border-slate-700/50' : 'bg-white/95 backdrop-blur-xl text-slate-900 border border-slate-200'}`}
+                          style={{
+                            top: `${Math.min(popoverPosition, window.innerHeight - 280)}px`
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className={`absolute -left-2 top-4 w-0 h-0 border-y-8 border-y-transparent border-r-8 ${theme === 'dark' ? 'border-r-slate-700/50' : 'border-r-slate-200'}`} />
+                          <div className={`absolute -left-[6px] top-4 w-0 h-0 border-y-8 border-y-transparent border-r-8 ${theme === 'dark' ? 'border-r-slate-800/95' : 'border-r-white/95'}`} />
+
+                          <div className={`px-4 py-2.5 border-b ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                            <div className="flex items-center gap-2">
+                              <div className={`p-1.5 rounded-lg ${theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-50'}`}>
+                                <Icon className="w-4 h-4 text-emerald-500" />
+                              </div>
+                              <span className="font-semibold">{item.label}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-1 mx-2">
+                            {item.subItems?.map((subItem) => {
+                              const SubIcon = subItem.icon;
+                              const subActive = isActive(subItem.path);
+                              return (
+                                <Link
+                                  key={subItem.path}
+                                  to={subItem.path}
+                                  className={`flex items-center gap-2 px-2 py-2 rounded-lg transition-colors ${subActive
+                                      ? theme === 'dark' ? 'text-emerald-400 bg-emerald-500/20' : 'text-emerald-600 bg-emerald-50'
+                                      : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'
+                                    }`}
+                                  onClick={() => setCollapsedPopover(null)}
+                                >
+                                  <SubIcon className={`w-4 h-4 ${subActive ? 'text-emerald-500' : ''}`} />
+                                  {subItem.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Link
+                      to={item.path}
+                      className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 ${exactActive
+                          ? theme === 'dark'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10'
+                          : theme === 'dark'
+                            ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                      title={sidebarCollapsed ? item.label : undefined}
+                    >
+                      {exactActive && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                      )}
+                      <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${exactActive ? 'text-emerald-500' : ''}`} />
+                      {!sidebarCollapsed && <span>{item.label}</span>}
+
+                      {sidebarCollapsed && (
+                        <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 ${theme === 'dark' ? 'bg-slate-800 text-white shadow-xl' : 'bg-slate-900 text-white shadow-xl'}`}>
+                          {item.label}
+                        </div>
+                      )}
+                    </Link>
+                  )}
+
+                  {/* Sub Items - Expanded Desktop */}
+                  {hasSubItems && isExpanded && !sidebarCollapsed && (
+                    <div className={`ml-4 mt-1 pl-4 border-l-2 space-y-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                      {item.subItems?.map((subItem) => {
+                        const SubIcon = subItem.icon;
+                        const subActive = isActive(subItem.path);
+                        return (
+                          <Link
+                            key={subItem.path}
+                            to={subItem.path}
+                            className={`group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${subActive
+                                ? theme === 'dark'
+                                  ? 'bg-emerald-500/10 text-emerald-400'
+                                  : 'bg-emerald-50 text-emerald-600'
+                                : theme === 'dark'
+                                  ? 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                              }`}
+                          >
+                            {subActive && (
+                              <div className={`absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full ${theme === 'dark' ? 'bg-emerald-500' : 'bg-emerald-500'}`} />
+                            )}
+                            <SubIcon className={`w-4 h-4 flex-shrink-0 ${subActive ? 'text-emerald-500' : ''}`} />
+                            <span>{subItem.label}</span>
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -575,19 +733,47 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Logo */}
+        {/* Logo - Shop Branding / Ecosystem Branding */}
         <div className="flex items-center gap-3 px-6 h-16">
-          <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 shadow-lg">
-            <img src={logoImage} alt="ECOTEC Logo" className="w-full h-full object-cover" />
-          </div>
-          <div className="flex flex-col">
-            <span className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              <span className="text-emerald-500">ECO</span>TEC
-            </span>
-            <span className={`text-[10px] -mt-0.5 tracking-wider uppercase ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-              Computer Solutions
-            </span>
-          </div>
+          {user?.role === 'SUPER_ADMIN' ? (
+            // SUPER_ADMIN: Show Ecosystem branding
+            <>
+              <div className="flex-shrink-0">
+                <img src={ecosystemLogo} alt="Eco System" className="w-10 h-10 object-contain" />
+              </div>
+              <div className="flex flex-col">
+                <span className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  Eco System
+                </span>
+                <span className={`text-[9px] -mt-0.5 tracking-wider uppercase ${theme === 'dark' ? 'text-white/70' : 'text-slate-600'}`}>
+                  NEBULAINFINITE
+                </span>
+              </div>
+            </>
+          ) : (
+            // Regular users: Show Shop branding
+            <>
+              <div className="flex-shrink-0">
+                {branding.logo ? (
+                  <img src={branding.logo} alt="Shop Logo" className="w-10 h-10 object-contain" />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center">
+                    <Building className="w-6 h-6 text-white" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col">
+                <span className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {branding.name || 'ECOTEC'}
+                </span>
+                {branding.subName && (
+                  <span className={`text-[9px] -mt-0.5 tracking-wider uppercase ${theme === 'dark' ? 'text-white/70' : 'text-slate-600'}`}>
+                    {branding.subName.toUpperCase()}
+                  </span>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Navigation */}
@@ -697,24 +883,86 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
           {bottomNavItems.map((item) => {
             const Icon = item.icon;
-            const active = isActive(item.path);
+            const hasSubItems = item.subItems && item.subItems.length > 0;
+            const isExpanded = expandedMenus.includes(item.path);
+            const parentActive = isParentActive(item);
+            const exactActive = isExactActive(item.path);
+
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => setMobileSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all ${active
-                    ? theme === 'dark'
-                      ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400'
-                      : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600'
-                    : theme === 'dark'
-                      ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-              >
-                <Icon className={`w-5 h-5 ${active ? 'text-emerald-500' : ''}`} />
-                <span>{item.label}</span>
-              </Link>
+              <div key={item.path}>
+                {hasSubItems ? (
+                  <>
+                    <div
+                      onClick={() => toggleMenu(item.path)}
+                      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all cursor-pointer ${parentActive
+                          ? theme === 'dark'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600'
+                          : theme === 'dark'
+                            ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                    >
+                      {parentActive && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                      )}
+                      <Icon className={`w-5 h-5 ${parentActive ? 'text-emerald-500' : ''}`} />
+                      <span className="flex-1">{item.label}</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''} ${parentActive ? 'text-emerald-500' : ''}`} />
+                    </div>
+
+                    {/* Sub Items */}
+                    {isExpanded && (
+                      <div className={`ml-4 mt-1 pl-4 border-l-2 space-y-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                        {item.subItems?.map((subItem) => {
+                          const SubIcon = subItem.icon;
+                          const subActive = isActive(subItem.path);
+                          return (
+                            <Link
+                              key={subItem.path}
+                              to={subItem.path}
+                              onClick={() => setMobileSidebarOpen(false)}
+                              className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${subActive
+                                  ? theme === 'dark'
+                                    ? 'bg-emerald-500/10 text-emerald-400'
+                                    : 'bg-emerald-50 text-emerald-600'
+                                  : theme === 'dark'
+                                    ? 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                }`}
+                            >
+                              {subActive && (
+                                <div className={`absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-emerald-500`} />
+                              )}
+                              <SubIcon className={`w-4 h-4 ${subActive ? 'text-emerald-500' : ''}`} />
+                              <span>{subItem.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <Link
+                    to={item.path}
+                    onClick={() => setMobileSidebarOpen(false)}
+                    className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all ${exactActive
+                        ? theme === 'dark'
+                          ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400'
+                          : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600'
+                        : theme === 'dark'
+                          ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                  >
+                    {exactActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                    )}
+                    <Icon className={`w-5 h-5 ${exactActive ? 'text-emerald-500' : ''}`} />
+                    <span>{item.label}</span>
+                  </Link>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -769,6 +1017,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 />
               </div>
             </div>
+
+            {/* Center - Ecosystem Branding (hidden for SUPER_ADMIN) */}
+            {user?.role !== 'SUPER_ADMIN' && (
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg overflow-hidden">
+                  <img src={ecosystemLogo} alt="Eco System" className="w-full h-full object-contain" />
+                </div>
+                <div className="flex flex-col">
+                  <span className={`text-base font-bold tracking-wide ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    Eco System
+                  </span>
+                  <span className={`text-[9px] -mt-0.5 tracking-wider uppercase ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                    NEBULAINFINITE
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Right side */}
             <div className="flex items-center gap-3">

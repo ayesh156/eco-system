@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import logo from '../assets/logo.jpg';
+import logo from '../assets/logo.png';
 import * as XLSX from 'xlsx';
 import { 
   mockCashAccounts, 

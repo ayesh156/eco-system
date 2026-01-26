@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SearchableSelect } from '../../components/ui/searchable-select';
+import { ShopBrandingTab } from '../../components/admin/ShopBrandingTab';
 import {
   Users,
   Search,
@@ -71,6 +72,10 @@ export const ShopAdminPanel: React.FC = () => {
   const { theme } = useTheme();
   const { user, getAccessToken } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Determine active section from URL
+  const activeSection = location.pathname.includes('/branding') ? 'branding' : 'users';
 
   // State
   const [stats, setStats] = useState<ShopStats | null>(null);
@@ -879,34 +884,43 @@ export const ShopAdminPanel: React.FC = () => {
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
             <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              Shop Admin Panel
+              {activeSection === 'branding' ? 'Shop Branding' : 'User Management'}
             </h1>
           </div>
           <p className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            {stats?.shop?.name ? `Manage users for ${stats.shop.name}` : 'Manage your shop users'}
+            {activeSection === 'branding' 
+              ? 'Customize your shop\'s logo and branding for invoices and documents' 
+              : stats?.shop?.name ? `Manage users for ${stats.shop.name}` : 'Manage your shop users'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={fetchData}
-            className={`p-2.5 rounded-xl border transition-all ${
-              theme === 'dark'
-                ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50 text-slate-400'
-                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
-            }`}
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setIsCreateUserModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
-          >
-            <UserPlus className="w-5 h-5" />
-            Add User
-          </button>
-        </div>
+        {activeSection === 'users' && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchData}
+              className={`p-2.5 rounded-xl border transition-all ${
+                theme === 'dark'
+                  ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50 text-slate-400'
+                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+              }`}
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setIsCreateUserModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+            >
+              <UserPlus className="w-5 h-5" />
+              Add User
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Section Content */}
+      {activeSection === 'branding' ? (
+        <ShopBrandingTab />
+      ) : (
+        <>
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className={`relative overflow-hidden rounded-2xl border p-5 ${
@@ -1435,6 +1449,8 @@ export const ShopAdminPanel: React.FC = () => {
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {/* Modals */}
       <CreateUserModal
