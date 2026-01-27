@@ -79,9 +79,6 @@ export const ShopAdminPanel: React.FC = () => {
 
   // Determine if user has access: ADMIN or SUPER_ADMIN viewing a shop
   const hasAccess = user?.role === 'ADMIN' || (user?.role === 'SUPER_ADMIN' && isViewingShop);
-  
-  // Get the effective shop ID - for SUPER_ADMIN viewing a shop, use viewingShop.id
-  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : user?.shopId;
 
   // State
   const [stats, setStats] = useState<ShopStats | null>(null);

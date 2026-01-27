@@ -22,6 +22,10 @@ export interface User {
     name: string;
     slug: string;
     logo?: string;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    website?: string | null;
   } | null;
 }
 
