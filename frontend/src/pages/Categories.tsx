@@ -1054,6 +1054,7 @@ export const Categories: React.FC = () => {
         category={selectedCategory}
         onClose={() => setIsFormModalOpen(false)}
         onSave={handleSaveCategory}
+        shopId={effectiveShopId}
       />
 
       <DeleteConfirmationModal

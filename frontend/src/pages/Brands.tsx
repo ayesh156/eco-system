@@ -1045,6 +1045,7 @@ export const Brands: React.FC = () => {
         brand={selectedBrand}
         onClose={() => setIsFormModalOpen(false)}
         onSave={handleSaveBrand}
+        shopId={effectiveShopId}
       />
 
       <DeleteConfirmationModal

@@ -172,8 +172,8 @@ export const ProductForm: React.FC = () => {
       }
       try {
         const [categoriesResult, brandsResult] = await Promise.all([
-          categoryService.getAll(),
-          brandService.getAll()
+          categoryService.getAll({ shopId: currentShopId || undefined }),
+          brandService.getAll({ shopId: currentShopId || undefined })
         ]);
         setApiCategories(categoriesResult.categories);
         setApiBrands(brandsResult.brands);
@@ -181,7 +181,7 @@ export const ProductForm: React.FC = () => {
         // Fetch product if editing
         if (isEditing && id) {
           try {
-            const product = await productService.getById(id);
+            const product = await productService.getById(id, currentShopId || undefined);
             setExistingProduct(product);
             
             // Populate form with product data
@@ -215,7 +215,7 @@ export const ProductForm: React.FC = () => {
       }
     };
     loadData();
-  }, [isEditing, id]);
+  }, [isEditing, id, currentShopId]);
 
   // Dynamic category options from API or fallback
   const dynamicCategoryOptions = apiCategories.length > 0 

@@ -32,6 +32,7 @@ interface BrandFormModalProps {
   brand?: Brand | null;
   onClose: () => void;
   onSave: (brand: Brand) => void;
+  shopId?: string;  // For SuperAdmin shop viewing
 }
 
 interface BrandFormData {
@@ -48,6 +49,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
   brand,
   onClose,
   onSave,
+  shopId,
 }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -97,7 +99,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
         setLoadError(null);
         
         try {
-          const freshBrandData = await brandService.getById(brand.id);
+          const freshBrandData = await brandService.getById(brand.id, shopId);
           setFormData({
             name: freshBrandData.name,
             description: freshBrandData.description || '',

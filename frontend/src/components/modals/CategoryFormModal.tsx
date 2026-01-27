@@ -42,6 +42,7 @@ interface CategoryFormModalProps {
   category?: Category | null;
   onClose: () => void;
   onSave: (category: Category) => void;
+  shopId?: string;  // For SuperAdmin shop viewing
 }
 
 interface CategoryFormData {
@@ -56,6 +57,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   category,
   onClose,
   onSave,
+  shopId,
 }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -103,7 +105,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         setLoadError(null);
         
         try {
-          const freshCategoryData = await categoryService.getById(category.id);
+          const freshCategoryData = await categoryService.getById(category.id, shopId);
           setFormData({
             name: freshCategoryData.name,
             description: freshCategoryData.description || '',
