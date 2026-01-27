@@ -3,7 +3,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { 
   X, FileText, CreditCard, CheckCircle, AlertTriangle, Clock, 
   MessageCircle, Zap, Check, ChevronDown, ChevronUp, Receipt,
-  Banknote, Building2, Wallet, History
+  Banknote, Building2, Wallet, History, Loader2
 } from 'lucide-react';
 import type { Customer, Invoice, CustomerPayment } from '../../data/mockData';
 
@@ -13,15 +13,82 @@ interface CustomerStatementModalProps {
   isOpen: boolean;
   customer: Customer | null;
   invoices: Invoice[];
+  isLoading?: boolean;
   onClose: () => void;
-  onMarkAsPaid: (invoiceId: string, amount: number, paymentMethod: PaymentMethod, notes?: string) => void;
+  onMarkAsPaid: (invoiceId: string, amount: number, paymentMethod: PaymentMethod, notes?: string) => void | Promise<void>;
   onSendReminder: (invoice: Invoice, type: 'friendly' | 'urgent') => void;
 }
+
+// Creative Loading Animation Component
+const StatementLoadingAnimation: React.FC<{ theme: string }> = ({ theme }) => {
+  return (
+    <div className="py-16 px-8">
+      {/* Animated Logo/Icon */}
+      <div className="flex flex-col items-center justify-center">
+        {/* Pulsing Circle with Invoice Icon */}
+        <div className="relative">
+          {/* Outer rotating ring */}
+          <div className="absolute inset-0 w-24 h-24 rounded-full border-4 border-transparent border-t-emerald-500 border-r-teal-400 animate-spin" />
+          
+          {/* Middle pulsing ring */}
+          <div className="absolute inset-2 w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500/20 to-teal-500/20 animate-pulse" />
+          
+          {/* Inner circle with icon */}
+          <div className={`relative w-24 h-24 rounded-full flex items-center justify-center ${
+            theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
+          }`}>
+            <Receipt className={`w-10 h-10 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'} animate-bounce`} 
+              style={{ animationDuration: '1.5s' }} 
+            />
+          </div>
+        </div>
+
+        {/* Loading Text */}
+        <div className="mt-8 text-center">
+          <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            Loading Statement
+          </h3>
+          <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            Fetching invoice data...
+          </p>
+        </div>
+
+        {/* Animated Progress Dots */}
+        <div className="flex items-center gap-2 mt-6">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 animate-pulse"
+              style={{ 
+                animationDelay: `${i * 0.15}s`,
+                animationDuration: '1s'
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Skeleton Preview */}
+        <div className={`w-full max-w-md mt-8 space-y-3 ${theme === 'dark' ? 'opacity-30' : 'opacity-20'}`}>
+          {[1, 2, 3].map((i) => (
+            <div 
+              key={i}
+              className={`h-16 rounded-xl animate-pulse ${
+                theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
+              }`}
+              style={{ animationDelay: `${i * 0.2}s` }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
   isOpen,
   customer,
   invoices,
+  isLoading = false,
   onClose,
   onMarkAsPaid,
   onSendReminder
@@ -33,6 +100,7 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
   const [paymentNotes, setPaymentNotes] = useState<Record<string, string>>({});
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
   const [showHistoryFor, setShowHistoryFor] = useState<string | null>(null);
+  const [processingPayment, setProcessingPayment] = useState<string | null>(null); // Track which invoice is processing
 
   // Payment method options
   const paymentMethodOptions: { value: PaymentMethod; label: string; icon: React.ReactNode }[] = [
@@ -42,9 +110,58 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
     { value: 'cheque', label: 'Cheque', icon: <Wallet className="w-4 h-4" /> },
   ];
 
-  // Get payment history for an invoice
-  const getPaymentHistory = (invoiceId: string): CustomerPayment[] => {
-    return customer?.paymentHistory?.filter(p => p.invoiceId === invoiceId) || [];
+  // Unified payment history type for display
+  interface PaymentHistoryEntry {
+    id: string;
+    amount: number;
+    paymentDate: string;
+    paymentMethod: 'cash' | 'card' | 'bank' | 'cheque' | 'bank_transfer';
+    notes?: string;
+    source: 'invoice' | 'bulk' | 'direct'; // Where payment came from
+  }
+
+  // Get payment history for an invoice - combines invoice.payments and customer.paymentHistory
+  const getPaymentHistory = (invoiceId: string): PaymentHistoryEntry[] => {
+    const invoice = invoices.find(inv => inv.id === invoiceId);
+    const entries: PaymentHistoryEntry[] = [];
+    
+    // Get payments from invoice.payments array (API data)
+    if (invoice?.payments && invoice.payments.length > 0) {
+      invoice.payments.forEach(p => {
+        entries.push({
+          id: p.id,
+          amount: p.amount,
+          paymentDate: p.paymentDate,
+          paymentMethod: p.paymentMethod === 'bank_transfer' ? 'bank' : p.paymentMethod as PaymentHistoryEntry['paymentMethod'],
+          notes: p.notes,
+          source: p.notes?.includes('Bulk payment') ? 'bulk' : 'direct'
+        });
+      });
+    }
+    
+    // Also check customer.paymentHistory for any payments applied to this invoice
+    if (customer?.paymentHistory) {
+      customer.paymentHistory.forEach(p => {
+        if (p.invoiceId === invoiceId || p.appliedToInvoices?.some(a => a.invoiceId === invoiceId)) {
+          // Check if this payment is already in entries (avoid duplicates)
+          const existingEntry = entries.find(e => e.id === p.id);
+          if (!existingEntry) {
+            const appliedAmount = p.appliedToInvoices?.find(a => a.invoiceId === invoiceId)?.amount || p.amount;
+            entries.push({
+              id: p.id,
+              amount: appliedAmount,
+              paymentDate: p.paymentDate,
+              paymentMethod: p.paymentMethod === 'bank_transfer' ? 'bank' : p.paymentMethod as PaymentHistoryEntry['paymentMethod'],
+              notes: p.notes,
+              source: p.source === 'customer' ? 'bulk' : 'direct'
+            });
+          }
+        }
+      });
+    }
+    
+    // Sort by date descending (newest first)
+    return entries.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
   };
 
   // Filter invoices for this customer that have outstanding balance
@@ -117,20 +234,30 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
     return 'Unpaid';
   };
 
-  const handlePaymentSubmit = (invoiceId: string, maxAmount: number) => {
+  const handlePaymentSubmit = async (invoiceId: string, maxAmount: number) => {
     const amount = parseFloat(paymentAmounts[invoiceId] || '0');
     const method = paymentMethods[invoiceId] || 'cash';
     const notes = paymentNotes[invoiceId] || '';
     if (amount > 0 && amount <= maxAmount) {
-      onMarkAsPaid(invoiceId, amount, method, notes);
-      setPaymentAmounts(prev => ({ ...prev, [invoiceId]: '' }));
-      setPaymentNotes(prev => ({ ...prev, [invoiceId]: '' }));
+      setProcessingPayment(invoiceId);
+      try {
+        await onMarkAsPaid(invoiceId, amount, method, notes);
+        setPaymentAmounts(prev => ({ ...prev, [invoiceId]: '' }));
+        setPaymentNotes(prev => ({ ...prev, [invoiceId]: '' }));
+      } finally {
+        setProcessingPayment(null);
+      }
     }
   };
 
-  const handleMarkFullPaid = (invoiceId: string, amount: number) => {
+  const handleMarkFullPaid = async (invoiceId: string, amount: number) => {
     const method = paymentMethods[invoiceId] || 'cash';
-    onMarkAsPaid(invoiceId, amount, method);
+    setProcessingPayment(invoiceId);
+    try {
+      await onMarkAsPaid(invoiceId, amount, method);
+    } finally {
+      setProcessingPayment(null);
+    }
   };
 
   const toggleInvoiceSelection = (invoiceId: string) => {
@@ -268,7 +395,9 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
 
           {/* Invoices List */}
           <div className="space-y-3">
-            {customerInvoices.length === 0 ? (
+            {isLoading ? (
+              <StatementLoadingAnimation theme={theme} />
+            ) : customerInvoices.length === 0 ? (
               <div className={`text-center py-12 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                 <Receipt className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>No invoices found for this customer</p>
@@ -433,25 +562,36 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
                             {showHistoryFor === invoice.id && (
                               <div className="mt-3 space-y-2">
                                 {getPaymentHistory(invoice.id)
-                                  .sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())
                                   .map((payment) => (
                                     <div 
                                       key={payment.id}
                                       className={`flex items-center justify-between p-3 rounded-lg ${
-                                        theme === 'dark' ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-100'
+                                        payment.source === 'bulk'
+                                          ? theme === 'dark' 
+                                            ? 'bg-blue-500/10 border border-blue-500/20' 
+                                            : 'bg-blue-50 border border-blue-100'
+                                          : theme === 'dark' 
+                                            ? 'bg-emerald-500/10 border border-emerald-500/20' 
+                                            : 'bg-emerald-50 border border-emerald-100'
                                       }`}
                                     >
                                       <div className="flex items-center gap-3">
                                         <div className={`p-2 rounded-lg ${
-                                          theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-100'
+                                          payment.source === 'bulk'
+                                            ? theme === 'dark' ? 'bg-blue-500/20' : 'bg-blue-100'
+                                            : theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-100'
                                         }`}>
-                                          {payment.paymentMethod === 'cash' && <Banknote className="w-4 h-4 text-emerald-500" />}
-                                          {payment.paymentMethod === 'bank' && <Building2 className="w-4 h-4 text-emerald-500" />}
-                                          {payment.paymentMethod === 'card' && <CreditCard className="w-4 h-4 text-emerald-500" />}
-                                          {payment.paymentMethod === 'cheque' && <Wallet className="w-4 h-4 text-emerald-500" />}
+                                          {(payment.paymentMethod === 'cash') && <Banknote className={`w-4 h-4 ${payment.source === 'bulk' ? 'text-blue-500' : 'text-emerald-500'}`} />}
+                                          {(payment.paymentMethod === 'bank' || payment.paymentMethod === 'bank_transfer') && <Building2 className={`w-4 h-4 ${payment.source === 'bulk' ? 'text-blue-500' : 'text-emerald-500'}`} />}
+                                          {(payment.paymentMethod === 'card') && <CreditCard className={`w-4 h-4 ${payment.source === 'bulk' ? 'text-blue-500' : 'text-emerald-500'}`} />}
+                                          {(payment.paymentMethod === 'cheque') && <Wallet className={`w-4 h-4 ${payment.source === 'bulk' ? 'text-blue-500' : 'text-emerald-500'}`} />}
                                         </div>
                                         <div>
-                                          <p className={`text-sm font-medium ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                                          <p className={`text-sm font-medium ${
+                                            payment.source === 'bulk'
+                                              ? theme === 'dark' ? 'text-blue-400' : 'text-blue-700'
+                                              : theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'
+                                          }`}>
                                             {formatCurrency(payment.amount)}
                                           </p>
                                           <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -465,18 +605,37 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
                                           </p>
                                         </div>
                                       </div>
-                                      <div className="text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        {/* Source badge */}
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
+                                          payment.source === 'bulk'
+                                            ? theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
+                                            : theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+                                        }`}>
+                                          {payment.source === 'bulk' ? (
+                                            <>
+                                              <Zap className="w-3 h-3" />
+                                              Bulk Payment
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Receipt className="w-3 h-3" />
+                                              Direct
+                                            </>
+                                          )}
+                                        </span>
+                                        {/* Payment method */}
                                         <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${
                                           theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
                                         }`}>
-                                          {payment.paymentMethod.charAt(0).toUpperCase() + payment.paymentMethod.slice(1)}
+                                          {payment.paymentMethod === 'bank_transfer' ? 'Bank' : payment.paymentMethod.charAt(0).toUpperCase() + payment.paymentMethod.slice(1)}
                                         </span>
-                                        {payment.notes && (
-                                          <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                                            {payment.notes}
-                                          </p>
-                                        )}
                                       </div>
+                                      {payment.notes && (
+                                        <p className={`text-xs text-right ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                          {payment.notes}
+                                        </p>
+                                      )}
                                     </div>
                                   ))}
                               </div>
@@ -571,24 +730,49 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
                               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                 <button
                                   onClick={() => handlePaymentSubmit(invoice.id, outstanding)}
-                                  disabled={!paymentAmounts[invoice.id] || parseFloat(paymentAmounts[invoice.id]) <= 0 || parseFloat(paymentAmounts[invoice.id]) > outstanding}
+                                  disabled={processingPayment === invoice.id || !paymentAmounts[invoice.id] || parseFloat(paymentAmounts[invoice.id]) <= 0 || parseFloat(paymentAmounts[invoice.id]) > outstanding}
                                   className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                                    paymentAmounts[invoice.id] && parseFloat(paymentAmounts[invoice.id]) > 0 && parseFloat(paymentAmounts[invoice.id]) <= outstanding
-                                      ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                                      : theme === 'dark' 
-                                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
-                                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    processingPayment === invoice.id
+                                      ? 'bg-emerald-500/50 text-white cursor-wait'
+                                      : paymentAmounts[invoice.id] && parseFloat(paymentAmounts[invoice.id]) > 0 && parseFloat(paymentAmounts[invoice.id]) <= outstanding
+                                        ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                                        : theme === 'dark' 
+                                          ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
+                                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                   }`}
                                 >
-                                  <CreditCard className="w-4 h-4" />
-                                  Record Payment
+                                  {processingPayment === invoice.id ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      Processing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CreditCard className="w-4 h-4" />
+                                      Record Payment
+                                    </>
+                                  )}
                                 </button>
                                 <button
                                   onClick={() => handleMarkFullPaid(invoice.id, outstanding)}
-                                  className="flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:opacity-90"
+                                  disabled={processingPayment === invoice.id}
+                                  className={`flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                                    processingPayment === invoice.id
+                                      ? 'bg-gradient-to-r from-emerald-500/50 to-teal-500/50 text-white/70 cursor-wait'
+                                      : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:opacity-90'
+                                  }`}
                                 >
-                                  <Check className="w-4 h-4" />
-                                  Full Pay ({formatCurrency(outstanding)})
+                                  {processingPayment === invoice.id ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      Processing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Check className="w-4 h-4" />
+                                      Full Pay ({formatCurrency(outstanding)})
+                                    </>
+                                  )}
                                 </button>
                               </div>
 

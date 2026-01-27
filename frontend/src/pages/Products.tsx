@@ -1,8 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import { mockProducts, productCategories, productBrands, mockSalesHistory } from '../data/mockData';
-import type { Product, SaleRecord } from '../data/mockData';
+import { useDataCache } from '../contexts/DataCacheContext';
+import { useAuth } from '../contexts/AuthContext';
+import { mockProducts, productCategories, productBrands } from '../data/mockData';
+import type { Product } from '../data/mockData';
+import { productService, type APIProduct, type SalesHistoryItem, type SalesStats, type StockMovement, type PriceHistoryRecord } from '../services/productService';
+import { categoryService, type APICategory } from '../services/categoryService';
+import { brandService, type APIBrand } from '../services/brandService';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { SearchableSelect } from '../components/ui/searchable-select';
 import { 
@@ -12,12 +17,38 @@ import {
   LayoutGrid, List, ChevronsLeft, ChevronsRight, History, Clock,
   User, Receipt, Percent, TrendingUp, AlertTriangle, SortAsc, SortDesc,
   Barcode, ArrowUpCircle, ArrowDownCircle, ShoppingCart, Eye,
-  BadgeDollarSign, PieChart
+  BadgeDollarSign, PieChart, Loader2, AlertCircle, CheckCircle2
 } from 'lucide-react';
+
+// Helper to convert API Product to frontend Product format
+const convertAPIProductToFrontend = (apiProduct: APIProduct): Product => ({
+  id: apiProduct.id,
+  name: apiProduct.name,
+  serialNumber: apiProduct.serialNumber || '',
+  barcode: apiProduct.barcode || '',
+  category: apiProduct.category?.name || 'Uncategorized',
+  brand: apiProduct.brand?.name || 'Unknown',
+  price: apiProduct.price,
+  costPrice: apiProduct.costPrice || 0,
+  stock: apiProduct.stock,
+  lowStockThreshold: apiProduct.lowStockThreshold || 10,
+  warranty: apiProduct.warranty || '',
+  description: apiProduct.description || '',
+  image: apiProduct.image || '',
+  createdAt: apiProduct.createdAt,
+  status: apiProduct.stock > 0 ? 'In Stock' : 'Out of Stock',
+});
 
 export const Products: React.FC = () => {
   const { theme } = useTheme();
+  const { setProducts: setCachedProducts } = useDataCache();
+  const { isViewingShop, viewingShop } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get effective shopId for SUPER_ADMIN viewing a shop
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedBrand, setSelectedBrand] = useState('all');
@@ -56,15 +87,23 @@ export const Products: React.FC = () => {
   // Modal states
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   // Stock & Pricing Details Modal states
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const [selectedProductForPricing, setSelectedProductForPricing] = useState<Product | null>(null);
+  const [pricingActiveTab, setPricingActiveTab] = useState<'overview' | 'stock-movements' | 'price-history'>('overview');
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryRecord[]>([]);
+  const [isLoadingPricingData, setIsLoadingPricingData] = useState(false);
   
   // Sales History Modal states
   const [isSalesHistoryOpen, setIsSalesHistoryOpen] = useState(false);
   const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null);
-  const [productSalesHistory, setProductSalesHistory] = useState<SaleRecord[]>([]);
+  const [productSalesHistory, setProductSalesHistory] = useState<SalesHistoryItem[]>([]);
+  const [salesStats, setSalesStats] = useState<SalesStats | null>(null);
+  const [isLoadingSalesHistory, setIsLoadingSalesHistory] = useState(false);
   const [salesHistoryStartDate, setSalesHistoryStartDate] = useState('');
   const [salesHistoryEndDate, setSalesHistoryEndDate] = useState('');
   const [salesHistorySearchQuery, setSalesHistorySearchQuery] = useState('');
@@ -74,8 +113,59 @@ export const Products: React.FC = () => {
   const salesHistoryStartCalendarRef = useRef<HTMLDivElement>(null);
   const salesHistoryEndCalendarRef = useRef<HTMLDivElement>(null);
   
-  // Local products state for demo
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  // Local products state - loads from API
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  
+  // Highlighted product (newly created/updated)
+  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+  
+  // API Categories and Brands for dynamic filters (used for future dynamic filtering)
+  const [_apiCategories, setApiCategories] = useState<APICategory[]>([]);
+  const [_apiBrands, setApiBrands] = useState<APIBrand[]>([]);
+
+  // Load products from API
+  useEffect(() => {
+    const loadProducts = async () => {
+      setIsLoading(true);
+      setApiError(null);
+      
+      try {
+        const [productsResult, categoriesResult, brandsResult] = await Promise.all([
+          productService.getAll({ shopId: effectiveShopId }),
+          categoryService.getAll({ shopId: effectiveShopId }).catch(() => ({ categories: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } })),
+          brandService.getAll({ shopId: effectiveShopId }).catch(() => ({ brands: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } })),
+        ]);
+        
+        // Convert API products to frontend format
+        const frontendProducts = productsResult.products.map(convertAPIProductToFrontend);
+        setProducts(frontendProducts);
+        setCachedProducts(frontendProducts); // Sync with cache for other pages
+        setApiCategories(categoriesResult.categories);
+        setApiBrands(brandsResult.brands);
+        
+        // Check if we have a highlighted product from navigation
+        const state = location.state as { highlightProductId?: string; highlightProductName?: string } | null;
+        if (state?.highlightProductId) {
+          setHighlightedProductId(state.highlightProductId);
+          // Clear the highlight after 5 seconds
+          setTimeout(() => setHighlightedProductId(null), 5000);
+          // Clear the location state
+          window.history.replaceState({}, document.title);
+        }
+      } catch (error) {
+        console.error('Failed to load products:', error);
+        setApiError(error instanceof Error ? error.message : 'Failed to load products');
+        // Fallback to mock data
+        setProducts(mockProducts);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadProducts();
+  }, [location.state, effectiveShopId, setCachedProducts]);
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -384,14 +474,28 @@ export const Products: React.FC = () => {
 
   const handleDeleteClick = (product: Product) => {
     setProductToDelete(product);
+    setDeleteError(null);
     setIsDeleteModalOpen(true);
   };
 
-  const handleConfirmDelete = () => {
-    if (productToDelete) {
-      setProducts(prev => prev.filter(p => p.id !== productToDelete.id));
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+    
+    setIsDeleting(true);
+    setDeleteError(null);
+    
+    try {
+      await productService.delete(productToDelete.id, effectiveShopId);
+      const updater = (prev: Product[]) => prev.filter(p => p.id !== productToDelete.id);
+      setProducts(updater);
+      setCachedProducts(updater); // Sync with cache for other pages
       setIsDeleteModalOpen(false);
       setProductToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete product:', error);
+      setDeleteError(error instanceof Error ? error.message : 'Failed to delete product');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -408,30 +512,72 @@ export const Products: React.FC = () => {
   // Count of low stock products
   const lowStockCount = products.filter(p => p.stock <= (p.lowStockThreshold || 10)).length;
 
-  // Sales History Handler
-  const handleViewSalesHistory = (product: Product) => {
+  // Sales History Handler - Now fetches from API
+  const handleViewSalesHistory = async (product: Product) => {
     setSelectedProductForHistory(product);
-    const salesForProduct = mockSalesHistory.filter(sale => sale.productId === product.id);
-    // Sort by date descending (newest first)
-    salesForProduct.sort((a, b) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime());
-    setProductSalesHistory(salesForProduct);
+    setProductSalesHistory([]);
+    setSalesStats(null);
     setSalesHistoryStartDate('');
     setSalesHistoryEndDate('');
     setSalesHistorySearchQuery('');
     setShowSalesHistoryStartCalendar(false);
     setShowSalesHistoryEndCalendar(false);
     setIsSalesHistoryOpen(true);
+    setIsLoadingSalesHistory(true);
+    
+    try {
+      const result = await productService.getSalesHistory(product.id);
+      setProductSalesHistory(result.items);
+      setSalesStats(result.stats);
+    } catch (error) {
+      console.error('Failed to load sales history:', error);
+      // Keep modal open but show empty state
+    } finally {
+      setIsLoadingSalesHistory(false);
+    }
   };
 
   const closeSalesHistory = () => {
     setIsSalesHistoryOpen(false);
     setSelectedProductForHistory(null);
     setProductSalesHistory([]);
+    setSalesStats(null);
     setSalesHistoryStartDate('');
     setSalesHistoryEndDate('');
     setSalesHistorySearchQuery('');
     setShowSalesHistoryStartCalendar(false);
     setShowSalesHistoryEndCalendar(false);
+  };
+
+  // Stock & Pricing Modal Handler - Fetches stock movements and price history from API
+  const handleOpenPricingModal = async (product: Product) => {
+    setSelectedProductForPricing(product);
+    setPricingActiveTab('overview');
+    setStockMovements([]);
+    setPriceHistory([]);
+    setIsPricingModalOpen(true);
+    setIsLoadingPricingData(true);
+    
+    try {
+      const [movementsResult, historyResult] = await Promise.all([
+        productService.getStockMovements(product.id),
+        productService.getPriceHistory(product.id)
+      ]);
+      setStockMovements(movementsResult);
+      setPriceHistory(historyResult);
+    } catch (error) {
+      console.error('Failed to load pricing data:', error);
+    } finally {
+      setIsLoadingPricingData(false);
+    }
+  };
+
+  const closePricingModal = () => {
+    setIsPricingModalOpen(false);
+    setSelectedProductForPricing(null);
+    setStockMovements([]);
+    setPriceHistory([]);
+    setPricingActiveTab('overview');
   };
 
   // Render calendar for sales history modal
@@ -552,15 +698,15 @@ export const Products: React.FC = () => {
     if (salesHistorySearchQuery) {
       const query = salesHistorySearchQuery.toLowerCase();
       filtered = filtered.filter(sale => 
-        sale.customerName.toLowerCase().includes(query) ||
-        sale.invoiceId.toLowerCase().includes(query)
+        sale.invoice.customerName.toLowerCase().includes(query) ||
+        sale.invoice.invoiceNumber.toLowerCase().includes(query)
       );
     }
     
     // Date filter
     if (salesHistoryStartDate || salesHistoryEndDate) {
       filtered = filtered.filter(sale => {
-        const saleDate = new Date(sale.saleDate);
+        const saleDate = new Date(sale.invoice.date);
         
         if (salesHistoryStartDate) {
           const start = new Date(salesHistoryStartDate);
@@ -581,19 +727,63 @@ export const Products: React.FC = () => {
     return filtered;
   }, [productSalesHistory, salesHistoryStartDate, salesHistoryEndDate, salesHistorySearchQuery]);
 
-  // Calculate sales statistics (based on filtered data)
+  // Calculate sales statistics (based on filtered data or use API stats)
   const getSalesStats = () => {
-    if (filteredSalesHistory.length === 0) return { totalSold: 0, totalRevenue: 0, avgDiscount: 0 };
+    // If we have API stats and no filters applied, use API stats
+    if (salesStats && !salesHistorySearchQuery && !salesHistoryStartDate && !salesHistoryEndDate) {
+      return { 
+        totalSold: salesStats.totalUnitsSold, 
+        totalRevenue: salesStats.totalRevenue, 
+        avgPrice: salesStats.averageSellingPrice,
+        totalTransactions: salesStats.totalTransactions
+      };
+    }
+    
+    // Otherwise calculate from filtered data
+    if (filteredSalesHistory.length === 0) return { totalSold: 0, totalRevenue: 0, avgPrice: 0, totalTransactions: 0 };
     
     const totalSold = filteredSalesHistory.reduce((sum, sale) => sum + sale.quantity, 0);
     const totalRevenue = filteredSalesHistory.reduce((sum, sale) => sum + sale.total, 0);
-    const avgDiscount = filteredSalesHistory.reduce((sum, sale) => sum + sale.discount, 0) / filteredSalesHistory.length;
+    const avgPrice = totalSold > 0 ? totalRevenue / totalSold : 0;
     
-    return { totalSold, totalRevenue, avgDiscount };
+    return { totalSold, totalRevenue, avgPrice, totalTransactions: filteredSalesHistory.length };
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className={`w-10 h-10 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+        <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Loading products...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* API Error Alert */}
+      {apiError && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-amber-500 font-medium">Warning</p>
+            <p className={`text-sm ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+              {apiError}. Showing cached data.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Success Banner for newly saved product */}
+      {highlightedProductId && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3 animate-pulse">
+          <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+          <p className={`font-medium ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+            Product saved successfully! Highlighted below.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
@@ -1039,18 +1229,25 @@ export const Products: React.FC = () => {
                 {paginatedProducts.map((product) => (
                   <tr 
                     key={product.id}
-                    className={`border-b transition-colors ${
-                      isLowStock(product)
+                    className={`border-b transition-all duration-500 ${
+                      highlightedProductId === product.id
                         ? theme === 'dark'
-                          ? 'border-red-900/30 bg-red-950/20 hover:bg-red-950/30'
-                          : 'border-red-100 bg-red-50/50 hover:bg-red-50'
-                        : theme === 'dark' 
-                          ? 'border-slate-700/30 hover:bg-slate-800/30' 
-                          : 'border-slate-100 hover:bg-slate-50'
+                          ? 'border-emerald-500/50 bg-emerald-950/40 ring-2 ring-emerald-500/30'
+                          : 'border-emerald-300 bg-emerald-50 ring-2 ring-emerald-500/30'
+                        : isLowStock(product)
+                          ? theme === 'dark'
+                            ? 'border-red-900/30 bg-red-950/20 hover:bg-red-950/30'
+                            : 'border-red-100 bg-red-50/50 hover:bg-red-50'
+                          : theme === 'dark' 
+                            ? 'border-slate-700/30 hover:bg-slate-800/30' 
+                            : 'border-slate-100 hover:bg-slate-50'
                     }`}
                   >
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
+                        {highlightedProductId === product.id && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 animate-pulse" />
+                        )}
                         {renderProductImage(product, 'sm')}
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
@@ -1126,10 +1323,7 @@ export const Products: React.FC = () => {
                     <td className="px-3 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button 
-                          onClick={() => {
-                            setSelectedProductForPricing(product);
-                            setIsPricingModalOpen(true);
-                          }}
+                          onClick={() => handleOpenPricingModal(product)}
                           className={`p-1.5 rounded-lg transition-colors ${
                             theme === 'dark' ? 'hover:bg-purple-500/10 text-purple-400' : 'hover:bg-purple-50 text-purple-600'
                           }`}
@@ -1274,16 +1468,27 @@ export const Products: React.FC = () => {
           {paginatedProducts.map((product) => (
             <div 
               key={product.id}
-              className={`rounded-2xl border overflow-hidden transition-all hover:shadow-lg ${
-                isLowStock(product)
+              className={`rounded-2xl border overflow-hidden transition-all duration-500 hover:shadow-lg ${
+                highlightedProductId === product.id
                   ? theme === 'dark'
-                    ? 'bg-red-950/20 border-red-900/50 hover:border-red-800'
-                    : 'bg-red-50/50 border-red-200 hover:border-red-300'
-                  : theme === 'dark' 
-                    ? 'bg-slate-800/30 border-slate-700/50 hover:border-slate-600' 
-                    : 'bg-white border-slate-200 hover:border-slate-300'
+                    ? 'bg-emerald-950/30 border-emerald-500/50 ring-2 ring-emerald-500/30 shadow-emerald-500/20 shadow-lg'
+                    : 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/30 shadow-emerald-500/20 shadow-lg'
+                  : isLowStock(product)
+                    ? theme === 'dark'
+                      ? 'bg-red-950/20 border-red-900/50 hover:border-red-800'
+                      : 'bg-red-50/50 border-red-200 hover:border-red-300'
+                    : theme === 'dark' 
+                      ? 'bg-slate-800/30 border-slate-700/50 hover:border-slate-600' 
+                      : 'bg-white border-slate-200 hover:border-slate-300'
               }`}
             >
+              {/* Newly Saved Badge */}
+              {highlightedProductId === product.id && (
+                <div className="bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-medium px-3 py-1 flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Successfully Saved!
+                </div>
+              )}
               {/* Card Header with Image */}
               <div className={`p-4 ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                 <div className="flex items-start justify-between gap-3">
@@ -1311,10 +1516,7 @@ export const Products: React.FC = () => {
                       <History className="w-4 h-4" />
                     </button>
                     <button 
-                      onClick={() => {
-                        setSelectedProductForPricing(product);
-                        setIsPricingModalOpen(true);
-                      }}
+                      onClick={() => handleOpenPricingModal(product)}
                       className={`p-2 rounded-lg transition-colors ${
                         theme === 'dark' ? 'hover:bg-purple-500/10 text-purple-400' : 'hover:bg-purple-50 text-purple-600'
                       }`}
@@ -1744,7 +1946,7 @@ export const Products: React.FC = () => {
             </div>
 
             {/* Stats Cards */}
-            {filteredSalesHistory.length > 0 && (
+            {(filteredSalesHistory.length > 0 || salesStats) && (
               <div className={`px-6 py-4 border-b grid grid-cols-3 gap-4 flex-shrink-0 ${
                 theme === 'dark' ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50/50'
               }`}>
@@ -1783,12 +1985,12 @@ export const Products: React.FC = () => {
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                       theme === 'dark' ? 'bg-amber-500/10' : 'bg-amber-50'
                     }`}>
-                      <Percent className={`w-5 h-5 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
+                      <BadgeDollarSign className={`w-5 h-5 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
                     </div>
                     <div>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Avg. Discount</p>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Avg. Price</p>
                       <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                        {getSalesStats().avgDiscount.toFixed(1)}%
+                        {formatCurrency(getSalesStats().avgPrice)}
                       </p>
                     </div>
                   </div>
@@ -1798,7 +2000,12 @@ export const Products: React.FC = () => {
 
             {/* Sales List - Scrollable */}
             <div className="overflow-y-auto flex-1 min-h-0">
-              {filteredSalesHistory.length === 0 ? (
+              {/* Loading state */}
+              {isLoadingSalesHistory ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className={`w-8 h-8 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                </div>
+              ) : filteredSalesHistory.length === 0 ? (
                 <div className="p-12 text-center">
                   <History className={`w-12 h-12 mx-auto mb-3 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
                   <p className={`font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -1828,30 +2035,35 @@ export const Products: React.FC = () => {
                             </div>
                             <div>
                               <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                {sale.customerName}
+                                {sale.invoice.customerName}
                               </p>
                               <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                                 <Receipt className="w-3 h-3 inline mr-1" />
-                                {sale.invoiceId}
+                                {sale.invoice.invoiceNumber}
                               </p>
                             </div>
                           </div>
 
-                          {/* Date & Time */}
-                          <div className="flex items-center gap-2 text-sm">
-                            <Clock className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
-                            <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>
-                              {new Date(sale.saleDate).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric'
-                              })}
-                              {' at '}
-                              {new Date(sale.saleDate).toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: true
-                              })}
+                          {/* Date & Status */}
+                          <div className="flex items-center gap-3 text-sm">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                              <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>
+                                {new Date(sale.invoice.date).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                              sale.invoice.status === 'FULLPAID' 
+                                ? 'bg-emerald-500/10 text-emerald-500' 
+                                : sale.invoice.status === 'HALFPAY'
+                                ? 'bg-amber-500/10 text-amber-500'
+                                : 'bg-red-500/10 text-red-500'
+                            }`}>
+                              {sale.invoice.status === 'FULLPAID' ? 'Paid' : sale.invoice.status === 'HALFPAY' ? 'Partial' : 'Unpaid'}
                             </span>
                           </div>
                         </div>
@@ -1875,10 +2087,7 @@ export const Products: React.FC = () => {
                                   ? 'bg-amber-500/10 text-amber-400' 
                                   : 'bg-amber-50 text-amber-600'
                               }`}>
-                                -{sale.discount}% OFF
-                              </span>
-                              <span className={`text-xs line-through ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
-                                {formatCurrency(sale.unitPrice * sale.quantity)}
+                                -{formatCurrency(sale.discount)} OFF
                               </span>
                             </div>
                           )}
@@ -1915,10 +2124,14 @@ export const Products: React.FC = () => {
       <DeleteConfirmationModal
         isOpen={isDeleteModalOpen}
         title="Delete Product"
-        message="Are you sure you want to delete this product? This action cannot be undone."
+        message={deleteError || "Are you sure you want to delete this product? This action cannot be undone."}
         itemName={productToDelete?.name}
         onConfirm={handleConfirmDelete}
-        onCancel={() => setIsDeleteModalOpen(false)}
+        onCancel={() => {
+          setIsDeleteModalOpen(false);
+          setDeleteError(null);
+        }}
+        isLoading={isDeleting}
       />
 
       {/* Stock & Pricing Details Modal */}
@@ -1927,7 +2140,7 @@ export const Products: React.FC = () => {
           {/* Backdrop */}
           <div 
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setIsPricingModalOpen(false)}
+            onClick={closePricingModal}
           />
           
           {/* Modal Content */}
@@ -1961,7 +2174,7 @@ export const Products: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => setIsPricingModalOpen(false)}
+                  onClick={closePricingModal}
                   className={`p-2 rounded-xl transition-colors ${
                     theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
                   }`}
@@ -1971,8 +2184,60 @@ export const Products: React.FC = () => {
               </div>
             </div>
 
+            {/* Tabs */}
+            <div className={`px-6 border-b ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+              <div className="flex gap-1">
+                {[
+                  { id: 'overview', label: 'Overview', icon: PieChart },
+                  { id: 'stock-movements', label: 'Stock Movements', icon: Package },
+                  { id: 'price-history', label: 'Price History', icon: TrendingUp }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setPricingActiveTab(tab.id as 'overview' | 'stock-movements' | 'price-history')}
+                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                      pricingActiveTab === tab.id
+                        ? theme === 'dark'
+                          ? 'border-emerald-400 text-emerald-400'
+                          : 'border-emerald-600 text-emerald-600'
+                        : theme === 'dark'
+                          ? 'border-transparent text-slate-400 hover:text-slate-300'
+                          : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <tab.icon className="w-4 h-4" />
+                    {tab.label}
+                    {tab.id === 'stock-movements' && stockMovements.length > 0 && (
+                      <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${
+                        theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {stockMovements.length}
+                      </span>
+                    )}
+                    {tab.id === 'price-history' && priceHistory.length > 0 && (
+                      <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${
+                        theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {priceHistory.length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-250px)]">
+              {/* Loading State */}
+              {isLoadingPricingData && pricingActiveTab !== 'overview' && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className={`w-8 h-8 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                </div>
+              )}
+
+              {/* Overview Tab */}
+              {pricingActiveTab === 'overview' && (
+                <>
               {/* Pricing Overview Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 {/* Cost Price */}
@@ -2116,6 +2381,140 @@ export const Products: React.FC = () => {
                   </div>
                 </div>
               </div>
+                </>
+              )}
+
+              {/* Stock Movements Tab */}
+              {pricingActiveTab === 'stock-movements' && !isLoadingPricingData && (
+                <div className="space-y-4">
+                  {stockMovements.length === 0 ? (
+                    <div className={`text-center py-12 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                      <Package className={`w-12 h-12 mx-auto mb-3 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`} />
+                      <p className={`font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>No stock movements found</p>
+                      <p className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Stock changes will appear here</p>
+                    </div>
+                  ) : (
+                    <div className={`rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                      <table className="w-full">
+                        <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
+                          <tr>
+                            <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Date</th>
+                            <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Type</th>
+                            <th className={`px-4 py-3 text-right text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Qty</th>
+                            <th className={`px-4 py-3 text-right text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Stock</th>
+                            <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700' : 'divide-slate-200'}`}>
+                          {stockMovements.map((movement) => (
+                            <tr key={movement.id} className={theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}>
+                              <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                {new Date(movement.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+                                  movement.type === 'GRN_IN' ? 'bg-emerald-500/10 text-emerald-500' :
+                                  movement.type === 'INVOICE_OUT' ? 'bg-blue-500/10 text-blue-500' :
+                                  movement.type === 'RETURN' ? 'bg-purple-500/10 text-purple-500' :
+                                  movement.type === 'DAMAGED' ? 'bg-red-500/10 text-red-500' :
+                                  'bg-amber-500/10 text-amber-500'
+                                }`}>
+                                  {movement.type === 'GRN_IN' ? <ArrowDownCircle className="w-3 h-3" /> :
+                                   movement.type === 'INVOICE_OUT' ? <ArrowUpCircle className="w-3 h-3" /> :
+                                   <Package className="w-3 h-3" />}
+                                  {movement.type.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className={`px-4 py-3 text-right text-sm font-medium ${
+                                movement.quantity > 0 ? 'text-emerald-500' : 'text-red-500'
+                              }`}>
+                                {movement.quantity > 0 ? '+' : ''}{movement.quantity}
+                              </td>
+                              <td className={`px-4 py-3 text-right text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                {movement.previousStock} → {movement.newStock}
+                              </td>
+                              <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {movement.notes || movement.referenceNumber || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Price History Tab */}
+              {pricingActiveTab === 'price-history' && !isLoadingPricingData && (
+                <div className="space-y-4">
+                  {priceHistory.length === 0 ? (
+                    <div className={`text-center py-12 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                      <TrendingUp className={`w-12 h-12 mx-auto mb-3 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`} />
+                      <p className={`font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>No price changes recorded</p>
+                      <p className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Price updates will appear here</p>
+                    </div>
+                  ) : (
+                    <div className={`rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                      <table className="w-full">
+                        <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
+                          <tr>
+                            <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Date</th>
+                            <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Type</th>
+                            <th className={`px-4 py-3 text-right text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Cost Price</th>
+                            <th className={`px-4 py-3 text-right text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Selling Price</th>
+                            <th className={`px-4 py-3 text-left text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700' : 'divide-slate-200'}`}>
+                          {priceHistory.map((record) => (
+                            <tr key={record.id} className={theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}>
+                              <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                {new Date(record.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                  record.changeType === 'COST_UPDATE' ? 'bg-amber-500/10 text-amber-500' :
+                                  record.changeType === 'SELLING_UPDATE' ? 'bg-emerald-500/10 text-emerald-500' :
+                                  'bg-purple-500/10 text-purple-500'
+                                }`}>
+                                  {record.changeType === 'COST_UPDATE' ? 'Cost' :
+                                   record.changeType === 'SELLING_UPDATE' ? 'Selling' : 'Both'}
+                                </span>
+                              </td>
+                              <td className={`px-4 py-3 text-right text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                {record.previousCostPrice !== undefined && record.newCostPrice !== undefined ? (
+                                  <span>
+                                    <span className="text-slate-500">{formatCurrency(record.previousCostPrice)}</span>
+                                    <span className="mx-1">→</span>
+                                    <span className={record.newCostPrice > record.previousCostPrice ? 'text-red-500' : 'text-emerald-500'}>
+                                      {formatCurrency(record.newCostPrice)}
+                                    </span>
+                                  </span>
+                                ) : '-'}
+                              </td>
+                              <td className={`px-4 py-3 text-right text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                {record.previousSellingPrice !== undefined && record.newSellingPrice !== undefined ? (
+                                  <span>
+                                    <span className="text-slate-500">{formatCurrency(record.previousSellingPrice)}</span>
+                                    <span className="mx-1">→</span>
+                                    <span className={record.newSellingPrice > record.previousSellingPrice ? 'text-emerald-500' : 'text-red-500'}>
+                                      {formatCurrency(record.newSellingPrice)}
+                                    </span>
+                                  </span>
+                                ) : '-'}
+                              </td>
+                              <td className={`px-4 py-3 text-sm capitalize ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {record.reason?.replace('_', ' ') || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -2133,7 +2532,7 @@ export const Products: React.FC = () => {
                   View Sales History
                 </button>
                 <button
-                  onClick={() => setIsPricingModalOpen(false)}
+                  onClick={closePricingModal}
                   className={`flex-1 py-2.5 rounded-xl font-medium transition-colors ${
                     theme === 'dark'
                       ? 'bg-slate-700 hover:bg-slate-600 text-white'

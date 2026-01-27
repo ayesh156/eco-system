@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDataCache } from '../contexts/DataCacheContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import type { Invoice, InvoicePayment, Customer, CustomerPayment, Product } from '../data/mockData';
 import { 
@@ -32,6 +33,7 @@ export const Invoices: React.FC = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const { settings: whatsAppSettings } = useWhatsAppSettings();
+  const { isViewingShop, viewingShop } = useAuth();
   const { 
     invoices: cachedInvoices, 
     loadInvoices, 
@@ -41,6 +43,9 @@ export const Invoices: React.FC = () => {
     loadCustomers,
     setInvoices: setCachedInvoices
   } = useDataCache();
+  
+  // Get effective shopId for SUPER_ADMIN viewing a shop
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
   
   // Start with empty arrays - will load from API
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -144,6 +149,16 @@ export const Invoices: React.FC = () => {
       setInvoices([]);
     }
   }, [cachedInvoices]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload data when shop changes (SuperAdmin viewing different shop)
+  const previousShopIdRef = useRef<string | undefined>(effectiveShopId);
+  useEffect(() => {
+    if (previousShopIdRef.current !== effectiveShopId && initialLoadRef.current) {
+      console.log('🔄 Invoices: Shop changed from', previousShopIdRef.current, 'to', effectiveShopId, '- reloading');
+      previousShopIdRef.current = effectiveShopId;
+      fetchInvoices(true);
+    }
+  }, [effectiveShopId, fetchInvoices]);
   
   // Sync with cached customers when they change (for phone numbers)
   useEffect(() => {
@@ -675,7 +690,8 @@ export const Invoices: React.FC = () => {
             total: updatedInvoice.total,
             dueDate: updatedInvoice.dueDate,
             status: denormalizeStatus(updatedInvoice.status),
-          });
+            paidAmount: updatedInvoice.paidAmount, // Include paid amount for walk-in customer full payment
+          }, effectiveShopId);
           
           const convertedInvoice = convertAPIInvoiceToFrontend(apiUpdatedInvoice);
           
@@ -689,9 +705,15 @@ export const Invoices: React.FC = () => {
             description: `Invoice #${updatedInvoice.id} has been updated.`,
           });
           console.log('✅ Invoice updated via API');
+          
           // Close modal and reset state on success
           setShowEditModal(false);
           setSelectedInvoice(null);
+          
+          // Refetch fresh data to ensure consistency (async - no need to await)
+          console.log('📡 Refetching invoice data after edit...');
+          fetchInvoices(true).catch(err => console.warn('Refetch warning:', err));
+          
           return;
         } catch (error) {
           console.error('❌ Failed to update invoice via API:', error);
@@ -711,6 +733,7 @@ export const Invoices: React.FC = () => {
       toast.success('Invoice updated locally', {
         description: `Invoice #${updatedInvoice.id} has been updated.`,
       });
+      
       // Close modal and reset state on success
       setShowEditModal(false);
       setSelectedInvoice(null);
@@ -733,7 +756,7 @@ export const Invoices: React.FC = () => {
       // If using API, delete via API
       if (isUsingAPI && selectedInvoice.apiId) {
         try {
-          await invoiceService.delete(selectedInvoice.apiId);
+          await invoiceService.delete(selectedInvoice.apiId, effectiveShopId);
           toast.success('Invoice deleted successfully', {
             description: `Invoice #${selectedInvoice.id} has been deleted.`,
           });
@@ -779,7 +802,7 @@ export const Invoices: React.FC = () => {
           paymentMethod: denormalizePaymentMethod(paymentMethod),
           notes,
           paymentDate,
-        });
+        }, effectiveShopId);
         
         // Convert and update both local state and context cache
         const convertedInvoice = convertAPIInvoiceToFrontend(updatedInvoice);
@@ -1446,8 +1469,8 @@ export const Invoices: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    {/* Amount Section - Enhanced for payment tracking with consistent height */}
-                    <div className={`p-3 rounded-xl min-h-[90px] flex flex-col justify-between ${
+                    {/* Amount Section - Enhanced for payment tracking */}
+                    <div className={`p-3 rounded-xl flex flex-col justify-between ${
                       invoice.status === 'fullpaid'
                         ? theme === 'dark' ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'
                         : invoice.status === 'halfpay'
@@ -1608,13 +1631,13 @@ export const Invoices: React.FC = () => {
                                       <MessageCircle className="w-4 h-4" />
                                       💬 Send Reminder
                                       {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
-                                        <button 
+                                        <span 
                                           onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
                                           className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-green-800 cursor-pointer"
                                           title={`${invoice.reminderCount} reminders sent - Click to view history`}
                                         >
                                           {invoice.reminderCount}
-                                        </button>
+                                        </span>
                                       )}
                                     </button>
                                   </>
@@ -1957,7 +1980,7 @@ export const Invoices: React.FC = () => {
                             >
                               <MessageCircle className="w-4 h-4" />
                               {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
-                                <button 
+                                <span 
                                   onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
                                   className={`absolute -top-1 -right-1 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center hover:scale-110 cursor-pointer ${
                                     isOverdue(invoice) ? 'bg-rose-600 hover:bg-rose-700' : 'bg-green-700 hover:bg-green-800'
@@ -1965,7 +1988,7 @@ export const Invoices: React.FC = () => {
                                   title={`${invoice.reminderCount} reminders sent - Click to view history`}
                                 >
                                   {invoice.reminderCount}
-                                </button>
+                                </span>
                               )}
                             </button>
                           )}

@@ -153,6 +153,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   
   // Get shopId from authenticated user's token
   const shopId = getShopIdFromToken(req);
+  
+  // Get effective shopId (supports SuperAdmin viewing other shops via ?shopId= query param)
+  const effectiveShopId = getEffectiveShopId(req, query);
 
   try {
     // Health check
@@ -554,8 +557,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== CREATE INVOICE ====================
     if (path === '/api/v1/invoices' && method === 'POST') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Require authentication for multi-tenant isolation
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
@@ -565,13 +568,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const customer = await db.customer.findUnique({ where: { id: customerId } });
       const customerName = customer?.name || 'Unknown Customer';
       
-      // Verify customer belongs to same shop
-      if (customer && customer.shopId !== shopId) {
+      // Verify customer belongs to same shop (using effectiveShopId for SuperAdmin)
+      if (customer && customer.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Customer does not belong to your shop' });
       }
       
-      // Use authenticated user's shopId - NEVER trust shopId from request body
-      const invoiceShopId = shopId;
+      // Use effective shopId (supports SuperAdmin viewing other shops)
+      const invoiceShopId = effectiveShopId;
       
       // Generate invoice number for this shop
       const lastInvoice = await db.invoice.findFirst({ orderBy: { invoiceNumber: 'desc' } });
@@ -969,58 +972,214 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // ==================== CUSTOMERS (cached for 30 seconds) ====================
+    // ==================== CUSTOMERS (World-Class CRUD) ====================
+    
+    // GET /customers - List with filters and pagination
     if (path === '/api/v1/customers' && method === 'GET') {
-      // Get effective shopId (supports SuperAdmin shop viewing)
       const effectiveShopId = getEffectiveShopId(req, query);
       if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       setCacheHeaders(res, 30, 60);
-      const customers = await db.customer.findMany({ 
-        where: { shopId: effectiveShopId }, // CRITICAL: Filter by effectiveShopId
-        orderBy: { name: 'asc' } 
+      
+      // Build where clause with filters
+      const where: any = { shopId: effectiveShopId };
+      
+      // Search filter
+      if (query.search) {
+        where.OR = [
+          { name: { contains: query.search, mode: 'insensitive' } },
+          { email: { contains: query.search, mode: 'insensitive' } },
+          { phone: { contains: query.search } },
+          { nic: { contains: query.search, mode: 'insensitive' } },
+        ];
+      }
+      
+      // Credit status filter
+      if (query.creditStatus && query.creditStatus !== 'all') {
+        where.creditStatus = query.creditStatus.toUpperCase();
+      }
+      
+      // Customer type filter
+      if (query.customerType && query.customerType !== 'all') {
+        where.customerType = query.customerType.toUpperCase();
+      }
+      
+      // Pagination
+      const pageNum = Math.max(1, parseInt(query.page || '1'));
+      const limitNum = Math.min(100, Math.max(1, parseInt(query.limit || '50')));
+      const skip = (pageNum - 1) * limitNum;
+      
+      // Sorting
+      const validSortFields = ['name', 'creditBalance', 'totalSpent', 'lastPurchase', 'createdAt'];
+      const sortField = validSortFields.includes(query.sortBy || '') ? query.sortBy : 'name';
+      const order = query.sortOrder === 'desc' ? 'desc' : 'asc';
+      
+      const [customers, total] = await Promise.all([
+        db.customer.findMany({
+          where,
+          orderBy: { [sortField as string]: order },
+          skip,
+          take: limitNum,
+          include: {
+            _count: { select: { invoices: true } }
+          }
+        }),
+        db.customer.count({ where })
+      ]);
+      
+      return res.status(200).json({ 
+        success: true, 
+        data: customers,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum)
+        }
       });
-      return res.status(200).json({ success: true, data: customers });
     }
 
-    if (path === '/api/v1/customers' && method === 'POST') {
-      if (!shopId) {
+    // GET /customers/stats - Customer statistics
+    if (path === '/api/v1/customers/stats' && method === 'GET') {
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
+      
+      const [totalCustomers, clearCount, activeCount, overdueCount, creditStats] = await Promise.all([
+        db.customer.count({ where: { shopId: effectiveShopId } }),
+        db.customer.count({ where: { shopId: effectiveShopId, creditStatus: 'CLEAR' } }),
+        db.customer.count({ where: { shopId: effectiveShopId, creditStatus: 'ACTIVE' } }),
+        db.customer.count({ where: { shopId: effectiveShopId, creditStatus: 'OVERDUE' } }),
+        db.customer.aggregate({
+          where: { shopId: effectiveShopId },
+          _sum: { creditBalance: true, totalSpent: true }
+        })
+      ]);
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          totalCustomers,
+          byStatus: { clear: clearCount, active: activeCount, overdue: overdueCount },
+          totals: {
+            creditBalance: creditStats._sum.creditBalance || 0,
+            totalSpent: creditStats._sum.totalSpent || 0
+          }
+        }
+      });
+    }
+
+    // POST /customers - Create customer
+    if (path === '/api/v1/customers' && method === 'POST') {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const { shopId: _, id: __, ...safeData } = body;
+      
+      // Check for duplicate phone
+      const existingPhone = await db.customer.findFirst({
+        where: { shopId: effectiveShopId, phone: safeData.phone }
+      });
+      if (existingPhone) {
+        return res.status(409).json({ success: false, message: 'A customer with this phone number already exists' });
+      }
+      
+      // Check for duplicate NIC
+      if (safeData.nic) {
+        const existingNIC = await db.customer.findFirst({
+          where: { shopId: effectiveShopId, nic: safeData.nic }
+        });
+        if (existingNIC) {
+          return res.status(409).json({ success: false, message: 'A customer with this NIC already exists' });
+        }
+      }
+      
       const customer = await db.customer.create({ 
-        data: { ...body, shopId } // CRITICAL: Set shopId from token (not query)
+        data: { 
+          ...safeData, 
+          shopId: effectiveShopId,
+          creditBalance: safeData.creditBalance || 0,
+          creditLimit: safeData.creditLimit || 0,
+          creditStatus: safeData.creditStatus || 'CLEAR',
+          customerType: safeData.customerType || 'REGULAR',
+          totalSpent: 0,
+          totalOrders: 0,
+        }
       });
       return res.status(201).json({ success: true, data: customer });
     }
 
     const customerMatch = path.match(/^\/api\/v1\/customers\/([^/]+)$/);
+    
+    // GET /customers/:id - Get single customer
     if (customerMatch && method === 'GET') {
       const effectiveShopId = getEffectiveShopId(req, query);
       if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
-      const customer = await db.customer.findUnique({ where: { id: customerMatch[1] } });
+      const customer = await db.customer.findUnique({ 
+        where: { id: customerMatch[1] },
+        include: {
+          invoices: {
+            orderBy: { date: 'desc' },
+            take: 10,
+            select: {
+              id: true,
+              invoiceNumber: true,
+              total: true,
+              paidAmount: true,
+              dueAmount: true,
+              status: true,
+              date: true
+            }
+          },
+          _count: { select: { invoices: true } }
+        }
+      });
       if (!customer) {
         return res.status(404).json({ success: false, error: 'Customer not found' });
       }
-      // Verify ownership
-      if (customer.shopId !== shopId) {
+      if (customer.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied' });
       }
       return res.status(200).json({ success: true, data: customer });
     }
 
+    // PUT/PATCH /customers/:id - Update customer
     if (customerMatch && (method === 'PUT' || method === 'PATCH')) {
-      if (!shopId) {
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
-      // Verify ownership before update
       const existing = await db.customer.findUnique({ where: { id: customerMatch[1] } });
-      if (!existing || existing.shopId !== shopId) {
+      if (!existing || existing.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied' });
       }
-      const { shopId: _, ...safeData } = body; // Prevent shopId tampering
+      
+      const { shopId: _, id: __, ...safeData } = body;
+      
+      // Check for duplicate phone (excluding current)
+      if (safeData.phone && safeData.phone !== existing.phone) {
+        const existingPhone = await db.customer.findFirst({
+          where: { shopId: effectiveShopId, phone: safeData.phone, NOT: { id: customerMatch[1] } }
+        });
+        if (existingPhone) {
+          return res.status(409).json({ success: false, message: 'A customer with this phone number already exists' });
+        }
+      }
+      
+      // Check for duplicate NIC (excluding current)
+      if (safeData.nic && safeData.nic !== existing.nic) {
+        const existingNIC = await db.customer.findFirst({
+          where: { shopId: effectiveShopId, nic: safeData.nic, NOT: { id: customerMatch[1] } }
+        });
+        if (existingNIC) {
+          return res.status(409).json({ success: false, message: 'A customer with this NIC already exists' });
+        }
+      }
+      
       const customer = await db.customer.update({
         where: { id: customerMatch[1] },
         data: safeData,
@@ -1028,47 +1187,300 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ success: true, data: customer });
     }
 
+    // DELETE /customers/:id
     if (customerMatch && method === 'DELETE') {
-      if (!shopId) {
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
-      // Verify ownership before delete
-      const existing = await db.customer.findUnique({ where: { id: customerMatch[1] } });
-      if (!existing || existing.shopId !== shopId) {
+      const existing = await db.customer.findUnique({ 
+        where: { id: customerMatch[1] },
+        include: { _count: { select: { invoices: true } } }
+      });
+      if (!existing || existing.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      if (existing._count.invoices > 0) {
+        return res.status(400).json({ success: false, message: `Cannot delete customer with ${existing._count.invoices} invoice(s)` });
       }
       await db.customer.delete({ where: { id: customerMatch[1] } });
       return res.status(200).json({ success: true, message: 'Customer deleted' });
     }
 
-    // ==================== PRODUCTS (cached for 60 seconds) ====================
+    // ==================== PRODUCTS (World-Class CRUD) ====================
+    
+    // GET /products - List with filters and pagination
     if (path === '/api/v1/products' && method === 'GET') {
-      // Get effective shopId (supports SuperAdmin shop viewing)
       const effectiveShopId = getEffectiveShopId(req, query);
       if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
-      setCacheHeaders(res, 60, 120); // Products don't change often
-      const products = await db.product.findMany({
-        where: { shopId: effectiveShopId }, // CRITICAL: Filter by effectiveShopId
-        include: { category: true, brand: true },
-        orderBy: { name: 'asc' },
+      setCacheHeaders(res, 60, 120);
+      
+      // Build where clause with filters
+      const where: any = { shopId: effectiveShopId };
+      
+      // Search filter
+      if (query.search) {
+        where.OR = [
+          { name: { contains: query.search, mode: 'insensitive' } },
+          { serialNumber: { contains: query.search, mode: 'insensitive' } },
+          { barcode: { contains: query.search, mode: 'insensitive' } },
+          { description: { contains: query.search, mode: 'insensitive' } },
+        ];
+      }
+      
+      // Category filter
+      if (query.categoryId) {
+        where.categoryId = query.categoryId;
+      }
+      
+      // Brand filter
+      if (query.brandId) {
+        where.brandId = query.brandId;
+      }
+      
+      // Price range
+      if (query.minPrice) {
+        where.price = { ...where.price, gte: parseFloat(query.minPrice) };
+      }
+      if (query.maxPrice) {
+        where.price = { ...where.price, lte: parseFloat(query.maxPrice) };
+      }
+      
+      // Pagination
+      const pageNum = Math.max(1, parseInt(query.page || '1'));
+      const limitNum = Math.min(100, Math.max(1, parseInt(query.limit || '50')));
+      const skip = (pageNum - 1) * limitNum;
+      
+      // Sorting
+      const validSortFields = ['name', 'price', 'stock', 'createdAt', 'updatedAt'];
+      const sortField = validSortFields.includes(query.sortBy || '') ? query.sortBy : 'name';
+      const order = query.sortOrder === 'desc' ? 'desc' : 'asc';
+      
+      const [products, total] = await Promise.all([
+        db.product.findMany({
+          where,
+          orderBy: { [sortField as string]: order },
+          skip,
+          take: limitNum,
+          include: { 
+            category: true, 
+            brand: true,
+            _count: { select: { invoiceItems: true } }
+          },
+        }),
+        db.product.count({ where })
+      ]);
+      
+      return res.status(200).json({ 
+        success: true, 
+        data: products,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum)
+        }
       });
-      return res.status(200).json({ success: true, data: products });
     }
 
-    if (path === '/api/v1/products' && method === 'POST') {
+    // GET /products/stats - Product statistics
+    if (path === '/api/v1/products/stats' && method === 'GET') {
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const products = await db.product.findMany({
+        where: { shopId: effectiveShopId },
+        select: { stock: true, lowStockThreshold: true, price: true, costPrice: true }
+      });
+      
+      const totalProducts = products.length;
+      const lowStockCount = products.filter(p => p.stock <= p.lowStockThreshold).length;
+      const outOfStockCount = products.filter(p => p.stock === 0).length;
+      const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
+      const totalCostValue = products.reduce((sum, p) => sum + (p.stock * (p.costPrice || 0)), 0);
+      const totalStock = products.reduce((sum, p) => sum + p.stock, 0);
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          totalProducts,
+          lowStockCount,
+          outOfStockCount,
+          inStockCount: totalProducts - outOfStockCount,
+          totalStock,
+          totalStockValue,
+          totalCostValue,
+          potentialProfit: totalStockValue - totalCostValue
+        }
+      });
+    }
+
+    // GET /products/low-stock
+    if (path === '/api/v1/products/low-stock' && method === 'GET') {
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const products = await db.product.findMany({
+        where: { shopId: effectiveShopId },
+        include: { category: true, brand: true },
+        orderBy: { stock: 'asc' }
+      });
+      
+      const lowStockProducts = products.filter(p => p.stock <= p.lowStockThreshold);
+      return res.status(200).json({ success: true, data: lowStockProducts });
+    }
+
+    // GET /products/suggestions - Get global product suggestions
+    if (path === '/api/v1/products/suggestions' && method === 'GET') {
       if (!shopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
+      
+      const search = query.search as string | undefined;
+      const where: any = {};
+      if (search) {
+        where.name = { contains: search, mode: 'insensitive' };
+      }
+      
+      // Include full brand/category details for auto-creation in new shop
+      const allProducts = await db.product.findMany({
+        where,
+        select: {
+          name: true,
+          description: true,
+          price: true,
+          costPrice: true,
+          image: true,
+          warranty: true,
+          shopId: true,
+          category: { 
+            select: { 
+              id: true, 
+              name: true,
+              description: true,
+              image: true,
+            } 
+          },
+          brand: { 
+            select: { 
+              id: true, 
+              name: true,
+              description: true,
+              image: true,
+              website: true,
+              contactEmail: true,
+              contactPhone: true,
+            } 
+          },
+        },
+        distinct: ['name'],
+        orderBy: { name: 'asc' },
+        take: 15,
+      });
+      
+      const existingInShop = await db.product.findMany({
+        where: { shopId },
+        select: { name: true },
+      });
+      const existingNames = new Set(existingInShop.map(p => p.name.toLowerCase()));
+      
+      // Return full brand/category objects for auto-creation
+      const suggestions = allProducts.map(product => ({
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        costPrice: product.costPrice,
+        image: product.image,
+        warranty: product.warranty,
+        categoryId: product.category?.id,
+        categoryName: product.category?.name,
+        brandId: product.brand?.id,
+        brandName: product.brand?.name,
+        existsInYourShop: existingNames.has(product.name.toLowerCase()),
+        isFromOtherShop: product.shopId !== shopId,
+        // Full brand/category objects for creating in new shop
+        brand: product.brand ? {
+          name: product.brand.name,
+          description: product.brand.description,
+          image: product.brand.image,
+          website: product.brand.website,
+          contactEmail: product.brand.contactEmail,
+          contactPhone: product.brand.contactPhone,
+        } : undefined,
+        category: product.category ? {
+          name: product.category.name,
+          description: product.category.description,
+          image: product.category.image,
+        } : undefined,
+      }));
+      
+      return res.status(200).json({ success: true, data: suggestions });
+    }
+
+    // POST /products - Create product
+    if (path === '/api/v1/products' && method === 'POST') {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const { shopId: _, id: __, ...safeData } = body;
+      
+      // Check for duplicate barcode
+      if (safeData.barcode) {
+        const existingBarcode = await db.product.findFirst({
+          where: { shopId: effectiveShopId, barcode: safeData.barcode }
+        });
+        if (existingBarcode) {
+          return res.status(409).json({ success: false, message: 'A product with this barcode already exists' });
+        }
+      }
+      
+      // Calculate profit margin
+      let profitMargin: number | null = null;
+      if (safeData.price && safeData.costPrice && safeData.costPrice > 0) {
+        profitMargin = ((safeData.price - safeData.costPrice) / safeData.costPrice) * 100;
+      }
+      
       const product = await db.product.create({ 
-        data: { ...body, shopId }, // CRITICAL: Set shopId from token (not query)
+        data: { 
+          ...safeData, 
+          shopId: effectiveShopId,
+          profitMargin,
+          stock: safeData.stock || 0,
+          reservedStock: 0,
+          lowStockThreshold: safeData.lowStockThreshold || 10,
+          totalPurchased: 0,
+          totalSold: 0,
+        },
         include: { category: true, brand: true },
       });
+      
+      // Create initial stock movement if stock > 0
+      if (product.stock > 0) {
+        await db.stockMovement.create({
+          data: {
+            productId: product.id,
+            type: 'ADJUSTMENT',
+            quantity: product.stock,
+            previousStock: 0,
+            newStock: product.stock,
+            notes: 'Initial stock on product creation',
+            shopId: effectiveShopId,
+          }
+        });
+      }
+      
       return res.status(201).json({ success: true, data: product });
     }
 
     const productMatch = path.match(/^\/api\/v1\/products\/([^/]+)$/);
+    
+    // GET /products/:id - Get single product
     if (productMatch && method === 'GET') {
       const effectiveShopId = getEffectiveShopId(req, query);
       if (!effectiveShopId) {
@@ -1076,59 +1488,634 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const product = await db.product.findUnique({ 
         where: { id: productMatch[1] },
-        include: { category: true, brand: true },
+        include: { 
+          category: true, 
+          brand: true,
+          stockMovements: { orderBy: { createdAt: 'desc' }, take: 20 },
+          priceHistory: { orderBy: { createdAt: 'desc' }, take: 10 },
+          _count: { select: { invoiceItems: true } }
+        },
       });
       if (!product) {
         return res.status(404).json({ success: false, error: 'Product not found' });
       }
-      // Verify ownership
-      if (product.shopId !== shopId) {
+      if (product.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied' });
       }
       return res.status(200).json({ success: true, data: product });
     }
 
+    // PUT/PATCH /products/:id - Update product
     if (productMatch && (method === 'PUT' || method === 'PATCH')) {
-      if (!shopId) {
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
-      // Verify ownership before update
       const existing = await db.product.findUnique({ where: { id: productMatch[1] } });
-      if (!existing || existing.shopId !== shopId) {
+      if (!existing || existing.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied' });
       }
-      const { shopId: _, ...safeData } = body;
+      
+      const { shopId: _, id: __, ...safeData } = body;
+      
+      // Check for duplicate barcode (excluding current)
+      if (safeData.barcode && safeData.barcode !== existing.barcode) {
+        const existingBarcode = await db.product.findFirst({
+          where: { shopId: effectiveShopId, barcode: safeData.barcode, NOT: { id: productMatch[1] } }
+        });
+        if (existingBarcode) {
+          return res.status(409).json({ success: false, message: 'A product with this barcode already exists' });
+        }
+      }
+      
+      // Calculate new profit margin
+      const newPrice = safeData.price ?? existing.price;
+      const newCost = safeData.costPrice ?? existing.costPrice;
+      let profitMargin = existing.profitMargin;
+      if (newPrice && newCost && newCost > 0) {
+        profitMargin = ((newPrice - newCost) / newCost) * 100;
+      }
+      
+      // Store last cost price if changed
+      if (safeData.costPrice !== undefined && safeData.costPrice !== existing.costPrice && existing.costPrice) {
+        safeData.lastCostPrice = existing.costPrice;
+      }
+      
+      // Track price changes
+      const priceChanged = safeData.price !== undefined && safeData.price !== existing.price;
+      const costChanged = safeData.costPrice !== undefined && safeData.costPrice !== existing.costPrice;
+      
       const product = await db.product.update({
         where: { id: productMatch[1] },
-        data: safeData,
+        data: { ...safeData, profitMargin },
         include: { category: true, brand: true },
       });
+      
+      // Create price history if prices changed
+      if (priceChanged || costChanged) {
+        let changeType: 'COST_UPDATE' | 'SELLING_UPDATE' | 'BOTH' = 'BOTH';
+        if (priceChanged && !costChanged) changeType = 'SELLING_UPDATE';
+        if (costChanged && !priceChanged) changeType = 'COST_UPDATE';
+        
+        await db.priceHistory.create({
+          data: {
+            productId: productMatch[1],
+            changeType,
+            previousCostPrice: existing.costPrice,
+            newCostPrice: costChanged ? safeData.costPrice : undefined,
+            previousSellingPrice: existing.price,
+            newSellingPrice: priceChanged ? safeData.price : undefined,
+            reason: 'manual_adjustment',
+            shopId: effectiveShopId,
+          }
+        });
+      }
+      
       return res.status(200).json({ success: true, data: product });
     }
 
+    // DELETE /products/:id
     if (productMatch && method === 'DELETE') {
-      if (!shopId) {
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
-      // Verify ownership before delete
-      const existing = await db.product.findUnique({ where: { id: productMatch[1] } });
-      if (!existing || existing.shopId !== shopId) {
+      const existing = await db.product.findUnique({ 
+        where: { id: productMatch[1] },
+        include: { _count: { select: { invoiceItems: true } } }
+      });
+      if (!existing || existing.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      if (existing._count.invoiceItems > 0) {
+        return res.status(400).json({ success: false, message: `Cannot delete product used in ${existing._count.invoiceItems} invoice(s)` });
       }
       await db.product.delete({ where: { id: productMatch[1] } });
       return res.status(200).json({ success: true, message: 'Product deleted' });
     }
 
-    // ==================== CATEGORIES ====================
+    // PATCH /products/:id/stock - Stock adjustment
+    const stockMatch = path.match(/^\/api\/v1\/products\/([^/]+)\/stock$/);
+    if (stockMatch && method === 'PATCH') {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const { quantity, operation, type, notes, referenceId, referenceNumber } = body;
+      
+      if (typeof quantity !== 'number' || quantity <= 0) {
+        return res.status(400).json({ success: false, message: 'Quantity must be a positive number' });
+      }
+      if (!['add', 'subtract', 'set'].includes(operation)) {
+        return res.status(400).json({ success: false, message: 'Operation must be add, subtract, or set' });
+      }
+      
+      const existing = await db.product.findUnique({ where: { id: stockMatch[1] } });
+      if (!existing || existing.shopId !== effectiveShopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      
+      let newStock: number;
+      let movementQuantity: number;
+      switch (operation) {
+        case 'add':
+          newStock = existing.stock + quantity;
+          movementQuantity = quantity;
+          break;
+        case 'subtract':
+          newStock = Math.max(0, existing.stock - quantity);
+          movementQuantity = -quantity;
+          break;
+        case 'set':
+          newStock = quantity;
+          movementQuantity = quantity - existing.stock;
+          break;
+        default:
+          newStock = existing.stock;
+          movementQuantity = 0;
+      }
+      
+      const [product] = await db.$transaction([
+        db.product.update({
+          where: { id: stockMatch[1] },
+          data: { stock: newStock },
+          include: { category: true, brand: true },
+        }),
+        db.stockMovement.create({
+          data: {
+            productId: stockMatch[1],
+            type: type || 'ADJUSTMENT',
+            quantity: movementQuantity,
+            previousStock: existing.stock,
+            newStock,
+            referenceId,
+            referenceNumber,
+            notes,
+            shopId: effectiveShopId,
+          }
+        })
+      ]);
+      
+      return res.status(200).json({ success: true, data: product });
+    }
+
+    // GET /products/:id/stock-movements - Get stock history
+    const stockMovementsMatch = path.match(/^\/api\/v1\/products\/([^/]+)\/stock-movements$/);
+    if (stockMovementsMatch && method === 'GET') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const product = await db.product.findUnique({ where: { id: stockMovementsMatch[1] } });
+      if (!product || product.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      
+      const movements = await db.stockMovement.findMany({
+        where: { productId: stockMovementsMatch[1] },
+        orderBy: { createdAt: 'desc' },
+      });
+      
+      return res.status(200).json({ success: true, data: movements });
+    }
+
+    // GET /products/:id/price-history - Get price history
+    const priceHistoryMatch = path.match(/^\/api\/v1\/products\/([^/]+)\/price-history$/);
+    if (priceHistoryMatch && method === 'GET') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const product = await db.product.findUnique({ where: { id: priceHistoryMatch[1] } });
+      if (!product || product.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      
+      const history = await db.priceHistory.findMany({
+        where: { productId: priceHistoryMatch[1] },
+        orderBy: { createdAt: 'desc' },
+      });
+      
+      return res.status(200).json({ success: true, data: history });
+    }
+
+    // GET /products/:id/sales-history - Get sales history (invoices containing this product)
+    const salesHistoryMatch = path.match(/^\/api\/v1\/products\/([^/]+)\/sales-history$/);
+    if (salesHistoryMatch && method === 'GET') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const product = await db.product.findUnique({ where: { id: salesHistoryMatch[1] } });
+      if (!product || product.shopId !== shopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      
+      const page = parseInt(query.page || '1');
+      const limit = Math.min(50, parseInt(query.limit || '20'));
+      const skip = (page - 1) * limit;
+      
+      const [invoiceItems, total] = await Promise.all([
+        db.invoiceItem.findMany({
+          where: { productId: salesHistoryMatch[1] },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          include: {
+            invoice: {
+              select: {
+                id: true,
+                invoiceNumber: true,
+                customerName: true,
+                date: true,
+                status: true,
+                total: true,
+                paidAmount: true,
+              }
+            }
+          }
+        }),
+        db.invoiceItem.count({ where: { productId: salesHistoryMatch[1] } })
+      ]);
+      
+      // Calculate sales statistics
+      const allSales = await db.invoiceItem.aggregate({
+        where: { productId: salesHistoryMatch[1] },
+        _sum: { quantity: true, total: true },
+        _avg: { unitPrice: true },
+        _count: { id: true }
+      });
+      
+      const salesStats = {
+        totalUnitsSold: allSales._sum.quantity || 0,
+        totalRevenue: allSales._sum.total || 0,
+        averageSellingPrice: allSales._avg.unitPrice || 0,
+        totalTransactions: allSales._count.id || 0
+      };
+      
+      return res.status(200).json({
+        success: true,
+        data: invoiceItems,
+        stats: salesStats,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      });
+    }
+
+    // ==================== CATEGORIES (Full CRUD with shop isolation) ====================
+    
+    // GET /categories/suggestions - Get global category suggestions
+    if (path === '/api/v1/categories/suggestions' && method === 'GET') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const search = query.search as string | undefined;
+      const whereClause: any = {};
+      if (search) {
+        whereClause.name = { contains: search, mode: 'insensitive' };
+      }
+      
+      const allCategories = await db.category.findMany({
+        where: whereClause,
+        select: { name: true, description: true, image: true, shopId: true },
+        distinct: ['name'],
+        orderBy: { name: 'asc' },
+        take: 20,
+      });
+      
+      const existingInShop = await db.category.findMany({
+        where: { shopId },
+        select: { name: true },
+      });
+      const existingNames = new Set(existingInShop.map((c: { name: string }) => c.name.toLowerCase()));
+      
+      const suggestions = allCategories.map((cat: { name: string; description?: string | null; image?: string | null; shopId: string }) => ({
+        name: cat.name,
+        description: cat.description,
+        image: cat.image,
+        existsInYourShop: existingNames.has(cat.name.toLowerCase()),
+        isFromOtherShop: cat.shopId !== shopId,
+      }));
+      
+      return res.status(200).json({ success: true, data: suggestions });
+    }
+    
+    // GET /categories - List all categories for shop
     if (path === '/api/v1/categories' && method === 'GET') {
-      const categories = await db.category.findMany({ orderBy: { name: 'asc' } });
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const categories = await db.category.findMany({
+        where: { shopId: effectiveShopId },
+        orderBy: { name: 'asc' },
+        include: { _count: { select: { products: true } } }
+      });
+      
       return res.status(200).json({ success: true, data: categories });
     }
 
-    // ==================== BRANDS ====================
+    // POST /categories - Create new category
+    if (path === '/api/v1/categories' && method === 'POST') {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const { name, description, image } = body;
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ success: false, message: 'Category name is required' });
+      }
+      
+      // Check for duplicate name
+      const existing = await db.category.findFirst({
+        where: { shopId: effectiveShopId, name: { equals: name.trim(), mode: 'insensitive' } }
+      });
+      if (existing) {
+        return res.status(409).json({ success: false, message: 'Category with this name already exists' });
+      }
+      
+      const category = await db.category.create({
+        data: {
+          name: name.trim(),
+          description: description?.trim() || null,
+          image: image || null,
+          shopId: effectiveShopId,
+        },
+        include: { _count: { select: { products: true } } }
+      });
+      
+      return res.status(201).json({ success: true, data: category });
+    }
+
+    const categoryMatch = path.match(/^\/api\/v1\/categories\/([^/]+)$/);
+    
+    // GET /categories/:id - Get single category
+    if (categoryMatch && method === 'GET') {
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const category = await db.category.findUnique({
+        where: { id: categoryMatch[1] },
+        include: { _count: { select: { products: true } } }
+      });
+      
+      if (!category) {
+        return res.status(404).json({ success: false, message: 'Category not found' });
+      }
+      if (category.shopId !== effectiveShopId) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+      
+      return res.status(200).json({ success: true, data: category });
+    }
+
+    // PUT /categories/:id - Update category
+    if (categoryMatch && (method === 'PUT' || method === 'PATCH')) {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const existing = await db.category.findUnique({ where: { id: categoryMatch[1] } });
+      if (!existing || existing.shopId !== effectiveShopId) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+      
+      const { name, description, image } = body;
+      if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0)) {
+        return res.status(400).json({ success: false, message: 'Category name cannot be empty' });
+      }
+      
+      // Check for duplicate name (excluding current)
+      if (name && name.trim().toLowerCase() !== existing.name.toLowerCase()) {
+        const duplicate = await db.category.findFirst({
+          where: { shopId: effectiveShopId, name: { equals: name.trim(), mode: 'insensitive' }, NOT: { id: categoryMatch[1] } }
+        });
+        if (duplicate) {
+          return res.status(409).json({ success: false, message: 'Category with this name already exists' });
+        }
+      }
+      
+      const category = await db.category.update({
+        where: { id: categoryMatch[1] },
+        data: {
+          name: name !== undefined ? name.trim() : undefined,
+          description: description !== undefined ? (description?.trim() || null) : undefined,
+          image: image !== undefined ? (image || null) : undefined,
+        },
+        include: { _count: { select: { products: true } } }
+      });
+      
+      return res.status(200).json({ success: true, data: category });
+    }
+
+    // DELETE /categories/:id - Delete category
+    if (categoryMatch && method === 'DELETE') {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const existing = await db.category.findUnique({
+        where: { id: categoryMatch[1] },
+        include: { _count: { select: { products: true } } }
+      });
+      if (!existing || existing.shopId !== effectiveShopId) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+      if (existing._count.products > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Cannot delete category with ${existing._count.products} product(s). Remove products first.` 
+        });
+      }
+      
+      await db.category.delete({ where: { id: categoryMatch[1] } });
+      return res.status(200).json({ success: true, message: 'Category deleted successfully' });
+    }
+
+    // ==================== BRANDS (Full CRUD with shop isolation) ====================
+    
+    // GET /brands/suggestions - Get global brand suggestions
+    if (path === '/api/v1/brands/suggestions' && method === 'GET') {
+      if (!shopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const search = query.search as string | undefined;
+      const whereClause: any = {};
+      if (search) {
+        whereClause.name = { contains: search, mode: 'insensitive' };
+      }
+      
+      const allBrands = await db.brand.findMany({
+        where: whereClause,
+        select: { name: true, description: true, image: true, shopId: true },
+        distinct: ['name'],
+        orderBy: { name: 'asc' },
+        take: 20,
+      });
+      
+      const existingInShop = await db.brand.findMany({
+        where: { shopId },
+        select: { name: true },
+      });
+      const existingNames = new Set(existingInShop.map((b: { name: string }) => b.name.toLowerCase()));
+      
+      const suggestions = allBrands.map((brand: { name: string; description?: string | null; image?: string | null; shopId: string }) => ({
+        name: brand.name,
+        description: brand.description,
+        image: brand.image,
+        existsInYourShop: existingNames.has(brand.name.toLowerCase()),
+        isFromOtherShop: brand.shopId !== shopId,
+      }));
+      
+      return res.status(200).json({ success: true, data: suggestions });
+    }
+    
+    // GET /brands - List all brands for shop
     if (path === '/api/v1/brands' && method === 'GET') {
-      const brands = await db.brand.findMany({ orderBy: { name: 'asc' } });
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const brands = await db.brand.findMany({
+        where: { shopId: effectiveShopId },
+        orderBy: { name: 'asc' },
+        include: { _count: { select: { products: true } } }
+      });
+      
       return res.status(200).json({ success: true, data: brands });
+    }
+
+    // POST /brands - Create new brand
+    if (path === '/api/v1/brands' && method === 'POST') {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const { name, description, image, website, contactEmail, contactPhone } = body;
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ success: false, message: 'Brand name is required' });
+      }
+      
+      // Check for duplicate name
+      const existing = await db.brand.findFirst({
+        where: { shopId: effectiveShopId, name: { equals: name.trim(), mode: 'insensitive' } }
+      });
+      if (existing) {
+        return res.status(409).json({ success: false, message: 'Brand with this name already exists' });
+      }
+      
+      const brand = await db.brand.create({
+        data: {
+          name: name.trim(),
+          description: description?.trim() || null,
+          image: image || null,
+          website: website?.trim() || null,
+          contactEmail: contactEmail?.trim() || null,
+          contactPhone: contactPhone?.trim() || null,
+          shopId: effectiveShopId,
+        },
+        include: { _count: { select: { products: true } } }
+      });
+      
+      return res.status(201).json({ success: true, data: brand });
+    }
+
+    const brandMatch = path.match(/^\/api\/v1\/brands\/([^/]+)$/);
+    
+    // GET /brands/:id - Get single brand
+    if (brandMatch && method === 'GET') {
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const brand = await db.brand.findUnique({
+        where: { id: brandMatch[1] },
+        include: { _count: { select: { products: true } } }
+      });
+      
+      if (!brand) {
+        return res.status(404).json({ success: false, message: 'Brand not found' });
+      }
+      if (brand.shopId !== effectiveShopId) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+      
+      return res.status(200).json({ success: true, data: brand });
+    }
+
+    // PUT /brands/:id - Update brand
+    if (brandMatch && (method === 'PUT' || method === 'PATCH')) {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const existing = await db.brand.findUnique({ where: { id: brandMatch[1] } });
+      if (!existing || existing.shopId !== effectiveShopId) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+      
+      const { name, description, image, website, contactEmail, contactPhone } = body;
+      if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0)) {
+        return res.status(400).json({ success: false, message: 'Brand name cannot be empty' });
+      }
+      
+      // Check for duplicate name (excluding current)
+      if (name && name.trim().toLowerCase() !== existing.name.toLowerCase()) {
+        const duplicate = await db.brand.findFirst({
+          where: { shopId: effectiveShopId, name: { equals: name.trim(), mode: 'insensitive' }, NOT: { id: brandMatch[1] } }
+        });
+        if (duplicate) {
+          return res.status(409).json({ success: false, message: 'Brand with this name already exists' });
+        }
+      }
+      
+      const brand = await db.brand.update({
+        where: { id: brandMatch[1] },
+        data: {
+          name: name !== undefined ? name.trim() : undefined,
+          description: description !== undefined ? (description?.trim() || null) : undefined,
+          image: image !== undefined ? (image || null) : undefined,
+          website: website !== undefined ? (website?.trim() || null) : undefined,
+          contactEmail: contactEmail !== undefined ? (contactEmail?.trim() || null) : undefined,
+          contactPhone: contactPhone !== undefined ? (contactPhone?.trim() || null) : undefined,
+        },
+        include: { _count: { select: { products: true } } }
+      });
+      
+      return res.status(200).json({ success: true, data: brand });
+    }
+
+    // DELETE /brands/:id - Delete brand
+    if (brandMatch && method === 'DELETE') {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const existing = await db.brand.findUnique({
+        where: { id: brandMatch[1] },
+        include: { _count: { select: { products: true } } }
+      });
+      if (!existing || existing.shopId !== effectiveShopId) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+      if (existing._count.products > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Cannot delete brand with ${existing._count.products} product(s). Remove products first.` 
+        });
+      }
+      
+      await db.brand.delete({ where: { id: brandMatch[1] } });
+      return res.status(200).json({ success: true, message: 'Brand deleted successfully' });
     }
 
     // ==================== ADMIN ROUTES (Super Admin Only) ====================

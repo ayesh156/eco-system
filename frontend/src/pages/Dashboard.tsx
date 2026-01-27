@@ -2,19 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { mockInvoices, mockProducts, mockCustomers } from '../data/mockData';
+import { useDataCache } from '../contexts/DataCacheContext';
 import { AIMonthlyAnalysis } from '../components/AIMonthlyAnalysis';
 import { 
   Package, FileText, Users, ArrowRight, ArrowUpRight,
   DollarSign, ShoppingCart, AlertTriangle, CheckCircle,
-  RefreshCw, Cpu, Monitor, HardDrive, XCircle, CircleDollarSign
+  RefreshCw, Cpu, Monitor, HardDrive, XCircle, CircleDollarSign, Loader2
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const { theme } = useTheme();
   const { user, isViewingShop, viewingShop } = useAuth();
+  const { 
+    invoices, products, customers,
+    loadInvoices, loadProducts, loadCustomers,
+    invoicesLoading, productsLoading, customersLoading
+  } = useDataCache();
   const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState('7d');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Redirect SUPER_ADMIN to admin dashboard (only if not viewing a shop)
   useEffect(() => {
@@ -22,6 +28,42 @@ export const Dashboard: React.FC = () => {
       navigate('/admin', { replace: true });
     }
   }, [user, isViewingShop, navigate]);
+
+  // Load data when component mounts or when viewing shop changes
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        await Promise.all([
+          loadInvoices(),
+          loadProducts(),
+          loadCustomers()
+        ]);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      }
+    };
+    
+    // Only load if we're viewing a shop (or if regular user)
+    if (!user?.role || user.role !== 'SUPER_ADMIN' || isViewingShop) {
+      loadData();
+    }
+  }, [loadInvoices, loadProducts, loadCustomers, isViewingShop, user?.role]);
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        loadInvoices(true),
+        loadProducts(true),
+        loadCustomers(true)
+      ]);
+    } catch (error) {
+      console.error('Failed to refresh dashboard data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // If SUPER_ADMIN and not viewing a shop, show nothing while redirecting
   if (user?.role === 'SUPER_ADMIN' && !isViewingShop) {
@@ -31,14 +73,17 @@ export const Dashboard: React.FC = () => {
   // Determine which shop name to display
   const shopName = isViewingShop && viewingShop ? viewingShop.name : user?.shop?.name || 'Your Shop';
 
-  // Calculate statistics
-  const fullpaidInvoices = mockInvoices.filter((inv) => inv.status === 'fullpaid').length;
-  const halfpayInvoices = mockInvoices.filter((inv) => inv.status === 'halfpay').length;
-  const unpaidInvoices = mockInvoices.filter((inv) => inv.status === 'unpaid').length;
-  const totalRevenue = mockInvoices.filter(inv => inv.status === 'fullpaid').reduce((sum, inv) => sum + inv.total, 0);
-  const totalProducts = mockProducts.length;
-  const lowStockProducts = mockProducts.filter((p) => p.stock < 10).length;
-  const totalCustomers = mockCustomers.length;
+  // Loading state
+  const isLoading = invoicesLoading || productsLoading || customersLoading;
+
+  // Calculate statistics from actual data
+  const fullpaidInvoices = invoices.filter((inv) => inv.status === 'fullpaid').length;
+  const halfpayInvoices = invoices.filter((inv) => inv.status === 'halfpay').length;
+  const unpaidInvoices = invoices.filter((inv) => inv.status === 'unpaid').length;
+  const totalRevenue = invoices.filter(inv => inv.status === 'fullpaid').reduce((sum, inv) => sum + inv.total, 0);
+  const totalProducts = products.length;
+  const lowStockProducts = products.filter((p) => p.stock < 10).length;
+  const totalCustomers = customers.length;
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -57,17 +102,36 @@ export const Dashboard: React.FC = () => {
   ];
   const maxRevenue = Math.max(...revenueData.map(d => d.value));
 
-  // Recent activities
+  // Recent activities - Generate from actual data
   const recentActivities = [
-    { id: 1, type: 'invoice', message: 'Invoice INV-2024-0001 paid', time: '2 min ago', icon: CheckCircle, color: 'text-green-500' },
-    { id: 2, type: 'customer', message: 'New customer: Tech Solutions Ltd', time: '15 min ago', icon: Users, color: 'text-blue-500' },
-    { id: 3, type: 'stock', message: 'Low stock: RTX 4090 (5 remaining)', time: '1 hour ago', icon: AlertTriangle, color: 'text-amber-500' },
-    { id: 4, type: 'invoice', message: 'Invoice INV-2024-0003 created', time: '2 hours ago', icon: FileText, color: 'text-purple-500' },
-    { id: 5, type: 'order', message: 'Order #1234 shipped', time: '3 hours ago', icon: Package, color: 'text-emerald-500' },
-  ];
+    ...(invoices.length > 0 ? [{
+      id: 1,
+      type: 'invoice' as const,
+      message: `Invoice ${invoices[0].id} ${invoices[0].status === 'fullpaid' ? 'paid' : 'created'}`,
+      time: 'Recently',
+      icon: invoices[0].status === 'fullpaid' ? CheckCircle : FileText,
+      color: invoices[0].status === 'fullpaid' ? 'text-green-500' : 'text-purple-500'
+    }] : []),
+    ...(customers.length > 0 ? [{
+      id: 2,
+      type: 'customer' as const,
+      message: `Customer: ${customers[customers.length - 1]?.name || 'New customer'}`,
+      time: 'Recently',
+      icon: Users,
+      color: 'text-blue-500'
+    }] : []),
+    ...(lowStockProducts > 0 ? [{
+      id: 3,
+      type: 'stock' as const,
+      message: `${lowStockProducts} product${lowStockProducts > 1 ? 's' : ''} with low stock`,
+      time: 'Current',
+      icon: AlertTriangle,
+      color: 'text-amber-500'
+    }] : []),
+  ].slice(0, 5);
 
-  // Top selling products
-  const topProducts = mockProducts.slice(0, 5);
+  // Top selling products - Use actual products
+  const topProducts = products.slice(0, 5);
 
   return (
     <div className="space-y-6 pb-8">
@@ -103,12 +167,20 @@ export const Dashboard: React.FC = () => {
               </button>
             ))}
           </div>
-          <button className={`p-2.5 rounded-xl border transition-all ${
-            theme === 'dark' 
-              ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50 text-slate-400' 
-              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
-          }`}>
-            <RefreshCw className="w-4 h-4" />
+          <button 
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoading}
+            className={`p-2.5 rounded-xl border transition-all ${
+              theme === 'dark' 
+                ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50 text-slate-400' 
+                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+            } ${isRefreshing || isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {isRefreshing || isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>
@@ -161,7 +233,7 @@ export const Dashboard: React.FC = () => {
             <div className="mt-4">
               <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Total Orders</p>
               <p className={`text-2xl font-bold mt-1 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {mockInvoices.length}
+                {invoices.length}
               </p>
             </div>
           </div>

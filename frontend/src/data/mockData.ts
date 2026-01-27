@@ -84,6 +84,7 @@ export interface Product {
   lastGRNDate?: string;
   totalPurchased?: number; // Total quantity ever purchased via GRN
   totalSold?: number; // Total quantity sold via invoices
+  status?: string; // 'In Stock' | 'Out of Stock' | 'Low Stock'
 }
 
 // Stock Movement - Track all stock in/out movements
@@ -117,16 +118,24 @@ export interface PriceHistory {
   createdBy?: string;
 }
 
+// Customer types for Sri Lankan business context
+export type CustomerType = 'REGULAR' | 'WHOLESALE' | 'DEALER' | 'CORPORATE' | 'VIP';
+
 export interface Customer {
   id: string;
   name: string;
   email: string;
   phone: string;
   address?: string;
+  // Sri Lankan specific fields
+  nic?: string; // National ID Card (old: 9+V/X, new: 12 digits)
+  customerType: CustomerType; // Customer category for pricing/discounts
+  notes?: string; // Additional notes about customer
+  // Statistics
   totalSpent: number;
   totalOrders: number;
   lastPurchase?: string;
-  // Credit management fields
+  // Credit management fields (Naya system)
   creditBalance: number; // Outstanding credit amount (naya)
   creditLimit: number; // Maximum credit allowed
   creditDueDate?: string; // Due date for credit payment
@@ -135,6 +144,9 @@ export interface Customer {
   paymentHistory?: CustomerPayment[];
   // Credit-Invoice linking
   creditInvoices?: string[]; // IDs of invoices contributing to credit balance
+  // Timestamps
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Customer Payment History
@@ -1948,14 +1960,14 @@ export { generateSerialNumber };
 
 // Customers with credit management - creditInvoices links to invoices contributing to credit
 export const mockCustomers: Customer[] = [
-  { id: '1', name: 'Kasun Perera', email: 'kasun@gmail.com', phone: '078-3233760', address: 'No. 12, Galle Road, Colombo', totalSpent: 580000, totalOrders: 5, lastPurchase: '2026-01-11', creditBalance: 0, creditLimit: 100000, creditStatus: 'clear', creditInvoices: [] },
-  { id: '2', name: 'Nimali Fernando', email: 'nimali@email.com', phone: '078-3233760', address: '12A, Kandy Rd, Kurunegala', totalSpent: 320000, totalOrders: 3, lastPurchase: '2026-01-19', creditBalance: 103500, creditLimit: 200000, creditDueDate: '2026-02-03', creditStatus: 'active', creditInvoices: ['10260012'] },
-  { id: '3', name: 'Tech Solutions Ltd', email: 'info@techsol.lk', phone: '078-3233760', address: 'No. 45, Industrial Estate, Colombo 15', totalSpent: 2500000, totalOrders: 18, lastPurchase: '2026-01-15', creditBalance: 488000, creditLimit: 1000000, creditDueDate: '2026-01-30', creditStatus: 'active', creditInvoices: ['10260010'] },
-  { id: '4', name: 'Dilshan Silva', email: 'dilshan.s@hotmail.com', phone: '078-3233760', address: '78/2, Hill Street, Kandy', totalSpent: 185000, totalOrders: 2, lastPurchase: '2026-01-06', creditBalance: 72500, creditLimit: 100000, creditDueDate: '2026-02-01', creditStatus: 'active', creditInvoices: ['10260006'] },
-  { id: '5', name: 'GameZone Café', email: 'contact@gamezone.lk', phone: '078-3233760', address: 'Shop 5, Arcade Mall, Colombo', totalSpent: 3200000, totalOrders: 25, lastPurchase: '2026-01-17', creditBalance: 1231250, creditLimit: 1500000, creditDueDate: '2026-02-15', creditStatus: 'active', creditInvoices: ['10260003'] },
-  { id: '6', name: 'Priya Jayawardena', email: 'priya.j@yahoo.com', phone: '078-3233760', address: 'No. 7, Lake Road, Galle', totalSpent: 95000, totalOrders: 1, lastPurchase: '2026-01-14', creditBalance: 0, creditLimit: 50000, creditStatus: 'clear', creditInvoices: [] },
-  { id: '7', name: 'Creative Studios', email: 'studio@creative.lk', phone: '078-3233760', address: 'Studio 3, Art Lane, Colombo', totalSpent: 1850000, totalOrders: 12, lastPurchase: '2026-01-10', creditBalance: 1322500, creditLimit: 1500000, creditDueDate: '2026-01-25', creditStatus: 'active', creditInvoices: ['10260005'] },
-  { id: '8', name: 'Sanjay Mendis', email: 'sanjay.m@gmail.com', phone: '078-3233760', address: 'No. 21, Thotalanga Road, Colombo', totalSpent: 420000, totalOrders: 4, lastPurchase: '2026-01-12', creditBalance: 0, creditLimit: 100000, creditStatus: 'clear', creditInvoices: [] },
+  { id: '1', name: 'Kasun Perera', email: 'kasun@gmail.com', phone: '078-3233760', address: 'No. 12, Galle Road, Colombo', nic: '881234567V', customerType: 'REGULAR', notes: 'Regular walk-in customer', totalSpent: 580000, totalOrders: 5, lastPurchase: '2026-01-11', creditBalance: 0, creditLimit: 100000, creditStatus: 'clear', creditInvoices: [] },
+  { id: '2', name: 'Nimali Fernando', email: 'nimali@email.com', phone: '078-3233760', address: '12A, Kandy Rd, Kurunegala', nic: '905678901V', customerType: 'REGULAR', totalSpent: 320000, totalOrders: 3, lastPurchase: '2026-01-19', creditBalance: 103500, creditLimit: 200000, creditDueDate: '2026-02-03', creditStatus: 'active', creditInvoices: ['10260012'] },
+  { id: '3', name: 'Tech Solutions Ltd', email: 'info@techsol.lk', phone: '078-3233760', address: 'No. 45, Industrial Estate, Colombo 15', customerType: 'CORPORATE', notes: 'IT company, bulk orders', totalSpent: 2500000, totalOrders: 18, lastPurchase: '2026-01-15', creditBalance: 488000, creditLimit: 1000000, creditDueDate: '2026-01-30', creditStatus: 'active', creditInvoices: ['10260010'] },
+  { id: '4', name: 'Dilshan Silva', email: 'dilshan.s@hotmail.com', phone: '078-3233760', address: '78/2, Hill Street, Kandy', nic: '199012345678', customerType: 'REGULAR', totalSpent: 185000, totalOrders: 2, lastPurchase: '2026-01-06', creditBalance: 72500, creditLimit: 100000, creditDueDate: '2026-02-01', creditStatus: 'active', creditInvoices: ['10260006'] },
+  { id: '5', name: 'GameZone Café', email: 'contact@gamezone.lk', phone: '078-3233760', address: 'Shop 5, Arcade Mall, Colombo', customerType: 'CORPORATE', notes: 'Gaming café, frequent bulk PC orders', totalSpent: 3200000, totalOrders: 25, lastPurchase: '2026-01-17', creditBalance: 1231250, creditLimit: 1500000, creditDueDate: '2026-02-15', creditStatus: 'active', creditInvoices: ['10260003'] },
+  { id: '6', name: 'Priya Jayawardena', email: 'priya.j@yahoo.com', phone: '078-3233760', address: 'No. 7, Lake Road, Galle', nic: '956789012V', customerType: 'VIP', notes: 'VIP customer, special discounts', totalSpent: 95000, totalOrders: 1, lastPurchase: '2026-01-14', creditBalance: 0, creditLimit: 50000, creditStatus: 'clear', creditInvoices: [] },
+  { id: '7', name: 'Creative Studios', email: 'studio@creative.lk', phone: '078-3233760', address: 'Studio 3, Art Lane, Colombo', customerType: 'CORPORATE', notes: 'Design studio, high-end equipment', totalSpent: 1850000, totalOrders: 12, lastPurchase: '2026-01-10', creditBalance: 1322500, creditLimit: 1500000, creditDueDate: '2026-01-25', creditStatus: 'active', creditInvoices: ['10260005'] },
+  { id: '8', name: 'Sanjay Mendis', email: 'sanjay.m@gmail.com', phone: '078-3233760', address: 'No. 21, Thotalanga Road, Colombo', nic: '871234567V', customerType: 'WHOLESALE', notes: 'Wholesale dealer for Gampaha area', totalSpent: 420000, totalOrders: 4, lastPurchase: '2026-01-12', creditBalance: 0, creditLimit: 100000, creditStatus: 'clear', creditInvoices: [] },
 ];
 
 // Suppliers with credit management

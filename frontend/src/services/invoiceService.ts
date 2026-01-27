@@ -113,9 +113,9 @@ export interface GetInvoicesParams {
 }
 
 export interface CreateInvoiceData {
-  customerId: string;
+  customerId?: string; // Optional for walk-in customers
   items: {
-    productId: string;
+    productId?: string; // Optional for quick-add items
     productName: string;
     quantity: number;
     unitPrice: number;
@@ -288,9 +288,10 @@ export const invoiceService = {
   /**
    * Create a new invoice
    */
-  async create(data: CreateInvoiceData): Promise<APIInvoice> {
+  async create(data: CreateInvoiceData, shopId?: string): Promise<APIInvoice> {
     console.log('📝 Creating invoice with data:', data);
-    const response = await fetch(`${API_BASE_URL}/invoices`, {
+    const queryParams = shopId ? `?shopId=${shopId}` : '';
+    const response = await fetch(`${API_BASE_URL}/invoices${queryParams}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -303,9 +304,10 @@ export const invoiceService = {
   /**
    * Update an existing invoice
    */
-  async update(id: string, data: UpdateInvoiceData): Promise<APIInvoice> {
+  async update(id: string, data: UpdateInvoiceData, shopId?: string): Promise<APIInvoice> {
     console.log('📝 Updating invoice with ID:', id, 'Data:', data);
-    const response = await fetch(`${API_BASE_URL}/invoices/${id}`, {
+    const queryParams = shopId ? `?shopId=${shopId}` : '';
+    const response = await fetch(`${API_BASE_URL}/invoices/${id}${queryParams}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -317,8 +319,9 @@ export const invoiceService = {
   /**
    * Delete an invoice
    */
-  async delete(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/invoices/${id}`, {
+  async delete(id: string, shopId?: string): Promise<void> {
+    const queryParams = shopId ? `?shopId=${shopId}` : '';
+    const response = await fetch(`${API_BASE_URL}/invoices/${id}${queryParams}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -328,8 +331,9 @@ export const invoiceService = {
   /**
    * Add a payment to an invoice
    */
-  async addPayment(invoiceId: string, data: AddPaymentData): Promise<{ payment: APIInvoicePayment; invoice: APIInvoice }> {
-    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/payments`, {
+  async addPayment(invoiceId: string, data: AddPaymentData, shopId?: string): Promise<{ payment: APIInvoicePayment; invoice: APIInvoice }> {
+    const queryParams = shopId ? `?shopId=${shopId}` : '';
+    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/payments${queryParams}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -381,14 +385,24 @@ export const convertAPIInvoiceToFrontend = (apiInvoice: APIInvoice): Invoice => 
     dueDate: apiInvoice.dueDate,
     paymentMethod: normalizePaymentMethod(apiInvoice.paymentMethod),
     salesChannel: normalizeSalesChannel(apiInvoice.salesChannel),
-    payments: apiInvoice.payments?.map((payment): InvoicePayment => ({
-      id: payment.id,
-      invoiceId: payment.invoiceId,
-      amount: payment.amount,
-      paymentDate: payment.paymentDate,
-      paymentMethod: payment.paymentMethod.toLowerCase() as 'cash' | 'card' | 'bank' | 'cheque',
-      notes: payment.notes,
-    })),
+    payments: apiInvoice.payments?.map((payment): InvoicePayment => {
+      // Normalize payment method from API format to frontend format
+      let method: 'cash' | 'card' | 'bank' | 'cheque' = 'cash';
+      const pm = payment.paymentMethod?.toLowerCase() || 'cash';
+      if (pm === 'cash') method = 'cash';
+      else if (pm === 'card') method = 'card';
+      else if (pm === 'bank_transfer' || pm === 'bank' || pm === 'banktransfer') method = 'bank';
+      else if (pm === 'cheque' || pm === 'check') method = 'cheque';
+      
+      return {
+        id: payment.id,
+        invoiceId: payment.invoiceId,
+        amount: payment.amount,
+        paymentDate: payment.paymentDate,
+        paymentMethod: method,
+        notes: payment.notes,
+      };
+    }),
     lastPaymentDate: apiInvoice.payments?.length 
       ? apiInvoice.payments[0].paymentDate 
       : undefined,

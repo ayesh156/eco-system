@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { productCategories, mockProducts, categoryImages } from '../data/mockData';
+import { categoryService } from '../services/categoryService';
 import { CategoryFormModal } from '../components/modals/CategoryFormModal';
 import type { Category } from '../components/modals/CategoryFormModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { 
   FolderTree, Plus, Edit, Trash2, Search, X, LayoutGrid, List,
   ArrowDownUp, SortAsc, SortDesc, Calendar, ChevronLeft, ChevronRight,
-  ChevronsLeft, ChevronsRight, Package, Image as ImageIcon, Check
+  ChevronsLeft, ChevronsRight, Package, Image as ImageIcon, Check,
+  Loader2, AlertCircle, CheckCircle2
 } from 'lucide-react';
 
 // Extended Category interface with icon and date
@@ -52,10 +55,12 @@ const defaultCategoryIcons: Record<string, string> = {
 
 export const Categories: React.FC = () => {
   const { theme } = useTheme();
+  const { isViewingShop, viewingShop } = useAuth();
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
-  const [sortBy, setSortBy] = useState<'name' | 'products' | 'date'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<'name' | 'products' | 'date'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
   // Date filter states
   const [startDate, setStartDate] = useState('');
@@ -87,8 +92,42 @@ export const Categories: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<ExtendedCategory | null>(null);
   
-  // Local categories state for demo
-  const [categories, setCategories] = useState<ExtendedCategory[]>(initialCategories);
+  // Local categories state - loads from API
+  const [categories, setCategories] = useState<ExtendedCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [highlightedCategoryId, setHighlightedCategoryId] = useState<string | null>(null);
+
+  // Load categories from API
+  useEffect(() => {
+    const loadCategories = async () => {
+      setIsLoading(true);
+      setApiError(null);
+      
+      try {
+        const { categories: apiCategories } = await categoryService.getAll({ shopId: effectiveShopId });
+        const extendedCategories: ExtendedCategory[] = apiCategories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          description: cat.description || `All ${cat.name.toLowerCase()} products`,
+          productCount: cat._count?.products || 0,
+          icon: cat.image || categoryImages[cat.name] || '',
+          image: cat.image || categoryImages[cat.name] || '',
+          createdAt: cat.createdAt,
+        }));
+        setCategories(extendedCategories);
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+        setApiError(error instanceof Error ? error.message : 'Failed to load categories');
+        // Fallback to mock data
+        setCategories(initialCategories);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadCategories();
+  }, [effectiveShopId]);
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -331,24 +370,63 @@ export const Categories: React.FC = () => {
     return '📦'; // Default icon
   };
 
-  const handleSaveCategory = (category: Category) => {
-    if (selectedCategory) {
-      setCategories(prev => prev.map(c => c.id === category.id ? { ...c, ...category } : c));
-    } else {
-      // Auto-assign icon for new categories
-      const icon = getCategoryIcon(category.name);
-      const newCategory: ExtendedCategory = {
-        ...category,
-        icon: icon,
-        createdAt: new Date().toISOString(),
-      };
-      setCategories(prev => [...prev, newCategory]);
+  const handleSaveCategory = async (category: Category) => {
+    try {
+      if (selectedCategory) {
+        // Update existing category
+        const updated = await categoryService.update(category.id, {
+          name: category.name,
+          description: category.description,
+          image: category.image,
+        }, effectiveShopId);
+        setCategories(prev => prev.map(c => c.id === category.id ? { 
+          ...c, 
+          name: updated.name,
+          description: updated.description || c.description,
+          image: updated.image || c.image,
+          icon: updated.image || c.icon,
+          productCount: updated._count?.products || c.productCount,
+        } : c));
+        setHighlightedCategoryId(category.id);
+      } else {
+        // Create new category
+        const created = await categoryService.create({
+          name: category.name,
+          description: category.description,
+          image: category.image,
+        }, effectiveShopId);
+        const icon = created.image || getCategoryIcon(category.name);
+        const newCategory: ExtendedCategory = {
+          id: created.id,
+          name: created.name,
+          description: created.description || `All ${created.name.toLowerCase()} products`,
+          productCount: 0,
+          icon: icon,
+          image: created.image || '',
+          createdAt: created.createdAt,
+        };
+        setCategories(prev => [newCategory, ...prev]);
+        setHighlightedCategoryId(created.id);
+      }
+      // Clear highlight after 5 seconds
+      setTimeout(() => setHighlightedCategoryId(null), 5000);
+    } catch (error) {
+      console.error('Failed to save category:', error);
+      setApiError(error instanceof Error ? error.message : 'Failed to save category');
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (categoryToDelete) {
-      setCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
+      try {
+        await categoryService.delete(categoryToDelete.id, effectiveShopId);
+        setCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
+      } catch (error) {
+        console.error('Failed to delete category:', error);
+        setApiError(error instanceof Error ? error.message : 'Failed to delete category');
+        // Still remove from UI for demo
+        setCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
+      }
       setIsDeleteModalOpen(false);
       setCategoryToDelete(null);
     }
@@ -403,8 +481,41 @@ export const Categories: React.FC = () => {
     );
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className={`w-10 h-10 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+        <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Loading categories...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* API Error Alert */}
+      {apiError && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-amber-500 font-medium">Warning</p>
+            <p className={`text-sm ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+              {apiError}. Showing cached data.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Success Banner for newly saved category */}
+      {highlightedCategoryId && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3 animate-pulse">
+          <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+          <p className={`font-medium ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+            Category saved successfully! Highlighted below.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -658,15 +769,31 @@ export const Categories: React.FC = () => {
                   <tr 
                     key={category.id}
                     className={`border-b transition-colors ${
-                      theme === 'dark' ? 'border-slate-700/30 hover:bg-slate-800/30' : 'border-slate-100 hover:bg-slate-50'
+                      highlightedCategoryId === category.id
+                        ? theme === 'dark' 
+                          ? 'bg-emerald-900/30 border-emerald-500/30 ring-1 ring-inset ring-emerald-500/30' 
+                          : 'bg-emerald-50 border-emerald-200 ring-1 ring-inset ring-emerald-300'
+                        : theme === 'dark' 
+                          ? 'border-slate-700/30 hover:bg-slate-800/30' 
+                          : 'border-slate-100 hover:bg-slate-50'
                     }`}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {renderCategoryIcon(category, 'sm')}
-                        <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                          {category.name}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                            {category.name}
+                          </span>
+                          {highlightedCategoryId === category.id && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
+                            }`}>
+                              <CheckCircle2 className="w-3 h-3" />
+                              Saved!
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -723,11 +850,24 @@ export const Categories: React.FC = () => {
             <div 
               key={category.id}
               className={`group rounded-2xl border p-6 transition-all hover:shadow-lg ${
-                theme === 'dark' 
-                  ? 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/30' 
-                  : 'bg-white border-slate-200 hover:border-emerald-500/50'
+                highlightedCategoryId === category.id
+                  ? theme === 'dark'
+                    ? 'bg-emerald-900/30 border-emerald-500/50 ring-2 ring-emerald-500/30'
+                    : 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-300'
+                  : theme === 'dark' 
+                    ? 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/30' 
+                    : 'bg-white border-slate-200 hover:border-emerald-500/50'
               }`}
             >
+              {/* Highlight badge */}
+              {highlightedCategoryId === category.id && (
+                <div className="mb-3 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <span className={`text-xs font-semibold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                    Successfully Saved!
+                  </span>
+                </div>
+              )}
               <div className="flex items-start justify-between mb-4">
                 <div>
                   {renderCategoryIcon(category, 'lg')}

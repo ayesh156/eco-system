@@ -23,12 +23,16 @@ interface ReminderPreview {
 
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, isViewingShop, viewingShop } = useAuth();
   const { settings: whatsAppSettings, updateSettings, saveSettings } = useWhatsAppSettings();
   const { settings: taxSettings, updateSettings: updateTaxSettings, saveSettings: saveTaxSettings } = useTaxSettings();
   
-  // Check if user is Super Admin - hide business-specific settings
+  // Check if user is Super Admin - hide business-specific settings unless viewing a shop
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const canViewBusinessSettings = !isSuperAdmin || (isSuperAdmin && isViewingShop);
+  
+  // Get the effective shop (either viewed shop for SUPER_ADMIN or user's own shop)
+  const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
   
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'whatsapp'>('appearance');
@@ -37,12 +41,24 @@ export const Settings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   
-  // Profile form states
-  const [businessName, setBusinessName] = useState('ECOTEC Computer Solutions');
-  const [email, setEmail] = useState('admin@ecotec.lk');
-  const [phone, setPhone] = useState('011-2345678');
-  const [address, setAddress] = useState('123 Main Street, Colombo');
-  const [website, setWebsite] = useState('www.ecotec.lk');
+  // Profile form states - initialize with effective shop data
+  const [businessName, setBusinessName] = useState(effectiveShop?.name || 'Shop Name');
+  const [email, setEmail] = useState(effectiveShop?.email || '');
+  const [phone, setPhone] = useState(effectiveShop?.phone || '');
+  const [address, setAddress] = useState(effectiveShop?.address || '');
+  const [website, setWebsite] = useState(effectiveShop?.website || '');
+
+  // Update form when effective shop changes (e.g., SUPER_ADMIN switches shops)
+  React.useEffect(() => {
+    if (effectiveShop) {
+      console.log('📋 Settings: Loading shop details for:', effectiveShop.name, effectiveShop.id);
+      setBusinessName(effectiveShop.name || 'Shop Name');
+      setEmail(effectiveShop.email || '');
+      setPhone(effectiveShop.phone || '');
+      setAddress(effectiveShop.address || '');
+      setWebsite(effectiveShop.website || '');
+    }
+  }, [effectiveShop?.id, effectiveShop?.name, effectiveShop?.email, effectiveShop?.phone, effectiveShop?.address, effectiveShop?.website]);
 
   const placeholders = [
     { key: '{{customerName}}', desc: 'Customer name', example: 'John Doe' },
@@ -106,10 +122,10 @@ export const Settings: React.FC = () => {
     { id: 'whatsapp' as const, label: 'WhatsApp Reminders', icon: MessageCircle, color: 'green', businessOnly: true },
   ];
 
-  // Filter tabs - hide business-specific tabs for Super Admin
-  const tabs = isSuperAdmin 
-    ? allTabs.filter(tab => !tab.businessOnly)
-    : allTabs;
+  // Filter tabs - hide business-specific tabs for Super Admin unless viewing a shop
+  const tabs = canViewBusinessSettings 
+    ? allTabs
+    : allTabs.filter(tab => !tab.businessOnly);
 
   return (
     <div className="min-h-screen pb-8">
@@ -143,6 +159,31 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="max-w-6xl mx-auto px-4">
+        {/* Shop Viewing Banner for SUPER_ADMIN */}
+        {isSuperAdmin && isViewingShop && viewingShop && (
+          <div className={`mb-6 rounded-2xl border p-4 ${
+            theme === 'dark' 
+              ? 'bg-amber-500/10 border-amber-500/30' 
+              : 'bg-amber-50 border-amber-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${
+                theme === 'dark' ? 'bg-amber-500/20' : 'bg-amber-100'
+              }`}>
+                <Building2 className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <p className={`font-medium ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>
+                  Viewing Settings for: {viewingShop.name}
+                </p>
+                <p className={`text-sm ${theme === 'dark' ? 'text-amber-400/70' : 'text-amber-600'}`}>
+                  You are viewing this shop's settings as Super Admin
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modern Tab Navigation */}
         <div className={`rounded-2xl p-1.5 mb-8 ${
           theme === 'dark' ? 'bg-slate-800/50 backdrop-blur-sm' : 'bg-white shadow-lg shadow-slate-200/50'
@@ -515,7 +556,7 @@ export const Settings: React.FC = () => {
               <div className="relative px-6 pb-6">
                 <div className="absolute -top-12 left-6">
                   <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-xl shadow-purple-500/30 border-4 border-white dark:border-slate-900">
-                    EC
+                    {businessName?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'SH'}
                   </div>
                 </div>
                 

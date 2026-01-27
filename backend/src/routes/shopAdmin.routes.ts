@@ -1,13 +1,14 @@
 /**
  * Shop Admin Routes - Shop-level User Management
  * For ADMIN role users to manage users within their own shop
+ * SUPER_ADMIN can also access by providing shopId query param
  * Based on OWASP security best practices
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
-import { protect, requireShop, authorize } from '../middleware/auth';
+import { protect, authorize } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
 import { sensitiveRateLimiter } from '../middleware/rateLimiter';
 import { body, validationResult } from 'express-validator';
@@ -16,10 +17,32 @@ import { passwordConfig } from '../config/security';
 const router = Router();
 
 // ===================================
-// Apply ADMIN protection to ALL routes
-// Shop admins can only manage their own shop's users
+// Helper function to get effective shop ID
+// For SUPER_ADMIN, allows override via query param
+// For ADMIN, uses their own shop
 // ===================================
-router.use(protect, requireShop, authorize('ADMIN'));
+const getEffectiveShopId = (req: Request): string | null => {
+  const authReq = req as AuthRequest;
+  const user = authReq.user;
+  
+  if (!user) return null;
+  
+  // SUPER_ADMIN can specify a shopId via query param
+  if (user.role === 'SUPER_ADMIN') {
+    const shopIdParam = req.query.shopId as string;
+    if (shopIdParam) return shopIdParam;
+    // SUPER_ADMIN without shopId param - they might have a shop too
+    return user.shopId || null;
+  }
+  
+  // ADMIN uses their own shop
+  return user.shopId || null;
+};
+
+// ===================================
+// Apply ADMIN/SUPER_ADMIN protection to ALL routes
+// ===================================
+router.use(protect, authorize('ADMIN', 'SUPER_ADMIN'));
 
 // ===================================
 // Shop User Management
@@ -27,16 +50,15 @@ router.use(protect, requireShop, authorize('ADMIN'));
 
 /**
  * @route   GET /api/v1/shop-admin/users
- * @desc    Get all users in the current shop
- * @access  Shop Admin Only
+ * @desc    Get all users in the current shop (or specified shop for SUPER_ADMIN)
+ * @access  Shop Admin or SUPER_ADMIN
  */
 router.get('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const authReq = req as AuthRequest;
-    const shopId = authReq.user?.shopId;
+    const shopId = getEffectiveShopId(req);
 
     if (!shopId) {
-      return res.status(403).json({ success: false, message: 'Shop access required' });
+      return res.status(403).json({ success: false, message: 'Shop ID required (SUPER_ADMIN must provide shopId query param)' });
     }
 
     const users = await prisma.user.findMany({
@@ -66,16 +88,15 @@ router.get('/users', async (req: Request, res: Response, next: NextFunction) => 
 /**
  * @route   GET /api/v1/shop-admin/users/:id
  * @desc    Get a specific user in the shop
- * @access  Shop Admin Only
+ * @access  Shop Admin or SUPER_ADMIN
  */
 router.get('/users/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const authReq = req as AuthRequest;
-    const shopId = authReq.user?.shopId;
+    const shopId = getEffectiveShopId(req);
     const { id } = req.params;
 
     if (!shopId) {
-      return res.status(403).json({ success: false, message: 'Shop access required' });
+      return res.status(403).json({ success: false, message: 'Shop ID required' });
     }
 
     // Validate ID format
@@ -119,15 +140,14 @@ router.get('/users/:id', async (req: Request, res: Response, next: NextFunction)
 /**
  * @route   GET /api/v1/shop-admin/stats
  * @desc    Get shop statistics
- * @access  Shop Admin Only
+ * @access  Shop Admin or SUPER_ADMIN
  */
 router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const authReq = req as AuthRequest;
-    const shopId = authReq.user?.shopId;
+    const shopId = getEffectiveShopId(req);
 
     if (!shopId) {
-      return res.status(403).json({ success: false, message: 'Shop access required' });
+      return res.status(403).json({ success: false, message: 'Shop ID required' });
     }
 
     const [totalUsers, activeUsers, shop] = await Promise.all([
@@ -174,7 +194,7 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
 /**
  * @route   POST /api/v1/shop-admin/users
  * @desc    Create a new user in the shop (MANAGER or STAFF only)
- * @access  Shop Admin Only
+ * @access  Shop Admin or SUPER_ADMIN
  */
 router.post('/users', sensitiveRateLimiter, [
   body('email').isEmail().normalizeEmail(),
@@ -193,10 +213,17 @@ router.post('/users', sensitiveRateLimiter, [
     }
 
     const authReq = req as AuthRequest;
-    const shopId = authReq.user?.shopId;
+    
+    // For SUPER_ADMIN, allow shopId in body; for ADMIN, use their own shop
+    let shopId: string | null;
+    if (authReq.user?.role === 'SUPER_ADMIN' && req.body.shopId) {
+      shopId = req.body.shopId;
+    } else {
+      shopId = getEffectiveShopId(req);
+    }
 
     if (!shopId) {
-      return res.status(403).json({ success: false, message: 'Shop access required' });
+      return res.status(403).json({ success: false, message: 'Shop ID required' });
     }
 
     const { email, password, name, role } = req.body;
@@ -250,7 +277,7 @@ router.post('/users', sensitiveRateLimiter, [
 /**
  * @route   PUT /api/v1/shop-admin/users/:id
  * @desc    Update user details (within shop only)
- * @access  Shop Admin Only
+ * @access  Shop Admin or SUPER_ADMIN
  */
 router.put('/users/:id', sensitiveRateLimiter, [
   body('name').optional().trim().isLength({ min: 2, max: 100 }),
@@ -265,8 +292,9 @@ router.put('/users/:id', sensitiveRateLimiter, [
     }
 
     const authReq = req as AuthRequest;
-    const shopId = authReq.user?.shopId;
+    const shopId = getEffectiveShopId(req);
     const currentUserId = authReq.user?.id;
+    const isSuperAdmin = authReq.user?.role === 'SUPER_ADMIN';
     const { id } = req.params;
 
     // Validate ID format
@@ -275,7 +303,7 @@ router.put('/users/:id', sensitiveRateLimiter, [
     }
 
     if (!shopId) {
-      return res.status(403).json({ success: false, message: 'Shop access required' });
+      return res.status(403).json({ success: false, message: 'Shop ID required' });
     }
 
     // SECURITY: Find user and verify they belong to the same shop
@@ -286,7 +314,7 @@ router.put('/users/:id', sensitiveRateLimiter, [
     }
 
     if (user.shopId !== shopId) {
-      return res.status(403).json({ success: false, message: 'User does not belong to your shop' });
+      return res.status(403).json({ success: false, message: 'User does not belong to the specified shop' });
     }
 
     // SECURITY: Cannot modify SUPER_ADMIN users from any shop
@@ -319,14 +347,17 @@ router.put('/users/:id', sensitiveRateLimiter, [
       }
     }
 
+    // SUPER_ADMIN can modify any user's role/status; ADMIN cannot modify other ADMINs
+    const canModifyRoleStatus = isSuperAdmin || (user.role !== 'ADMIN' && !isOwnAccount);
+
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
         ...(name && { name }),
         ...(email && { email }),
-        // Only update role/status if NOT editing own account and NOT an ADMIN user
-        ...(role && !isOwnAccount && user.role !== 'ADMIN' && { role }),
-        ...(isActive !== undefined && !isOwnAccount && user.role !== 'ADMIN' && { isActive }),
+        // Only update role/status if allowed
+        ...(role && canModifyRoleStatus && { role }),
+        ...(isActive !== undefined && canModifyRoleStatus && { isActive }),
       },
       select: {
         id: true,
@@ -353,7 +384,7 @@ router.put('/users/:id', sensitiveRateLimiter, [
 /**
  * @route   PUT /api/v1/shop-admin/users/:id/reset-password
  * @desc    Reset user password (within shop only)
- * @access  Shop Admin Only
+ * @access  Shop Admin or SUPER_ADMIN
  */
 router.put('/users/:id/reset-password', sensitiveRateLimiter, [
   body('newPassword')
@@ -369,13 +400,14 @@ router.put('/users/:id/reset-password', sensitiveRateLimiter, [
     }
 
     const authReq = req as AuthRequest;
-    const shopId = authReq.user?.shopId;
+    const shopId = getEffectiveShopId(req);
     const currentUserId = authReq.user?.id;
+    const isSuperAdmin = authReq.user?.role === 'SUPER_ADMIN';
     const { id } = req.params;
     const { newPassword } = req.body;
 
     if (!shopId) {
-      return res.status(403).json({ success: false, message: 'Shop access required' });
+      return res.status(403).json({ success: false, message: 'Shop ID required' });
     }
 
     // SECURITY: Find user and verify they belong to the same shop
@@ -386,7 +418,7 @@ router.put('/users/:id/reset-password', sensitiveRateLimiter, [
     }
 
     if (user.shopId !== shopId) {
-      return res.status(403).json({ success: false, message: 'User does not belong to your shop' });
+      return res.status(403).json({ success: false, message: 'User does not belong to the specified shop' });
     }
 
     // SECURITY: Cannot reset SUPER_ADMIN passwords
@@ -400,8 +432,8 @@ router.put('/users/:id/reset-password', sensitiveRateLimiter, [
     // Allow ADMIN to reset their own password
     const isOwnAccount = user.id === currentUserId;
 
-    // SECURITY: If resetting other ADMIN's password (not own), prevent it
-    if (user.role === 'ADMIN' && !isOwnAccount) {
+    // SECURITY: If resetting other ADMIN's password (not own), only SUPER_ADMIN can do it
+    if (user.role === 'ADMIN' && !isOwnAccount && !isSuperAdmin) {
       return res.status(403).json({ 
         success: false, 
         message: 'Cannot reset other ADMIN passwords' 
@@ -429,17 +461,18 @@ router.put('/users/:id/reset-password', sensitiveRateLimiter, [
 /**
  * @route   DELETE /api/v1/shop-admin/users/:id
  * @desc    Deactivate user (within shop only)
- * @access  Shop Admin Only
+ * @access  Shop Admin or SUPER_ADMIN
  */
 router.delete('/users/:id', sensitiveRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authReq = req as AuthRequest;
-    const shopId = authReq.user?.shopId;
+    const shopId = getEffectiveShopId(req);
     const currentUserId = authReq.user?.id;
+    const isSuperAdmin = authReq.user?.role === 'SUPER_ADMIN';
     const { id } = req.params;
 
     if (!shopId) {
-      return res.status(403).json({ success: false, message: 'Shop access required' });
+      return res.status(403).json({ success: false, message: 'Shop ID required' });
     }
 
     // SECURITY: Prevent self-deletion
@@ -455,14 +488,22 @@ router.delete('/users/:id', sensitiveRateLimiter, async (req: Request, res: Resp
     }
 
     if (user.shopId !== shopId) {
-      return res.status(403).json({ success: false, message: 'User does not belong to your shop' });
+      return res.status(403).json({ success: false, message: 'User does not belong to the specified shop' });
     }
 
-    // SECURITY: Cannot delete ADMIN or SUPER_ADMIN users
-    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+    // SECURITY: Cannot delete SUPER_ADMIN users
+    if (user.role === 'SUPER_ADMIN') {
       return res.status(403).json({ 
         success: false, 
-        message: 'Cannot delete ADMIN or SUPER_ADMIN users' 
+        message: 'Cannot delete SUPER_ADMIN users' 
+      });
+    }
+
+    // SECURITY: Only SUPER_ADMIN can delete ADMIN users
+    if (user.role === 'ADMIN' && !isSuperAdmin) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Cannot delete ADMIN users' 
       });
     }
 

@@ -21,6 +21,14 @@ interface ViewingShop {
   id: string;
   name: string;
   slug: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  website?: string | null;
+  logo?: string | null;
+  currency?: string;
+  taxRate?: number;
+  businessRegNo?: string | null;
 }
 
 interface AuthContextType {

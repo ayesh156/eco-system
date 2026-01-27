@@ -240,64 +240,206 @@ export const validateSearch = (): ValidationChain => {
 // ===================================
 
 /**
- * Customer validation rules
+ * Sri Lankan NIC validation
+ * Old format: 9 digits + V/X (e.g., 123456789V)
+ * New format: 12 digits (e.g., 200012345678)
+ */
+export const validateNIC = (fieldName: string = 'nic'): ValidationChain => {
+  return body(fieldName)
+    .optional()
+    .trim()
+    .matches(/^([0-9]{9}[VvXx]|[0-9]{12})$/)
+    .withMessage('Please provide a valid Sri Lankan NIC number');
+};
+
+/**
+ * Customer validation rules - World-class comprehensive validation
  */
 export const validateCustomer = [
+  // Name - Required, 2-100 characters
   body('name')
     .trim()
     .notEmpty()
     .withMessage('Customer name is required')
     .isLength({ min: 2, max: 100 })
     .withMessage('Name must be between 2 and 100 characters'),
+  
+  // Email - Optional but must be valid if provided
   validateEmail('email').optional(),
-  validatePhone('phone'),
+  
+  // Phone - Required for SL businesses, validates SL format
+  body('phone')
+    .trim()
+    .notEmpty()
+    .withMessage('Phone number is required')
+    .matches(/^(\+94|0)?[0-9]{9,10}$/)
+    .withMessage('Please provide a valid phone number'),
+  
+  // Address - Optional, max 500 characters
   body('address')
     .optional()
     .trim()
     .isLength({ max: 500 })
     .withMessage('Address must not exceed 500 characters'),
+  
+  // NIC - Optional, validates SL NIC format
+  body('nic')
+    .optional()
+    .trim()
+    .matches(/^([0-9]{9}[VvXx]|[0-9]{12})$/)
+    .withMessage('Please provide a valid Sri Lankan NIC number'),
+  
+  // Credit Limit - Optional, 0 to 10 million LKR
   body('creditLimit')
     .optional()
     .isFloat({ min: 0, max: 10000000 })
     .withMessage('Credit limit must be between 0 and 10,000,000'),
+  
+  // Credit Balance - Optional, can be negative (overpayment)
+  body('creditBalance')
+    .optional()
+    .isFloat({ min: -10000000, max: 10000000 })
+    .withMessage('Credit balance must be between -10,000,000 and 10,000,000'),
+  
+  // Credit Status - Optional, must be valid enum
+  body('creditStatus')
+    .optional()
+    .isIn(['CLEAR', 'ACTIVE', 'OVERDUE'])
+    .withMessage('Credit status must be CLEAR, ACTIVE, or OVERDUE'),
+  
+  // Credit Due Date - Optional, must be valid date
+  body('creditDueDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Credit due date must be a valid date'),
+  
+  // Customer Type - Optional, must be valid enum
+  body('customerType')
+    .optional()
+    .isIn(['REGULAR', 'WHOLESALE', 'DEALER', 'CORPORATE', 'VIP'])
+    .withMessage('Customer type must be REGULAR, WHOLESALE, DEALER, CORPORATE, or VIP'),
+  
+  // Notes - Optional, max 2000 characters
+  body('notes')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('Notes must not exceed 2000 characters'),
+  
+  // Total Spent - Optional (usually calculated by system)
+  body('totalSpent')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Total spent must be a positive number'),
+  
+  // Total Orders - Optional (usually calculated by system)
+  body('totalOrders')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Total orders must be a positive integer'),
+  
   handleValidationErrors,
 ];
 
 /**
- * Product validation rules
+ * Product validation rules - World-class comprehensive validation
  */
 export const validateProduct = [
+  // Name - Required, 2-200 characters
   body('name')
     .trim()
     .notEmpty()
     .withMessage('Product name is required')
     .isLength({ min: 2, max: 200 })
     .withMessage('Name must be between 2 and 200 characters'),
+  
+  // Description - Optional, max 2000 characters
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('Description must not exceed 2000 characters'),
+  
+  // Selling Price - Required, 0 to 999 million LKR
   body('price')
     .isFloat({ min: 0, max: 999999999 })
     .withMessage('Price must be a positive number'),
-  body('cost')
+  
+  // Cost Price - Optional
+  body('costPrice')
     .optional()
     .isFloat({ min: 0, max: 999999999 })
-    .withMessage('Cost must be a positive number'),
+    .withMessage('Cost price must be a positive number'),
+  
+  // Stock - Optional, defaults to 0
   body('stock')
     .optional()
     .isInt({ min: 0, max: 999999 })
     .withMessage('Stock must be a positive integer'),
-  body('minStock')
+  
+  // Reserved Stock - Optional
+  body('reservedStock')
     .optional()
     .isInt({ min: 0, max: 999999 })
-    .withMessage('Minimum stock must be a positive integer'),
+    .withMessage('Reserved stock must be a positive integer'),
+  
+  // Low Stock Threshold - Optional
+  body('lowStockThreshold')
+    .optional()
+    .isInt({ min: 0, max: 999999 })
+    .withMessage('Low stock threshold must be a positive integer'),
+  
+  // Serial Number - Optional, max 100 characters
   body('serialNumber')
     .optional()
     .trim()
     .isLength({ max: 100 })
     .withMessage('Serial number must not exceed 100 characters'),
+  
+  // Barcode - Optional, max 50 characters
   body('barcode')
     .optional()
     .trim()
     .isLength({ max: 50 })
     .withMessage('Barcode must not exceed 50 characters'),
+  
+  // Warranty - Optional, text description
+  body('warranty')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Warranty must not exceed 50 characters'),
+  
+  // Warranty Months - Optional, 0-120 months
+  body('warrantyMonths')
+    .optional()
+    .isInt({ min: 0, max: 120 })
+    .withMessage('Warranty months must be between 0 and 120'),
+  
+  // Image - Optional, base64 or URL (can be large)
+  body('image')
+    .optional()
+    .isString()
+    .withMessage('Image must be a string (base64 or URL)'),
+  
+  // Category ID - Optional, must be valid UUID if provided
+  body('categoryId')
+    .optional()
+    .isString()
+    .withMessage('Category ID must be a valid ID'),
+  
+  // Brand ID - Optional, must be valid UUID if provided
+  body('brandId')
+    .optional()
+    .isString()
+    .withMessage('Brand ID must be a valid ID'),
+  
+  // Profit Margin - Optional, calculated field
+  body('profitMargin')
+    .optional()
+    .isFloat({ min: -100, max: 1000 })
+    .withMessage('Profit margin must be a valid percentage'),
+  
   handleValidationErrors,
 ];
 

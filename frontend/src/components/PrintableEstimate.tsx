@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import { Building2 } from 'lucide-react';
 import logo from '../assets/logo.png';
 
 interface EstimateItem {
@@ -31,12 +32,30 @@ interface EstimateData {
   terms?: string;
 }
 
+interface EstimateBranding {
+  name?: string;
+  subName?: string;
+  logo?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+}
+
 interface PrintableEstimateProps {
   estimate: EstimateData;
+  branding?: EstimateBranding;
 }
 
 export const PrintableEstimate = forwardRef<HTMLDivElement, PrintableEstimateProps>(
-  ({ estimate }, ref) => {
+  ({ estimate, branding }, ref) => {
+    // Use branding values with fallbacks
+    const shopName = branding?.name || 'ECOTEC';
+    const shopSubName = branding?.subName || '';
+    const hasCustomLogo = branding?.logo && branding.logo !== logo;
+    const shopLogo = branding?.logo || logo;
+    const shopPhone = branding?.phone || '011-2345678 | 077-1234567';
+    const shopEmail = branding?.email || 'info@ecotec.lk';
+
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString('en-GB', {
         year: 'numeric',
@@ -518,10 +537,26 @@ export const PrintableEstimate = forwardRef<HTMLDivElement, PrintableEstimatePro
         {/* Header */}
         <div className="estimate-header">
           <div className="company-section">
-            <img src={logo} alt="Logo" className="company-logo" />
+            <div className="company-logo">
+              {hasCustomLogo ? (
+                <img src={shopLogo} alt="Shop Logo" />
+              ) : (
+                <div style={{ 
+                  width: '70px', 
+                  height: '70px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)',
+                  borderRadius: '12px'
+                }}>
+                  <Building2 style={{ width: '40px', height: '40px', color: 'white', strokeWidth: 2 }} />
+                </div>
+              )}
+            </div>
             <div className="company-info">
-              <h1>ECOTEC</h1>
-              <div className="contact">Tel: 011-2345678 | 077-1234567 | Email: info@ecotec.lk</div>
+              <h1>{shopName}{shopSubName && ` ${shopSubName}`}</h1>
+              <div className="contact">Tel: {shopPhone} | Email: {shopEmail}</div>
             </div>
           </div>
           <div className="estimate-number-box">

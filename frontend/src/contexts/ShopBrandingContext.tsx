@@ -135,7 +135,7 @@ async function updateShopBranding(
 // ===================================
 
 export const ShopBrandingProvider: React.FC<ShopBrandingProviderProps> = ({ children }) => {
-  const { user, getAccessToken } = useAuth();
+  const { user, getAccessToken, isViewingShop, viewingShop } = useAuth();
   const [branding, setBranding] = useState<ShopBranding>(DEFAULT_BRANDING);
   const [originalBranding, setOriginalBranding] = useState<ShopBranding>(DEFAULT_BRANDING);
   const [isLoading, setIsLoading] = useState(false);
@@ -143,11 +143,14 @@ export const ShopBrandingProvider: React.FC<ShopBrandingProviderProps> = ({ chil
 
   // Check for unsaved changes
   const hasUnsavedChanges = JSON.stringify(branding) !== JSON.stringify(originalBranding);
+  
+  // Get effective shop ID - for SUPER_ADMIN viewing a shop, use viewingShop.id
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : user?.shop?.id;
 
-  // Fetch branding on mount when user has a shop
+  // Fetch branding on mount when user has a shop or SUPER_ADMIN is viewing a shop
   useEffect(() => {
     const loadBranding = async () => {
-      const shopId = user?.shop?.id;
+      const shopId = effectiveShopId;
       const token = getAccessToken();
 
       if (!shopId || !token) {
@@ -170,7 +173,7 @@ export const ShopBrandingProvider: React.FC<ShopBrandingProviderProps> = ({ chil
     };
 
     loadBranding();
-  }, [user?.shop?.id, getAccessToken]);
+  }, [effectiveShopId, getAccessToken]);
 
   // Update branding locally
   const updateBranding = useCallback((updates: Partial<ShopBranding>) => {
@@ -184,7 +187,7 @@ export const ShopBrandingProvider: React.FC<ShopBrandingProviderProps> = ({ chil
 
   // Save branding to server
   const saveBranding = useCallback(async () => {
-    const shopId = user?.shop?.id;
+    const shopId = effectiveShopId;
     const token = getAccessToken();
 
     if (!shopId || !token) {
@@ -206,7 +209,7 @@ export const ShopBrandingProvider: React.FC<ShopBrandingProviderProps> = ({ chil
     } finally {
       setIsLoading(false);
     }
-  }, [user?.shop?.id, getAccessToken, branding]);
+  }, [effectiveShopId, getAccessToken, branding]);
 
   // Clear error
   const clearError = useCallback(() => {

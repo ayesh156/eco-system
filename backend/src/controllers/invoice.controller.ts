@@ -287,27 +287,35 @@ export const createInvoice = async (
 
     console.log('📝 Creating invoice:', { customerId, itemCount: items?.length, tax, discount, dueDate, paymentMethod, salesChannel, paidAmount });
 
-    // Validate customer exists
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
-    });
-
-    if (!customer) {
-      throw new AppError(`Customer not found with ID: ${customerId}`, 404);
-    }
-
-    // 🔐 SECURITY: Verify customer belongs to user's shop
+    // 🔐 SECURITY: Verify user has shop access
     if (!req.user?.shopId) {
       throw new AppError('User is not associated with any shop', 403);
     }
-    if (customer.shopId !== req.user.shopId) {
-      throw new AppError('Customer does not belong to your shop', 403);
-    }
+    const invoiceShopId = req.user.shopId;
 
-    // Use customer's shopId (already validated above)
-    const invoiceShopId = customer.shopId;
-    if (!invoiceShopId) {
-      throw new AppError('Shop ID is required. Customer does not have a shop assigned.', 400);
+    // Check if this is a walk-in customer
+    const isWalkIn = !customerId || customerId === 'walk-in';
+    
+    let customerName = 'Walk-in Customer';
+    let validCustomerId: string | null = null;
+
+    // Validate customer exists (only if not walk-in)
+    if (!isWalkIn) {
+      const customer = await prisma.customer.findUnique({
+        where: { id: customerId },
+      });
+
+      if (!customer) {
+        throw new AppError(`Customer not found with ID: ${customerId}`, 404);
+      }
+
+      // Verify customer belongs to user's shop
+      if (customer.shopId !== req.user.shopId) {
+        throw new AppError('Customer does not belong to your shop', 403);
+      }
+      
+      customerName = customer.name;
+      validCustomerId = customer.id;
     }
 
     // Validate items
@@ -366,8 +374,8 @@ export const createInvoice = async (
       const newInvoice = await tx.invoice.create({
         data: {
           invoiceNumber,
-          customerId,
-          customerName: customer.name,
+          customerId: validCustomerId, // null for walk-in customers
+          customerName, // "Walk-in Customer" or actual customer name
           subtotal,
           tax,
           discount,
@@ -418,17 +426,19 @@ export const createInvoice = async (
         });
       }
 
-      // Update customer stats
-      await tx.customer.update({
-        where: { id: customerId },
-        data: {
-          totalOrders: { increment: 1 },
-          totalSpent: { increment: paidAmount },
-          lastPurchase: new Date(),
-          creditBalance: status !== 'FULLPAID' ? { increment: dueAmount } : undefined,
-          creditStatus: status !== 'FULLPAID' ? 'ACTIVE' : undefined,
-        },
-      });
+      // Update customer stats (only for non-walk-in customers)
+      if (validCustomerId) {
+        await tx.customer.update({
+          where: { id: validCustomerId },
+          data: {
+            totalOrders: { increment: 1 },
+            totalSpent: { increment: paidAmount },
+            lastPurchase: new Date(),
+            creditBalance: status !== 'FULLPAID' ? { increment: dueAmount } : undefined,
+            creditStatus: status !== 'FULLPAID' ? 'ACTIVE' : undefined,
+          },
+        });
+      }
 
       // Update product stock (only for items with valid productId)
       for (const item of validatedItems) {
@@ -689,15 +699,17 @@ export const deleteInvoice = async (
         }
       }
 
-      // Update customer stats
-      await tx.customer.update({
-        where: { id: invoice.customerId },
-        data: {
-          totalOrders: { decrement: 1 },
-          totalSpent: { decrement: invoice.paidAmount },
-          creditBalance: { decrement: invoice.dueAmount },
-        },
-      });
+      // Update customer stats (only for non-walk-in customers with valid customerId)
+      if (invoice.customerId) {
+        await tx.customer.update({
+          where: { id: invoice.customerId },
+          data: {
+            totalOrders: { decrement: 1 },
+            totalSpent: { decrement: invoice.paidAmount },
+            creditBalance: { decrement: invoice.dueAmount },
+          },
+        });
+      }
 
       // Delete invoice (cascade deletes items and payments)
       await tx.invoice.delete({

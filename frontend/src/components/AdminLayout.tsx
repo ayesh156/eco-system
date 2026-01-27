@@ -238,7 +238,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         { path: '/help', icon: HelpCircle, label: 'Help Center', badge: null },
       ]
     : [
-        ...(user?.role === 'ADMIN' ? [
+        // Show Shop Admin for both ADMIN users AND SUPER_ADMIN viewing a shop
+        ...((user?.role === 'ADMIN' || (user?.role === 'SUPER_ADMIN' && isViewingShop)) ? [
           { 
             path: '/shop-admin', 
             icon: Shield, 
@@ -276,8 +277,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       {/* Logo Section - Shop Branding */}
       <div className={`flex items-center h-16 px-4 border-b ${theme === 'dark' ? 'border-slate-800/50' : 'border-slate-200'}`}>
         <Link to="/" className="flex items-center gap-3 group">
-          {user?.role === 'SUPER_ADMIN' ? (
-            // SUPER_ADMIN: Show Ecosystem branding
+          {user?.role === 'SUPER_ADMIN' && !isViewingShop ? (
+            // SUPER_ADMIN not viewing a shop: Show Ecosystem branding
             <>
               <div className="relative flex-shrink-0">
                 <img src={ecosystemLogo} alt="Eco System" className="w-10 h-10 object-contain" />
@@ -294,7 +295,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               )}
             </>
           ) : (
-            // Regular users: Show Shop branding
+            // Regular users OR SUPER_ADMIN viewing a shop: Show Shop branding
             <>
               <div className="relative flex-shrink-0">
                 {branding.logo ? (

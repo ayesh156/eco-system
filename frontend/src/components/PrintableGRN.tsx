@@ -1,14 +1,34 @@
 import { forwardRef } from 'react';
+import { Building2 } from 'lucide-react';
 import type { GoodsReceivedNote, Supplier } from '../data/mockData';
 import logo from '../assets/logo.png';
+
+interface GRNBranding {
+  name?: string;
+  subName?: string;
+  logo?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+}
 
 interface PrintableGRNProps {
   grn: GoodsReceivedNote;
   supplier?: Supplier | null;
+  branding?: GRNBranding;
 }
 
 export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
-  ({ grn, supplier }, ref) => {
+  ({ grn, supplier, branding }, ref) => {
+    // Use branding values with fallbacks
+    const shopName = branding?.name || 'ECOTEC COMPUTER';
+    const shopSubName = branding?.subName || 'SOLUTIONS';
+    const hasCustomLogo = branding?.logo && branding.logo !== logo;
+    const shopLogo = branding?.logo || logo;
+    const shopAddress = branding?.address || 'No.14, Mulatiyana junction, Mulatiyana, Matara.';
+    const shopPhone = branding?.phone || '0711453111';
+    const shopEmail = branding?.email || 'ecoteccomputersolutions@gmail.com';
+
     const formatCurrency = (amount: number) => {
       return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
     };
@@ -648,22 +668,40 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
         <div className="grn-header">
           <div className="company-section">
             <div className="company-logo">
-              <img src={logo} alt="ECOTEC Logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+              {hasCustomLogo ? (
+                <img src={shopLogo} alt="Shop Logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+              ) : (
+                <div style={{ 
+                  width: '40px', 
+                  height: '40px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)',
+                  borderRadius: '8px'
+                }}>
+                  <Building2 style={{ width: '24px', height: '24px', color: 'white', strokeWidth: 2 }} />
+                </div>
+              )}
             </div>
             <div className="company-info">
-              <h1>ECOTEC COMPUTER</h1>
-              <div className="sub-name">SOLUTIONS</div>
+              <h1>{shopName}</h1>
+              {shopSubName && <div className="sub-name">{shopSubName}</div>}
               <div className="details">
-                No.14, Mulatiyana junction,<br />
-                Mulatiyana, Matara.
+                {shopAddress.split(',').map((line, i, arr) => (
+                  <span key={i}>
+                    {line.trim()}
+                    {i < arr.length - 1 && <br />}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
           <div className="contact-box">
             <h3>Contact information</h3>
             <div className="info">
-              ecoteccomputersolutions@gmail.com<br />
-              0711453111
+              {shopEmail}<br />
+              {shopPhone}
             </div>
           </div>
         </div>

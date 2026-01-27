@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import { Building2 } from 'lucide-react';
 import type { JobNote } from '../data/mockData';
 import defaultLogo from '../assets/logo.png';
 
@@ -22,6 +23,7 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
   ({ jobNote, branding }, ref) => {
     // Use branding values with fallbacks
     const shopName = branding?.name || 'ECOTEC';
+    const hasCustomLogo = branding?.logo && branding.logo !== defaultLogo;
     const shopLogo = branding?.logo || defaultLogo;
     const shopPhone = branding?.phone || '011-2345678';
     const shopEmail = branding?.email || 'info@ecotec.lk';
@@ -564,7 +566,23 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
         {/* Header */}
         <div className="job-header">
           <div className="company-section">
-            <img src={shopLogo} alt="Logo" className="company-logo" />
+            <div className="company-logo">
+              {hasCustomLogo ? (
+                <img src={shopLogo} alt="Shop Logo" />
+              ) : (
+                <div style={{ 
+                  width: '70px', 
+                  height: '70px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)',
+                  borderRadius: '12px'
+                }}>
+                  <Building2 style={{ width: '40px', height: '40px', color: 'white', strokeWidth: 2 }} />
+                </div>
+              )}
+            </div>
             <div className="company-info">
               <h1>{shopName.includes(' ') ? shopName : <>{shopName.substring(0, 3)}<span>{shopName.substring(3)}</span></>}</h1>
               <div className="contact">{shopPhone} | {shopEmail}</div>

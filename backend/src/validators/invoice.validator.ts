@@ -19,16 +19,18 @@ const handleValidationErrors = (
 // Invoice validation rules
 export const validateInvoice = [
   body('customerId')
-    .notEmpty()
-    .withMessage('Customer ID is required'),
+    .optional() // Optional for walk-in customers
+    .isString()
+    .withMessage('Customer ID must be a string'),
   
   body('items')
     .isArray({ min: 1 })
     .withMessage('At least one item is required'),
   
   body('items.*.productId')
-    .notEmpty()
-    .withMessage('Product ID is required for each item'),
+    .optional() // Optional for quick-add items
+    .isString()
+    .withMessage('Product ID must be a string'),
   
   body('items.*.productName')
     .notEmpty()

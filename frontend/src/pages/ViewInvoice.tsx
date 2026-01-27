@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
 import { useDataCache } from '../contexts/DataCacheContext';
 import { useShopBranding } from '../contexts/ShopBrandingContext';
@@ -28,6 +29,8 @@ export const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { isViewingShop, viewingShop } = useAuth();
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
   const { settings: whatsAppSettings } = useWhatsAppSettings();
   const { branding } = useShopBranding();
   const { 
@@ -61,7 +64,7 @@ export const ViewInvoice: React.FC = () => {
     try {
       // First try to fetch by invoice number (the id param is usually the invoice number)
       const [{ invoices: apiInvoices }, loadedCustomers] = await Promise.all([
-        invoiceService.getAll({ search: id, limit: 1 }),
+        invoiceService.getAll({ search: id, limit: 1, shopId: effectiveShopId }),
         loadCustomers()
       ]);
       
@@ -85,7 +88,7 @@ export const ViewInvoice: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [id, loadCustomers]);
+  }, [id, loadCustomers, effectiveShopId]);
 
   useEffect(() => {
     fetchInvoice();
@@ -123,7 +126,8 @@ export const ViewInvoice: React.FC = () => {
         totalOrders: 0,
         creditBalance: 0,
         creditLimit: 0,
-        creditStatus: 'clear' as const
+        creditStatus: 'clear' as const,
+        customerType: 'REGULAR' as const
       };
     }
     // Try to find from cached customers first, then from invoice's embedded customer data
@@ -142,7 +146,8 @@ export const ViewInvoice: React.FC = () => {
         totalOrders: 0,
         creditBalance: 0,
         creditLimit: 0,
-        creditStatus: 'clear' as const
+        creditStatus: 'clear' as const,
+        customerType: 'REGULAR' as const
       };
     }
     return null;
@@ -321,7 +326,7 @@ export const ViewInvoice: React.FC = () => {
           paymentMethod: denormalizePaymentMethod(paymentMethod),
           notes,
           paymentDate,
-        });
+        }, effectiveShopId);
         
         // Convert and update local state - this updates the invoice prop for the modal
         const convertedInvoice = convertAPIInvoiceToFrontend(updatedInvoice);
@@ -411,7 +416,7 @@ export const ViewInvoice: React.FC = () => {
             total: updatedInvoice.total,
             dueDate: updatedInvoice.dueDate || invoice?.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             status: denormalizeStatus(updatedInvoice.status),
-          });
+          }, effectiveShopId);
           
           const convertedInvoice = convertAPIInvoiceToFrontend(apiUpdatedInvoice);
           setInvoices([convertedInvoice]);

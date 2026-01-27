@@ -11,12 +11,14 @@ interface DataCacheContextType {
   customersLoading: boolean;
   customersLoaded: boolean;
   loadCustomers: (forceRefresh?: boolean) => Promise<Customer[]>;
+  setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
   
   // Products
   products: Product[];
   productsLoading: boolean;
   productsLoaded: boolean;
   loadProducts: (forceRefresh?: boolean) => Promise<Product[]>;
+  setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   
   // Invoices
   invoices: Invoice[];
@@ -95,7 +97,11 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     const newShopId = effectiveShopId || null;
     const previousShopId = currentShopIdRef.current;
     
-    if (previousShopId !== null && previousShopId !== newShopId) {
+    // Clear cache when shop changes (including first selection from null)
+    // Skip if both are null (initial state before any shop is selected)
+    const shopChanged = previousShopId !== newShopId && (previousShopId !== null || newShopId !== null);
+    
+    if (shopChanged) {
       console.log('🔄 Shop changed from', previousShopId, 'to', newShopId, '- clearing data cache');
       
       // Start transition - prevents showing stale data
@@ -287,10 +293,12 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       customersLoading,
       customersLoaded,
       loadCustomers,
+      setCustomers,
       products,
       productsLoading,
       productsLoaded,
       loadProducts,
+      setProducts,
       invoices,
       invoicesLoading,
       invoicesLoaded,

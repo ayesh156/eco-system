@@ -42,8 +42,14 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
 
   const remainingAmount = invoice ? invoice.total - (invoice.paidAmount || 0) : 0;
 
+  // Check if this is a walk-in customer invoice (no partial/credit payments allowed)
+  const isWalkInInvoice = invoice?.customerId === 'walk-in' || 
+                          invoice?.customerName?.toLowerCase().includes('walk-in') ||
+                          invoice?.customerName?.toLowerCase().includes('walkin');
+
   useEffect(() => {
     if (invoice) {
+      // For walk-in invoices, always set to full remaining amount (no partial allowed)
       setPaymentAmount(remainingAmount);
       setPaymentNotes('');
       // Set current date and time as default
@@ -55,7 +61,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     setShowSuccess(false);
     setIsProcessing(false);
     setActiveTab('payment');
-  }, [invoice, isOpen]);
+  }, [invoice, isOpen, remainingAmount]);
 
   const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-LK')}`;
 
@@ -171,7 +177,8 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     }
   };
 
-  const quickAmounts = invoice ? [
+  // Quick amounts - disabled for walk-in customers (must pay full)
+  const quickAmounts = invoice && !isWalkInInvoice ? [
     { label: 'Full', value: remainingAmount, icon: '💯', description: 'Clear balance' },
     { label: '75%', value: Math.round(remainingAmount * 0.75), icon: '🔷', description: 'Three quarters' },
     { label: '50%', value: Math.round(remainingAmount / 2), icon: '⚡', description: 'Half payment' },
@@ -448,11 +455,11 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                 </div>
               </div>
 
-              {/* Custom Amount Input */}
+              {/* Custom Amount Input - Read-only for walk-in */}
               <div>
                 <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                   <Calculator className="w-4 h-4 text-purple-500" />
-                  Custom Amount
+                  {isWalkInInvoice ? 'Payment Amount (Full Payment Required)' : 'Custom Amount'}
                 </label>
                 <div className="relative">
                   <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold ${
@@ -463,13 +470,16 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                   <input
                     type="number"
                     value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(Math.min(Number(e.target.value), remainingAmount))}
+                    onChange={(e) => !isWalkInInvoice && setPaymentAmount(Math.min(Number(e.target.value), remainingAmount))}
                     max={remainingAmount}
                     min={0}
+                    readOnly={isWalkInInvoice}
                     className={`w-full pl-14 pr-4 py-4 rounded-xl border-2 text-2xl font-bold transition-all ${
-                      theme === 'dark'
-                        ? 'bg-slate-800/50 border-slate-700 text-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20'
-                        : 'bg-white border-slate-200 text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20'
+                      isWalkInInvoice
+                        ? 'cursor-not-allowed opacity-75 ' + (theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-slate-100 border-slate-300 text-slate-500')
+                        : theme === 'dark'
+                          ? 'bg-slate-800/50 border-slate-700 text-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20'
+                          : 'bg-white border-slate-200 text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20'
                     }`}
                   />
                   {/* Percentage indicator */}
@@ -482,6 +492,12 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                     </span>
                   </div>
                 </div>
+                {isWalkInInvoice && (
+                  <p className={`text-xs mt-2 flex items-center gap-1 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                    <AlertTriangle className="w-3 h-3" />
+                    Walk-in customers must pay the full amount. Partial payments are not allowed.
+                  </p>
+                )}
               </div>
 
               {/* Payment Method Selection */}

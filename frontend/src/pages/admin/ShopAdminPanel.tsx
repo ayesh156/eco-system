@@ -70,12 +70,18 @@ type RoleFilter = 'all' | 'MANAGER' | 'STAFF';
 
 export const ShopAdminPanel: React.FC = () => {
   const { theme } = useTheme();
-  const { user, getAccessToken } = useAuth();
+  const { user, getAccessToken, isViewingShop, viewingShop } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Determine active section from URL
   const activeSection = location.pathname.includes('/branding') ? 'branding' : 'users';
+
+  // Determine if user has access: ADMIN or SUPER_ADMIN viewing a shop
+  const hasAccess = user?.role === 'ADMIN' || (user?.role === 'SUPER_ADMIN' && isViewingShop);
+  
+  // Get the effective shop ID - for SUPER_ADMIN viewing a shop, use viewingShop.id
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : user?.shopId;
 
   // State
   const [stats, setStats] = useState<ShopStats | null>(null);
@@ -100,12 +106,12 @@ export const ShopAdminPanel: React.FC = () => {
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [isDeleteUserModalOpen, setIsDeleteUserModalOpen] = useState(false);
 
-  // Check authorization - must be ADMIN role
+  // Check authorization - must be ADMIN role or SUPER_ADMIN viewing a shop
   useEffect(() => {
-    if (user && user.role !== 'ADMIN') {
+    if (user && !hasAccess) {
       navigate('/dashboard');
     }
-  }, [user, navigate]);
+  }, [user, hasAccess, navigate]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -118,12 +124,15 @@ export const ShopAdminPanel: React.FC = () => {
     setError(null);
     const token = getAccessToken();
 
+    // For SUPER_ADMIN viewing a shop, pass shopId as query param
+    const shopIdParam = isViewingShop && viewingShop ? `?shopId=${viewingShop.id}` : '';
+
     try {
       const [statsRes, usersRes] = await Promise.all([
-        fetch(`${API_URL}/shop-admin/stats`, {
+        fetch(`${API_URL}/shop-admin/stats${shopIdParam}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`${API_URL}/shop-admin/users`, {
+        fetch(`${API_URL}/shop-admin/users${shopIdParam}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -148,10 +157,10 @@ export const ShopAdminPanel: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user?.role === 'ADMIN') {
+    if (hasAccess) {
       fetchData();
     }
-  }, [user]);
+  }, [user, hasAccess, isViewingShop, viewingShop]);
 
   // Filtered users
   const filteredUsers = useMemo(() => {
@@ -237,13 +246,18 @@ export const ShopAdminPanel: React.FC = () => {
 
       try {
         const token = getAccessToken();
+        // For SUPER_ADMIN viewing a shop, include shopId in body
+        const bodyData = isViewingShop && viewingShop 
+          ? { ...formData, shopId: viewingShop.id }
+          : formData;
+        
         const response = await fetch(`${API_URL}/shop-admin/users`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(bodyData),
         });
 
         const data = await response.json();
@@ -423,7 +437,9 @@ export const ShopAdminPanel: React.FC = () => {
 
       try {
         const token = getAccessToken();
-        const response = await fetch(`${API_URL}/shop-admin/users/${editUser.id}`, {
+        // For SUPER_ADMIN viewing a shop, include shopId as query param
+        const shopIdParam = isViewingShop && viewingShop ? `?shopId=${viewingShop.id}` : '';
+        const response = await fetch(`${API_URL}/shop-admin/users/${editUser.id}${shopIdParam}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -603,7 +619,9 @@ export const ShopAdminPanel: React.FC = () => {
 
       try {
         const token = getAccessToken();
-        const response = await fetch(`${API_URL}/shop-admin/users/${resetUser.id}/reset-password`, {
+        // For SUPER_ADMIN viewing a shop, include shopId as query param
+        const shopIdParam = isViewingShop && viewingShop ? `?shopId=${viewingShop.id}` : '';
+        const response = await fetch(`${API_URL}/shop-admin/users/${resetUser.id}/reset-password${shopIdParam}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -743,7 +761,9 @@ export const ShopAdminPanel: React.FC = () => {
 
       try {
         const token = getAccessToken();
-        const response = await fetch(`${API_URL}/shop-admin/users/${deleteUser.id}`, {
+        // For SUPER_ADMIN viewing a shop, include shopId as query param
+        const shopIdParam = isViewingShop && viewingShop ? `?shopId=${viewingShop.id}` : '';
+        const response = await fetch(`${API_URL}/shop-admin/users/${deleteUser.id}${shopIdParam}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` },
         });

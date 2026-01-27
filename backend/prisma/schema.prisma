@@ -121,15 +121,26 @@ model Customer {
   email         String?
   phone         String
   address       String?
+  
+  // Sri Lankan specific - NIC for warranty claims
+  nic           String?   // National Identity Card number
+  
+  // Purchase statistics
   totalSpent    Float     @default(0)
   totalOrders   Int       @default(0)
   lastPurchase  DateTime?
   
-  // Credit management
+  // Credit management (Naya system - common in SL shops)
   creditBalance Float     @default(0)
   creditLimit   Float     @default(0)
   creditDueDate DateTime?
   creditStatus  CreditStatus @default(CLEAR)
+  
+  // Customer notes
+  notes         String?   @db.Text
+  
+  // Customer type/category
+  customerType  CustomerType @default(REGULAR)
   
   // Shop relation
   shopId        String
@@ -140,9 +151,60 @@ model Customer {
 
   // Relations
   invoices      Invoice[]
+  payments      CustomerPaymentRecord[]
 
   @@index([shopId])
+  @@index([phone])
+  @@index([nic])
   @@map("customers")
+}
+
+enum CustomerType {
+  REGULAR       // Regular walk-in customer
+  WHOLESALE     // Wholesale/bulk buyer
+  DEALER        // Dealer/reseller
+  CORPORATE     // Corporate/business customer
+  VIP           // VIP customer with special privileges
+}
+
+// Customer Payment Records - Track all payments made by customer
+model CustomerPaymentRecord {
+  id            String    @id @default(cuid())
+  
+  // Customer relation
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  // Invoice relation (optional - for direct invoice payments)
+  invoiceId     String?
+  
+  // Payment details
+  amount        Float
+  paymentMethod PaymentMethod
+  paymentDate   DateTime  @default(now())
+  
+  // Reference and notes
+  reference     String?   // Transaction reference number
+  notes         String?
+  
+  // Source tracking for bi-directional sync
+  source        PaymentSource @default(INVOICE)
+  
+  // Shop relation
+  shopId        String
+  
+  createdAt     DateTime  @default(now())
+
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([shopId])
+  @@map("customer_payments")
+}
+
+enum PaymentSource {
+  INVOICE       // Payment recorded from invoice
+  CUSTOMER      // Direct payment to customer account
+  CREDIT        // Credit adjustment
 }
 
 enum CreditStatus {
@@ -159,6 +221,7 @@ model Category {
   id          String    @id @default(cuid())
   name        String
   description String?
+  image       String?   @db.Text  // Compressed image URL from Supabase
   
   // Shop relation
   shopId      String
@@ -178,6 +241,10 @@ model Brand {
   id          String    @id @default(cuid())
   name        String
   description String?
+  image       String?   @db.Text  // Compressed image URL from Supabase
+  website     String?
+  contactEmail String?
+  contactPhone String?
   
   // Shop relation
   shopId      String
@@ -196,27 +263,35 @@ model Brand {
 model Product {
   id              String    @id @default(cuid())
   name            String
-  description     String?
+  description     String?   @db.Text
   
-  // Pricing
-  price           Float     // Selling price
-  costPrice       Float?    // Cost/purchase price
-  profitMargin    Float?
+  // Pricing - Enhanced for GRN integration
+  price           Float     // Current selling price
+  costPrice       Float?    // Current cost/purchase price from latest GRN
+  lastCostPrice   Float?    // Previous cost price for comparison
+  profitMargin    Float?    // Calculated profit margin percentage
   
-  // Stock
+  // Stock management
   stock           Int       @default(0)
-  reservedStock   Int       @default(0)
-  lowStockThreshold Int     @default(10)
+  reservedStock   Int       @default(0)  // Stock reserved for pending orders
+  lowStockThreshold Int     @default(10) // Custom low stock threshold
   
   // Identifiers
   serialNumber    String?
   barcode         String?
   
-  // Warranty
-  warranty        String?   // e.g., "6 months", "1 year"
+  // Warranty - Important for Sri Lankan electronics shops
+  warranty        String?   // Warranty period (e.g., "6 months", "1 year")
+  warrantyMonths  Int?      // Warranty in months for calculations
   
   // Media
-  image           String?
+  image           String?   @db.Text  // Base64 or URL of product image
+  
+  // GRN & Purchase tracking
+  lastGRNId       String?   // Last GRN that updated this product
+  lastGRNDate     DateTime?
+  totalPurchased  Int       @default(0)  // Total quantity ever purchased via GRN
+  totalSold       Int       @default(0)  // Total quantity sold via invoices
   
   // Shop relation
   shopId          String
@@ -231,11 +306,99 @@ model Product {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // Relations
   invoiceItems    InvoiceItem[]
+  stockMovements  StockMovement[]
+  priceHistory    PriceHistory[]
 
   @@unique([shopId, barcode])  // Unique barcode per shop
   @@index([shopId])
+  @@index([serialNumber])
   @@map("products")
+}
+
+// Stock Movement - Track all stock in/out movements
+model StockMovement {
+  id              String    @id @default(cuid())
+  
+  // Product relation
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  // Movement details
+  type            StockMovementType
+  quantity        Int       // Positive for in, negative for out
+  previousStock   Int
+  newStock        Int
+  
+  // Reference to source document
+  referenceId     String?   // GRN ID or Invoice ID
+  referenceNumber String?   // GRN-2026-0001 or INV-2026-0001
+  referenceType   String?   // 'grn' or 'invoice'
+  
+  // Price at the time of movement
+  unitPrice       Float?
+  
+  // Notes and audit
+  notes           String?
+  createdBy       String?
+  
+  // Shop relation
+  shopId          String
+  
+  createdAt       DateTime  @default(now())
+
+  @@index([productId])
+  @@index([shopId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+enum StockMovementType {
+  GRN_IN          // Stock in from GRN
+  INVOICE_OUT     // Stock out from invoice
+  ADJUSTMENT      // Manual stock adjustment
+  RETURN          // Customer return
+  DAMAGED         // Damaged stock write-off
+  TRANSFER        // Stock transfer between locations
+}
+
+// Price History - Track all price changes
+model PriceHistory {
+  id                    String    @id @default(cuid())
+  
+  // Product relation
+  productId             String
+  product               Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  // Change details
+  changeType            PriceChangeType
+  previousCostPrice     Float?
+  newCostPrice          Float?
+  previousSellingPrice  Float?
+  newSellingPrice       Float?
+  
+  // Reason and reference
+  reason                String?   // 'grn_purchase', 'manual_adjustment', 'promotion'
+  referenceId           String?   // GRN ID if from GRN
+  
+  // Audit
+  createdBy             String?
+  
+  // Shop relation
+  shopId                String
+  
+  createdAt             DateTime  @default(now())
+
+  @@index([productId])
+  @@index([shopId])
+  @@map("price_history")
+}
+
+enum PriceChangeType {
+  COST_UPDATE           // Only cost price changed
+  SELLING_UPDATE        // Only selling price changed
+  BOTH                  // Both prices changed
 }
 
 // ==========================================
@@ -250,10 +413,10 @@ model Invoice {
   shopId        String
   shop          Shop          @relation(fields: [shopId], references: [id])
   
-  // Customer relation
-  customerId    String
-  customer      Customer      @relation(fields: [customerId], references: [id])
-  customerName  String        // Denormalized for quick access
+  // Customer relation (nullable for walk-in customers)
+  customerId    String?
+  customer      Customer?     @relation(fields: [customerId], references: [id])
+  customerName  String        // Denormalized for quick access ("Walk-in Customer" for walk-ins)
   
   // Amounts
   subtotal      Float

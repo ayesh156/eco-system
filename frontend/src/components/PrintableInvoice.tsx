@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import type { Invoice, Customer } from '../data/mockData';
+import { Building2 } from 'lucide-react';
 import defaultLogo from '../assets/logo.png';
 
 interface InvoiceItemWithWarranty {
@@ -37,10 +38,16 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
     // Use branding values with fallbacks
     const shopName = branding?.name || 'ECOTEC COMPUTER';
     const shopSubName = branding?.subName || 'SOLUTIONS';
+    const hasCustomLogo = branding?.logo && branding.logo !== defaultLogo;
     const shopLogo = branding?.logo || defaultLogo;
     const shopAddress = branding?.address || 'No.14, Mulatiyana junction, Mulatiyana, Matara.';
     const shopPhone = branding?.phone || '0711453111';
     const shopEmail = branding?.email || 'ecoteccomputersolutions@gmail.com';
+
+    // Check if this is a walk-in customer
+    const isWalkIn = invoice.customerId === 'walk-in' || 
+                     invoice.customerName?.toLowerCase().includes('walk-in') ||
+                     invoice.customerName?.toLowerCase().includes('walkin');
 
     const formatCurrency = (amount: number) => {
       return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
@@ -506,7 +513,21 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
         <div className="invoice-header">
           <div className="company-section">
             <div className="company-logo">
-              <img src={shopLogo} alt="Shop Logo" />
+              {hasCustomLogo ? (
+                <img src={shopLogo} alt="Shop Logo" />
+              ) : (
+                <div style={{ 
+                  width: '70px', 
+                  height: '70px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)',
+                  borderRadius: '12px'
+                }}>
+                  <Building2 style={{ width: '40px', height: '40px', color: 'white', strokeWidth: 2 }} />
+                </div>
+              )}
             </div>
             <div className="company-info">
               <h1>{shopName}</h1>
@@ -546,12 +567,23 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
         <div className="invoice-meta">
           <div className="bill-to">
             <label>Bill to:</label>
-            <div className="name">{invoice.customerName}</div>
-            {customer && customer.email && (
-              <div className="info">
-                Email: {customer.email}<br />
-                Phone: {customer.phone}
-              </div>
+            {isWalkIn ? (
+              <>
+                <div className="name">Walk-in Customer</div>
+                <div className="info" style={{ fontStyle: 'italic', color: '#666' }}>
+                  Cash Sale
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="name">{invoice.customerName}</div>
+                {customer && customer.email && (
+                  <div className="info">
+                    Email: {customer.email}<br />
+                    Phone: {customer.phone}
+                  </div>
+                )}
+              </>
             )}
           </div>
           <div className="invoice-details">

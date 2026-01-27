@@ -1,27 +1,38 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { productBrands, mockProducts, brandLogos } from '../data/mockData';
+import { brandService } from '../services/brandService';
 import { BrandFormModal } from '../components/modals/BrandFormModal';
 import type { Brand } from '../components/modals/BrandFormModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { 
   Building2, Plus, Edit, Trash2, Search, X, LayoutGrid, List, 
   ArrowDownUp, SortAsc, SortDesc, Calendar, ChevronLeft, ChevronRight,
-  ChevronsLeft, ChevronsRight, Package, Image as ImageIcon, Check
+  ChevronsLeft, ChevronsRight, Package, Image as ImageIcon, Check,
+  Loader2, AlertCircle, CheckCircle2
 } from 'lucide-react';
 
 // Extended Brand interface with image and date
 interface ExtendedBrand extends Brand {
   image?: string;
   createdAt: string;
+  website?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
 export const Brands: React.FC = () => {
   const { theme } = useTheme();
+  const { isViewingShop, viewingShop } = useAuth();
+  
+  // Get effective shopId for SUPER_ADMIN viewing a shop
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
-  const [sortBy, setSortBy] = useState<'name' | 'products' | 'date'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<'name' | 'products' | 'date'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
   // Date filter states
   const [startDate, setStartDate] = useState('');
@@ -54,8 +65,41 @@ export const Brands: React.FC = () => {
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
   const [brandToDelete, setBrandToDelete] = useState<ExtendedBrand | null>(null);
   
-  // Local brands state for demo
-  const [brands, setBrands] = useState<ExtendedBrand[]>(initialBrands);
+  // Local brands state - loads from API
+  const [brands, setBrands] = useState<ExtendedBrand[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [highlightedBrandId, setHighlightedBrandId] = useState<string | null>(null);
+
+  // Load brands from API
+  useEffect(() => {
+    const loadBrands = async () => {
+      setIsLoading(true);
+      setApiError(null);
+      
+      try {
+        const { brands: apiBrands } = await brandService.getAll({ shopId: effectiveShopId });
+        const extendedBrands: ExtendedBrand[] = apiBrands.map(brand => ({
+          id: brand.id,
+          name: brand.name,
+          description: brand.description || `${brand.name} brand products`,
+          productCount: brand._count?.products || 0,
+          image: brand.image || brandLogos[brand.name] || '',
+          createdAt: brand.createdAt,
+        }));
+        setBrands(extendedBrands);
+      } catch (error) {
+        console.error('Failed to load brands:', error);
+        setApiError(error instanceof Error ? error.message : 'Failed to load brands');
+        // Fallback to mock data
+        setBrands(initialBrands);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadBrands();
+  }, [effectiveShopId]);
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -289,24 +333,73 @@ export const Brands: React.FC = () => {
     return `https://logo.clearbit.com/${sanitizedName}.com`;
   };
 
-  const handleSaveBrand = (brand: Brand) => {
-    if (selectedBrand) {
-      setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, ...brand } : b));
-    } else {
-      // Auto-fetch logo for new brands
-      const logoUrl = getBrandLogoUrl(brand.name);
-      const newBrand: ExtendedBrand = {
-        ...brand,
-        image: logoUrl,
-        createdAt: new Date().toISOString(),
-      };
-      setBrands(prev => [...prev, newBrand]);
+  const handleSaveBrand = async (brand: Brand) => {
+    try {
+      if (selectedBrand) {
+        // Update existing brand
+        const updated = await brandService.update(brand.id, {
+          name: brand.name,
+          description: brand.description,
+          website: (brand as any).website,
+          contactEmail: (brand as any).contactEmail,
+          contactPhone: (brand as any).contactPhone,
+          image: brand.image,
+        }, effectiveShopId);
+        setBrands(prev => prev.map(b => b.id === brand.id ? {
+          ...b,
+          name: updated.name,
+          description: updated.description || b.description,
+          image: updated.image || b.image,
+          productCount: updated._count?.products || b.productCount,
+          website: (updated as any).website || (b as any).website,
+          contactEmail: (updated as any).contactEmail || (b as any).contactEmail,
+          contactPhone: (updated as any).contactPhone || (b as any).contactPhone,
+        } : b));
+        setHighlightedBrandId(brand.id);
+      } else {
+        // Create new brand
+        const created = await brandService.create({
+          name: brand.name,
+          description: brand.description,
+          website: (brand as any).website,
+          contactEmail: (brand as any).contactEmail,
+          contactPhone: (brand as any).contactPhone,
+          image: brand.image,
+        }, effectiveShopId);
+        const logoUrl = created.image || getBrandLogoUrl(brand.name);
+        const newBrand: ExtendedBrand = {
+          id: created.id,
+          name: created.name,
+          description: created.description || `${created.name} brand products`,
+          productCount: 0,
+          image: logoUrl,
+          createdAt: created.createdAt,
+          website: (created as any).website,
+          contactEmail: (created as any).contactEmail,
+          contactPhone: (created as any).contactPhone,
+        };
+        setBrands(prev => [newBrand, ...prev]);
+        setHighlightedBrandId(created.id);
+      }
+      // Clear highlight after 5 seconds
+      setTimeout(() => setHighlightedBrandId(null), 5000);
+    } catch (error) {
+      console.error('Failed to save brand:', error);
+      setApiError(error instanceof Error ? error.message : 'Failed to save brand');
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (brandToDelete) {
-      setBrands(prev => prev.filter(b => b.id !== brandToDelete.id));
+      try {
+        await brandService.delete(brandToDelete.id, effectiveShopId);
+        setBrands(prev => prev.filter(b => b.id !== brandToDelete.id));
+      } catch (error) {
+        console.error('Failed to delete brand:', error);
+        setApiError(error instanceof Error ? error.message : 'Failed to delete brand');
+        // Still remove from UI for demo
+        setBrands(prev => prev.filter(b => b.id !== brandToDelete.id));
+      }
       setIsDeleteModalOpen(false);
       setBrandToDelete(null);
     }
@@ -346,8 +439,45 @@ export const Brands: React.FC = () => {
     );
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className={`w-10 h-10 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+        <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Loading brands...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* API Error Alert */}
+      {apiError && (
+        <div className={`flex items-center gap-3 p-4 rounded-xl border ${
+          theme === 'dark' 
+            ? 'bg-red-500/10 border-red-500/30 text-red-400' 
+            : 'bg-red-50 border-red-200 text-red-600'
+        }`}>
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Failed to load from database</p>
+            <p className="text-sm opacity-80">{apiError}. Showing local data.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Success Banner for highlighted brand */}
+      {highlightedBrandId && (
+        <div className={`flex items-center gap-3 p-4 rounded-xl border ${
+          theme === 'dark' 
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+            : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+        }`}>
+          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+          <p className="font-medium">Brand saved successfully!</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -585,6 +715,15 @@ export const Brands: React.FC = () => {
                   <th className={`text-left px-4 py-3 text-xs font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                     Description
                   </th>
+                  <th className={`text-left px-4 py-3 text-xs font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Website
+                  </th>
+                  <th className={`text-left px-4 py-3 text-xs font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Contact Email
+                  </th>
+                  <th className={`text-left px-4 py-3 text-xs font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Contact Phone
+                  </th>
                   <th className={`text-center px-4 py-3 text-xs font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                     Products
                   </th>
@@ -601,19 +740,55 @@ export const Brands: React.FC = () => {
                   <tr 
                     key={brand.id}
                     className={`border-b transition-colors ${
-                      theme === 'dark' ? 'border-slate-700/30 hover:bg-slate-800/30' : 'border-slate-100 hover:bg-slate-50'
+                      highlightedBrandId === brand.id
+                        ? theme === 'dark' 
+                          ? 'bg-emerald-900/30 border-emerald-500/30 ring-1 ring-inset ring-emerald-500/30' 
+                          : 'bg-emerald-50 border-emerald-200 ring-1 ring-inset ring-emerald-300'
+                        : theme === 'dark' 
+                          ? 'border-slate-700/30 hover:bg-slate-800/30' 
+                          : 'border-slate-100 hover:bg-slate-50'
                     }`}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {renderBrandImage(brand, 'sm')}
-                        <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                          {brand.name}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                            {brand.name}
+                          </span>
+                          {highlightedBrandId === brand.id && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
+                            }`}>
+                              <CheckCircle2 className="w-3 h-3" />
+                              Saved!
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                       {brand.description || '-'}
+                    </td>
+                    <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {(brand as any).website ? (
+                        <a 
+                          href={(brand as any).website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-500 hover:text-emerald-600 underline"
+                        >
+                          {(brand as any).website}
+                        </a>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {(brand as any).contactEmail || '-'}
+                    </td>
+                    <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {(brand as any).contactPhone || '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -666,11 +841,24 @@ export const Brands: React.FC = () => {
             <div 
               key={brand.id}
               className={`group rounded-2xl border p-6 transition-all hover:shadow-lg ${
-                theme === 'dark' 
-                  ? 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/30' 
-                  : 'bg-white border-slate-200 hover:border-emerald-500/50'
+                highlightedBrandId === brand.id
+                  ? theme === 'dark'
+                    ? 'bg-emerald-900/30 border-emerald-500/50 ring-2 ring-emerald-500/30'
+                    : 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-300'
+                  : theme === 'dark' 
+                    ? 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/30' 
+                    : 'bg-white border-slate-200 hover:border-emerald-500/50'
               }`}
             >
+              {/* Highlight badge */}
+              {highlightedBrandId === brand.id && (
+                <div className="mb-3 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <span className={`text-xs font-semibold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                    Successfully Saved!
+                  </span>
+                </div>
+              )}
               <div className="flex items-start justify-between mb-4">
                 <div>
                   {renderBrandImage(brand, 'lg')}

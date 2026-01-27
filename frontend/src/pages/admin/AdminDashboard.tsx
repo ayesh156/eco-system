@@ -196,6 +196,13 @@ export const AdminDashboard: React.FC = () => {
       id: shop.id,
       name: shop.name,
       slug: shop.slug,
+      email: shop.email,
+      phone: shop.phone,
+      address: shop.address,
+      logo: shop.logo,
+      currency: shop.currency,
+      taxRate: shop.taxRate,
+      businessRegNo: shop.businessRegNo,
     });
     navigate('/');
   };
@@ -1604,7 +1611,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
     email: user.email,
     role: user.role,
     isActive: user.isActive,
-    shopId: user.shopId || '',
+    shopId: user.shop?.id || '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

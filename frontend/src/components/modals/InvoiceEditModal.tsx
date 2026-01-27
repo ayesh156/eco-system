@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Invoice, InvoiceItem, Product } from '../../data/mockData';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Plus, Trash2, Search, FileText, Package, Calendar, CheckCircle, XCircle, CircleDollarSign, CreditCard } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, Package, Calendar, CheckCircle, XCircle, CircleDollarSign, CreditCard, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -33,13 +33,18 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
   
-  // Payment method for adding products
+  // Payment method for adding products (default to 'cash' for walk-in, 'credit' for others)
   const [addPaymentMethod, setAddPaymentMethod] = useState<'cash' | 'card' | 'bank' | 'credit'>('credit');
   
   // Tax states
   const [hasTax, setHasTax] = useState(true);
   const [taxPercentage, setTaxPercentage] = useState(15);
   const [originalHadTax, setOriginalHadTax] = useState(true);
+
+  // Check if this is a walk-in customer invoice (no partial/credit payments allowed)
+  const isWalkInInvoice = invoice?.customerId === 'walk-in' || 
+                          invoice?.customerName?.toLowerCase().includes('walk-in') ||
+                          invoice?.customerName?.toLowerCase().includes('walkin');
   
   // Calendar states
   const [showIssueDatePicker, setShowIssueDatePicker] = useState(false);
@@ -65,6 +70,14 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
         setTaxPercentage(Math.round(calculatedPercentage));
       } else {
         setTaxPercentage(15);
+      }
+      
+      // Reset payment method to 'cash' for walk-in customers (credit not allowed)
+      const isWalkIn = invoice.customerId === 'walk-in' || 
+                       invoice.customerName?.toLowerCase().includes('walk-in') ||
+                       invoice.customerName?.toLowerCase().includes('walkin');
+      if (isWalkIn) {
+        setAddPaymentMethod('cash');
       }
     }
   }, [invoice]);
@@ -193,6 +206,24 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   const handleSave = async () => {
     if (!invoice || items.length === 0 || isSaving) return;
 
+    // For walk-in customers: ALWAYS full payment (paidAmount = total)
+    // For regular customers: determine status based on paid amount
+    let newPaidAmount = invoice.paidAmount || 0;
+    let newStatus = status;
+    
+    if (isWalkInInvoice) {
+      // Walk-in customer - always full cash payment
+      newPaidAmount = total;
+      newStatus = 'fullpaid';
+    } else {
+      // Regular flow - determine status based on paid amount vs total
+      if (newPaidAmount > 0 && newPaidAmount < total) {
+        newStatus = 'halfpay';
+      } else if (newPaidAmount >= total) {
+        newStatus = 'fullpaid';
+      }
+    }
+
     const updatedInvoice: Invoice = {
       ...invoice,
       items,
@@ -201,12 +232,8 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
       total: Math.round(total * 100) / 100,
       date: issueDate,
       dueDate,
-      // Preserve status if it was halfpay or if paid amount > 0 but < total
-      status: invoice.paidAmount && invoice.paidAmount > 0 && invoice.paidAmount < total 
-        ? 'halfpay' 
-        : invoice.paidAmount && invoice.paidAmount >= total 
-          ? 'fullpaid' 
-          : status,
+      status: newStatus,
+      paidAmount: Math.round(newPaidAmount * 100) / 100,
     };
 
     await onSave(updatedInvoice);
@@ -453,6 +480,28 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                     )}
                     <span className="ml-auto text-xs opacity-60">Auto-calculated</span>
                   </div>
+                ) : isWalkInInvoice ? (
+                  // Walk-in customers can only be Unpaid or Full Paid (no Half Pay/Credit)
+                  <>
+                    <SearchableSelect
+                      value={status}
+                      onValueChange={(value) => setStatus(value as 'unpaid' | 'fullpaid' | 'halfpay')}
+                      placeholder="Select status"
+                      searchPlaceholder="Search status..."
+                      emptyMessage="No status found"
+                      theme={theme}
+                      options={[
+                        { value: 'unpaid', label: 'Unpaid', icon: <XCircle className="w-4 h-4 text-red-500" /> },
+                        { value: 'fullpaid', label: 'Full Paid', icon: <CheckCircle className="w-4 h-4 text-emerald-500" /> },
+                      ]}
+                    />
+                    <p className={`text-xs mt-1 flex items-center gap-1 ${
+                      theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
+                    }`}>
+                      <AlertTriangle className="w-3 h-3" />
+                      Half pay not available for walk-in customers
+                    </p>
+                  </>
                 ) : (
                   <SearchableSelect
                     value={status}
@@ -622,30 +671,43 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                   { value: 'card', label: 'Card', emoji: '💳', color: 'blue' },
                   { value: 'bank', label: 'Bank', emoji: '🏦', color: 'purple' },
                   { value: 'credit', label: 'Credit', emoji: '⏳', color: 'red' },
-                ].map(({ value, label, emoji, color }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setAddPaymentMethod(value as 'cash' | 'card' | 'bank' | 'credit')}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
-                      addPaymentMethod === value
-                        ? `scale-105`
-                        : theme === 'dark' 
-                          ? 'border-slate-700 hover:border-slate-600 hover:bg-slate-800/50' 
-                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                    style={addPaymentMethod === value ? {
-                      borderColor: color === 'emerald' ? '#10b981' : color === 'blue' ? '#3b82f6' : color === 'purple' ? '#8b5cf6' : '#ef4444',
-                      backgroundColor: color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : color === 'purple' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)'
-                    } : {}}
-                  >
-                    <span className="text-xl">{emoji}</span>
-                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {label}
-                    </span>
-                  </button>
-                ))}
+                ].map(({ value, label, emoji, color }) => {
+                  const isCreditDisabled = value === 'credit' && isWalkInInvoice;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => !isCreditDisabled && setAddPaymentMethod(value as 'cash' | 'card' | 'bank' | 'credit')}
+                      disabled={isCreditDisabled}
+                      title={isCreditDisabled ? 'Credit not available for walk-in customers' : undefined}
+                      className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
+                        isCreditDisabled
+                          ? 'opacity-40 cursor-not-allowed border-slate-500/30'
+                          : addPaymentMethod === value
+                            ? `scale-105`
+                            : theme === 'dark' 
+                              ? 'border-slate-700 hover:border-slate-600 hover:bg-slate-800/50' 
+                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                      style={!isCreditDisabled && addPaymentMethod === value ? {
+                        borderColor: color === 'emerald' ? '#10b981' : color === 'blue' ? '#3b82f6' : color === 'purple' ? '#8b5cf6' : '#ef4444',
+                        backgroundColor: color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : color === 'purple' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+                      } : {}}
+                    >
+                      <span className="text-xl">{emoji}</span>
+                      <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
+              {isWalkInInvoice && (
+                <p className={`text-xs mt-2 flex items-center gap-1 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                  <AlertTriangle className="w-3 h-3" />
+                  Credit payment not available for walk-in customers
+                </p>
+              )}
             </div>
 
             {/* Quantity & Add */}
@@ -683,7 +745,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                 <span>Product will be added with <strong>{addPaymentMethod}</strong> payment</span>
               </div>
             )}
-            {addPaymentMethod === 'credit' && (
+            {addPaymentMethod === 'credit' && !isWalkInInvoice && (
               <div className={`mt-3 p-2 rounded-lg text-sm flex items-center gap-2 ${
                 theme === 'dark' ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-600'
               }`}>
@@ -760,21 +822,40 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                 Rs. {Math.round(total).toLocaleString()}
               </span>
             </div>
-            {/* Show paid amount if any */}
-            {invoice.paidAmount && invoice.paidAmount > 0 && (
-              <div className={`flex justify-between text-sm pt-2 border-t ${
-                theme === 'dark' ? 'border-slate-700 text-emerald-400' : 'border-slate-200 text-emerald-600'
-              }`}>
-                <span>Paid Amount:</span>
-                <span>Rs. {invoice.paidAmount.toLocaleString()}</span>
-              </div>
+            {/* Show paid amount and remaining ONLY for non-walk-in customers */}
+            {!isWalkInInvoice && invoice.paidAmount && invoice.paidAmount > 0 && (
+              <>
+                <div className={`flex justify-between text-sm pt-2 border-t ${
+                  theme === 'dark' ? 'border-slate-700 text-emerald-400' : 'border-slate-200 text-emerald-600'
+                }`}>
+                  <span>Paid Amount:</span>
+                  <span>Rs. {invoice.paidAmount.toLocaleString()}</span>
+                </div>
+                <div className={`flex justify-between text-sm ${
+                  theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
+                }`}>
+                  <span>Remaining:</span>
+                  <span>Rs. {Math.max(0, Math.round(total) - invoice.paidAmount).toLocaleString()}</span>
+                </div>
+              </>
             )}
-            {invoice.paidAmount && invoice.paidAmount > 0 && (
-              <div className={`flex justify-between text-sm ${
-                theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
+            
+            {/* Walk-in customer: Show that full payment will be made */}
+            {isWalkInInvoice && (
+              <div className={`mt-3 p-3 rounded-xl border-2 ${
+                theme === 'dark' 
+                  ? 'bg-emerald-500/10 border-emerald-500/30' 
+                  : 'bg-emerald-50 border-emerald-200'
               }`}>
-                <span>Remaining:</span>
-                <span>Rs. {Math.max(0, Math.round(total) - invoice.paidAmount).toLocaleString()}</span>
+                <div className={`flex items-center gap-2 ${
+                  theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'
+                }`}>
+                  <CircleDollarSign className="w-4 h-4" />
+                  <span className="font-semibold text-sm">Walk-in Customer - Full Cash Payment</span>
+                </div>
+                <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Invoice will be paid in full immediately
+                </p>
               </div>
             )}
           </div>

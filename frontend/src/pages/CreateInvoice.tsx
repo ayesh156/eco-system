@@ -9,6 +9,8 @@ import { mockInvoices } from '../data/mockData';
 import type { Customer, Product, Invoice, InvoiceItem } from '../data/mockData';
 import PrintableInvoice from '../components/PrintableInvoice';
 import { SearchableSelect } from '../components/ui/searchable-select';
+import { CustomerFormModal } from '../components/modals/CustomerFormModal';
+import { ProductFormModal } from '../components/modals/ProductFormModal';
 import {
   invoiceService,
   denormalizePaymentMethod,
@@ -19,7 +21,7 @@ import {
   FileText, User, Package, CheckCircle, ChevronRight, ChevronLeft,
   Search, Plus, Trash2, ArrowLeft, UserX, CreditCard,
   Building2, ShoppingCart, Receipt, Calendar,
-  Zap, Banknote, Printer, X, Minus, Edit2, Shield, Store, Globe, GripVertical, RefreshCw
+  Zap, Banknote, Printer, X, Minus, Edit2, Shield, Store, Globe, GripVertical, RefreshCw, AlertCircle, UserPlus
 } from 'lucide-react';
 
 // Extended Invoice Item with warranty tracking
@@ -53,7 +55,7 @@ export const CreateInvoice: React.FC = () => {
   const { settings: taxSettings } = useTaxSettings();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
-  const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts } = useDataCache();
+  const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts, invoices: cachedInvoices, setInvoices: setCachedInvoices, currentShopId } = useDataCache();
   const { branding } = useShopBranding();
   
   // API data states - Start with empty arrays, will load from API
@@ -134,6 +136,12 @@ export const CreateInvoice: React.FC = () => {
   const [quickAddPrice, setQuickAddPrice] = useState<number>(0);
   const [quickAddQty, setQuickAddQty] = useState<number>(1);
   
+  // Quick customer registration modal state
+  const [showCustomerFormModal, setShowCustomerFormModal] = useState(false);
+  
+  // Quick product creation modal state
+  const [showProductFormModal, setShowProductFormModal] = useState(false);
+  
   // Invoice dates
   const [buyingDate, setBuyingDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState(
@@ -142,6 +150,13 @@ export const CreateInvoice: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'bank_transfer' | 'credit'>('cash');
   const [salesChannel, setSalesChannel] = useState<'on-site' | 'online'>('on-site');
   const [notes, setNotes] = useState('');
+
+  // Reset payment method when walk-in is selected (no credit allowed)
+  useEffect(() => {
+    if (isWalkIn && paymentMethod === 'credit') {
+      setPaymentMethod('cash');
+    }
+  }, [isWalkIn, paymentMethod]);
 
   // Resizable panels state
   const [leftPanelWidth, setLeftPanelWidth] = useState(55); // percentage
@@ -231,8 +246,38 @@ export const CreateInvoice: React.FC = () => {
     });
   }, [products, productSearch]);
 
+  // Helper function to map product warranty text to warranty code
+  const mapWarrantyToCode = (warranty: string | undefined): string => {
+    if (!warranty) return '';
+    const lower = warranty.toLowerCase();
+    if (lower.includes('lifetime')) return 'L/W';
+    if (lower.includes('10 year')) return '10Y';
+    if (lower.includes('5 year')) return '05Y';
+    if (lower.includes('3 year')) return '03Y';
+    if (lower.includes('2 year')) return '02Y';
+    if (lower.includes('1 year') || lower.includes('one year')) return '01Y';
+    if (lower.includes('6 month')) return '06M';
+    if (lower.includes('3 month')) return '03M';
+    if (lower.includes('1 month') || lower.includes('one month')) return '01M';
+    return '';
+  };
+
+  // Calculate warranty due date based on warranty code
+  const calculateWarrantyDueDate = (warrantyCode: string): string => {
+    if (!warrantyCode) return '';
+    const option = warrantyOptions.find(o => o.value === warrantyCode);
+    if (!option || option.days === 0) return '';
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + option.days);
+    return dueDate.toISOString().split('T')[0];
+  };
+
   const addItem = (product: Product) => {
     const unitPrice = product.price;
+    
+    // Auto-select warranty based on product's warranty field
+    const warrantyCode = mapWarrantyToCode(product.warranty);
+    const warrantyDueDate = calculateWarrantyDueDate(warrantyCode);
     
     const newItem: ExtendedInvoiceItem = {
       productId: product.id,
@@ -241,7 +286,7 @@ export const CreateInvoice: React.FC = () => {
       unitPrice,
       originalPrice: unitPrice,
       total: unitPrice,
-      warrantyDueDate: '',
+      warrantyDueDate,
     };
 
     const existingItem = items.find((i) => i.productId === product.id);
@@ -256,6 +301,36 @@ export const CreateInvoice: React.FC = () => {
     } else {
       setItems([...items, newItem]);
     }
+  };
+
+  // Handle new customer registration from modal
+  const handleNewCustomerSave = (newCustomer: Customer) => {
+    // Add to customers list
+    setCustomers(prev => [newCustomer, ...prev]);
+    // Auto-select the new customer
+    setSelectedCustomer(newCustomer.id);
+    // Turn off walk-in mode if it was on
+    setIsWalkIn(false);
+    // Close modal
+    setShowCustomerFormModal(false);
+    // Show success toast
+    toast.success('Customer Registered', {
+      description: `${newCustomer.name} has been added and selected.`,
+    });
+  };
+
+  // Handle new product creation from modal
+  const handleNewProductSave = (newProduct: Product) => {
+    // Add to products list
+    setProducts(prev => [newProduct, ...prev]);
+    // Auto-add to invoice items
+    addItem(newProduct);
+    // Close modal
+    setShowProductFormModal(false);
+    // Show success toast
+    toast.success('Product Added', {
+      description: `${newProduct.name} has been added to invoice.`,
+    });
   };
 
   // Quick add item (not in inventory)
@@ -361,51 +436,59 @@ export const CreateInvoice: React.FC = () => {
     if ((!selectedCustomer && !isWalkIn) || items.length === 0) return;
 
     const customerName = isWalkIn ? 'Walk-in Customer' : (currentCustomer?.name || 'Unknown');
-    const customerId = isWalkIn ? 'walk-in' : selectedCustomer;
+    const customerId = isWalkIn ? null : selectedCustomer; // null for walk-in customers
     const now = new Date().toISOString();
     
     setIsSubmitting(true);
 
     // Try to create via API first
     try {
-      // Only try API if not walk-in (API requires valid customer ID)
-      if (!isWalkIn && customerId) {
-        const apiInvoice = await invoiceService.create({
-          customerId,
-          items: items.map(item => ({
-            productId: item.productId,
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            originalPrice: item.originalPrice,
-            discount: item.originalPrice ? item.originalPrice - item.unitPrice : 0,
-            total: item.total,
-            warrantyDueDate: item.warrantyDueDate || undefined,
-          })),
-          subtotal: Math.round(subtotal * 100) / 100,
-          tax: Math.round(tax * 100) / 100,
-          discount: Math.round(discountAmount * 100) / 100,
-          total: Math.round(total * 100) / 100,
-          dueDate,
-          paymentMethod: denormalizePaymentMethod(paymentMethod),
-          salesChannel: denormalizeSalesChannel(salesChannel),
-          paidAmount: paymentMethod === 'credit' ? 0 : Math.round(total * 100) / 100,
-          notes: undefined,
-        });
+      // Prepare invoice data
+      const invoiceData = {
+        customerId: customerId || undefined, // undefined for walk-in (omit from request)
+        items: items.map(item => ({
+          productId: item.productId || undefined, // undefined for quick-add items
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          originalPrice: item.originalPrice,
+          discount: item.originalPrice ? item.originalPrice - item.unitPrice : 0,
+          total: item.total,
+          warrantyDueDate: item.warrantyDueDate || undefined,
+        })),
+        subtotal: Math.round(subtotal * 100) / 100,
+        tax: Math.round(tax * 100) / 100,
+        discount: Math.round(discountAmount * 100) / 100,
+        total: Math.round(total * 100) / 100,
+        dueDate,
+        paymentMethod: denormalizePaymentMethod(paymentMethod),
+        salesChannel: denormalizeSalesChannel(salesChannel),
+        paidAmount: paymentMethod === 'credit' ? 0 : Math.round(total * 100) / 100,
+        notes: undefined,
+      };
+      
+      console.log('📤 Sending invoice data to API:', JSON.stringify(invoiceData, null, 2));
+      
+      // Try API for all invoices (including walk-in with null customerId)
+      // Pass shopId for SuperAdmin viewing other shops
+      const apiInvoice = await invoiceService.create(invoiceData, currentShopId || undefined);
 
-        console.log('✅ Invoice created via API:', apiInvoice.invoiceNumber);
-        
-        toast.success('Invoice created successfully', {
-          description: `Invoice #${apiInvoice.invoiceNumber} has been created.`,
-        });
-        
-        // Convert API response to frontend format for print preview
-        const convertedInvoice = convertAPIInvoiceToFrontend(apiInvoice);
-        setCreatedInvoice(convertedInvoice as Invoice & { buyingDate: string });
-        setShowPrintPreview(true);
-        setIsSubmitting(false);
-        return;
-      }
+      console.log('✅ Invoice created via API:', apiInvoice.invoiceNumber);
+      
+      toast.success('Invoice created successfully', {
+        description: `Invoice #${apiInvoice.invoiceNumber} has been created.`,
+      });
+      
+      // Convert API response to frontend format for print preview
+      const convertedInvoice = convertAPIInvoiceToFrontend(apiInvoice);
+      
+      // Add the new invoice to the cache so it appears immediately on the invoices page
+      setCachedInvoices(prev => [convertedInvoice, ...prev]);
+      
+      setCreatedInvoice(convertedInvoice as Invoice & { buyingDate: string });
+      setShowPrintPreview(true);
+      setIsSubmitting(false);
+      return;
     } catch (error) {
       console.warn('⚠️ API not available, creating invoice locally:', error);
       toast.error('Failed to save to database', {
@@ -417,7 +500,7 @@ export const CreateInvoice: React.FC = () => {
     // Local invoice creation (fallback or for walk-in customers)
     const invoice: Invoice & { buyingDate: string } = {
       id: generateInvoiceNumber(),
-      customerId,
+      customerId: customerId || 'walk-in', // Use 'walk-in' for local storage
       customerName,
       items: items.map(item => ({
         productId: item.productId,
@@ -501,7 +584,8 @@ export const CreateInvoice: React.FC = () => {
         totalOrders: 0,
         creditBalance: 0,
         creditLimit: 0,
-        creditStatus: 'clear' as const
+        creditStatus: 'clear' as const,
+        customerType: 'REGULAR' as const
       };
     }
     return customers.find(c => c.id === createdInvoice.customerId) || null;
@@ -808,17 +892,29 @@ export const CreateInvoice: React.FC = () => {
                     Select Customer
                   </span>
                 </div>
-                <button
-                  onClick={() => { setIsWalkIn(!isWalkIn); setSelectedCustomer(''); }}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    isWalkIn
-                      ? 'bg-purple-500 text-white'
-                      : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  <UserX className="w-4 h-4" />
-                  Walk-in
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowCustomerFormModal(true)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                    }`}
+                    title="Register a new customer"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Register
+                  </button>
+                  <button
+                    onClick={() => { setIsWalkIn(!isWalkIn); setSelectedCustomer(''); }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      isWalkIn
+                        ? 'bg-purple-500 text-white'
+                        : theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    <UserX className="w-4 h-4" />
+                    Walk-in
+                  </button>
+                </div>
               </div>
 
               {isWalkIn ? (
@@ -901,17 +997,29 @@ export const CreateInvoice: React.FC = () => {
                     Double-click price to edit
                   </span>
                 </div>
-                <button
-                  onClick={() => setShowQuickAdd(!showQuickAdd)}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    showQuickAdd
-                      ? 'bg-amber-500 text-white'
-                      : theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-50 text-amber-600'
-                  }`}
-                >
-                  <Zap className="w-4 h-4" />
-                  Quick Add
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowProductFormModal(true)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      theme === 'dark' ? 'bg-teal-500/20 text-teal-400 hover:bg-teal-500/30' : 'bg-teal-50 text-teal-600 hover:bg-teal-100'
+                    }`}
+                    title="Add a new product to inventory"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Product
+                  </button>
+                  <button
+                    onClick={() => setShowQuickAdd(!showQuickAdd)}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      showQuickAdd
+                        ? 'bg-amber-500 text-white'
+                        : theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-50 text-amber-600'
+                    }`}
+                  >
+                    <Zap className="w-4 h-4" />
+                    Quick Add
+                  </button>
+                </div>
               </div>
 
               {/* Quick Add Panel */}
@@ -1065,23 +1173,36 @@ export const CreateInvoice: React.FC = () => {
                       { key: 'card', label: 'Card', icon: CreditCard },
                       { key: 'bank_transfer', label: 'Bank', icon: Building2 },
                       { key: 'credit', label: 'Credit', icon: Receipt },
-                    ].map(({ key, label, icon: Icon }) => (
-                      <button
-                        key={key}
-                        onClick={() => setPaymentMethod(key as typeof paymentMethod)}
-                        className={`p-3 rounded-xl text-center transition-all border-2 ${
-                          paymentMethod === key
-                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent'
-                            : theme === 'dark' 
-                              ? 'bg-slate-700/50 hover:bg-slate-700 text-slate-300 border-slate-600' 
-                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        <Icon className="w-5 h-5 mx-auto mb-1" />
-                        <span className="text-xs font-medium">{label}</span>
-                      </button>
-                    ))}
+                    ].map(({ key, label, icon: Icon }) => {
+                      const isCreditDisabled = key === 'credit' && isWalkIn;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => !isCreditDisabled && setPaymentMethod(key as typeof paymentMethod)}
+                          disabled={isCreditDisabled}
+                          title={isCreditDisabled ? 'Credit not available for walk-in customers' : undefined}
+                          className={`p-3 rounded-xl text-center transition-all border-2 ${
+                            isCreditDisabled
+                              ? 'opacity-40 cursor-not-allowed bg-slate-500/20 border-slate-500/30 text-slate-400'
+                              : paymentMethod === key
+                                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent'
+                                : theme === 'dark' 
+                                  ? 'bg-slate-700/50 hover:bg-slate-700 text-slate-300 border-slate-600' 
+                                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          <Icon className="w-5 h-5 mx-auto mb-1" />
+                          <span className="text-xs font-medium">{label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
+                  {isWalkIn && (
+                    <p className={`text-xs mt-2 flex items-center gap-1 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                      <AlertCircle className="w-3 h-3" />
+                      Credit payment is not available for walk-in customers
+                    </p>
+                  )}
                 </div>
 
                 {/* Sales Channel */}
@@ -1434,6 +1555,23 @@ export const CreateInvoice: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Customer Registration Modal */}
+      <CustomerFormModal
+        isOpen={showCustomerFormModal}
+        onClose={() => setShowCustomerFormModal(false)}
+        onSave={handleNewCustomerSave}
+        shopId={currentShopId || undefined}
+      />
+
+      {/* Product Creation Modal */}
+      <ProductFormModal
+        isOpen={showProductFormModal}
+        onClose={() => setShowProductFormModal(false)}
+        onSave={handleNewProductSave}
+        autoAddToInvoice={true}
+        shopId={currentShopId || undefined}
+      />
     </div>
   );
 };

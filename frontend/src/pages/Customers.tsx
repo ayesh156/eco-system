@@ -1,23 +1,56 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useDataCache } from '../contexts/DataCacheContext';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   mockCustomers, 
   mockWhatsAppSettings, 
   mockInvoices
 } from '../data/mockData';
 import type { Customer, Invoice, CustomerPayment } from '../data/mockData';
+import { customerService, type APICustomer } from '../services/customerService';
+import { invoiceService, convertAPIInvoiceToFrontend } from '../services/invoiceService';
 import { CustomerFormModal } from '../components/modals/CustomerFormModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { CustomerStatementModal } from '../components/modals/CustomerStatementModal';
+import { CustomerBulkPaymentModal } from '../components/modals/CustomerBulkPaymentModal';
 import { 
   Search, Plus, Edit, Trash2, Mail, Phone, AlertTriangle, CheckCircle, 
   Clock, CreditCard, Calendar, MessageCircle, Package, FileText,
   X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal,
-  List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc, Zap
+  List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc, Zap, Loader2, AlertCircle, CheckCircle2
 } from 'lucide-react';
+
+// Helper to convert API Customer to frontend Customer format
+const convertAPICustomerToFrontend = (apiCustomer: APICustomer): Customer => ({
+  id: apiCustomer.id,
+  name: apiCustomer.name,
+  email: apiCustomer.email || '',
+  phone: apiCustomer.phone || '',
+  address: apiCustomer.address || '',
+  creditBalance: apiCustomer.creditBalance || 0,
+  totalSpent: apiCustomer.totalSpent || 0,
+  totalOrders: apiCustomer.totalOrders || 0,
+  creditStatus: (apiCustomer.creditStatus?.toLowerCase() || 'clear') as 'clear' | 'active' | 'overdue',
+  lastPurchase: apiCustomer.lastPurchase || undefined,
+  createdAt: apiCustomer.createdAt,
+  notes: apiCustomer.notes || '',
+  nic: apiCustomer.nic || '',
+  customerType: apiCustomer.customerType as 'REGULAR' | 'WHOLESALE' | 'DEALER' | 'CORPORATE' | 'VIP' || 'REGULAR',
+  creditLimit: apiCustomer.creditLimit || 0,
+  creditDueDate: apiCustomer.creditDueDate || undefined,
+  paymentHistory: [],
+});
 
 export const Customers: React.FC = () => {
   const { theme } = useTheme();
+  const { setCustomers: setCachedCustomers, setInvoices: setCachedInvoices } = useDataCache();
+  const { isViewingShop, viewingShop } = useAuth();
+  
+  // Get effective shopId for SUPER_ADMIN viewing a shop
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
@@ -48,18 +81,120 @@ export const Customers: React.FC = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
+  const [isBulkPaymentModalOpen, setIsBulkPaymentModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>(undefined);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [customerForStatement, setCustomerForStatement] = useState<Customer | null>(null);
+  const [customerForPayment, setCustomerForPayment] = useState<Customer | null>(null);
   
-  // Local customers state for demo
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  // Local customers state - loads from API
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
   
-  // Invoices state for tracking payments
-  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
+  // Highlighted customer (newly created/updated)
+  const [highlightedCustomerId, setHighlightedCustomerId] = useState<string | null>(null);
+  
+  // Invoices state for tracking payments - loaded from API
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
 
   // WhatsApp settings
   const whatsAppSettings = mockWhatsAppSettings;
+  
+  // Location for receiving navigation state
+  const location = useLocation();
+
+  // Helper to update a single customer in cache
+  const updateCustomer = useCallback((updatedCustomer: Customer) => {
+    // Update local state
+    setCustomers(prev => prev.map(c => 
+      c.id === updatedCustomer.id ? updatedCustomer : c
+    ));
+    // Update global cache
+    setCachedCustomers(prev => prev.map(c => 
+      c.id === updatedCustomer.id ? updatedCustomer : c
+    ));
+  }, [setCachedCustomers]);
+
+  // Helper to update a single invoice in cache
+  const updateInvoice = useCallback((updatedInvoice: Invoice) => {
+    // Update local state
+    setInvoices(prev => prev.map(inv => 
+      inv.id === updatedInvoice.id || inv.apiId === updatedInvoice.apiId ? updatedInvoice : inv
+    ));
+    // Update global cache
+    setCachedInvoices(prev => prev.map(inv => 
+      inv.id === updatedInvoice.id || inv.apiId === updatedInvoice.apiId ? updatedInvoice : inv
+    ));
+  }, [setCachedInvoices]);
+
+  // Load invoices from API
+  const loadInvoices = async (customerId?: string) => {
+    setInvoicesLoading(true);
+    try {
+      const { invoices: apiInvoices } = await invoiceService.getAll({
+        customerId,
+        limit: 100,
+        sortBy: 'date',
+        sortOrder: 'desc',
+        shopId: effectiveShopId,
+      });
+      const frontendInvoices = apiInvoices.map(convertAPIInvoiceToFrontend);
+      
+      if (customerId) {
+        // Update only invoices for this customer
+        setInvoices(prev => {
+          const otherInvoices = prev.filter(inv => inv.customerId !== customerId);
+          return [...otherInvoices, ...frontendInvoices];
+        });
+      } else {
+        setInvoices(frontendInvoices);
+      }
+    } catch (error) {
+      console.error('Failed to load invoices:', error);
+      // Fallback to mock data on error
+      if (invoices.length === 0) {
+        setInvoices(mockInvoices);
+      }
+    } finally {
+      setInvoicesLoading(false);
+    }
+  };
+
+  // Load customers from API
+  useEffect(() => {
+    const loadCustomers = async () => {
+      setIsLoading(true);
+      setApiError(null);
+      
+      try {
+        const { customers: customersData } = await customerService.getAll({ shopId: effectiveShopId });
+        const frontendCustomers = customersData.map(convertAPICustomerToFrontend);
+        setCustomers(frontendCustomers);
+        setCachedCustomers(frontendCustomers); // Sync with cache for other pages
+        
+        // Check if we have a highlighted customer from navigation
+        const state = location.state as { highlightCustomerId?: string; highlightCustomerName?: string } | null;
+        if (state?.highlightCustomerId) {
+          setHighlightedCustomerId(state.highlightCustomerId);
+          // Clear the highlight after 5 seconds
+          setTimeout(() => setHighlightedCustomerId(null), 5000);
+          // Clear the location state
+          window.history.replaceState({}, document.title);
+        }
+      } catch (error) {
+        console.error('Failed to load customers:', error);
+        setApiError(error instanceof Error ? error.message : 'Failed to load customers');
+        // Fallback to mock data
+        setCustomers(mockCustomers);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadCustomers();
+  }, [location.state, effectiveShopId, setCachedCustomers]);
 
   // Update itemsPerPage when view mode changes
   useEffect(() => {
@@ -183,7 +318,7 @@ export const Customers: React.FC = () => {
     return { totalCredit, overdueCount, activeCount, clearCount };
   }, [customers]);
 
-  const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-LK')}`;
+  const formatCurrency = (amount: number | undefined | null) => `Rs. ${(amount ?? 0).toLocaleString('en-LK')}`;
 
   const formatDateDisplay = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -383,125 +518,230 @@ export const Customers: React.FC = () => {
 
   const handleSaveCustomer = (customer: Customer) => {
     if (selectedCustomer) {
-      setCustomers(prev => prev.map(c => c.id === customer.id ? customer : c));
+      // Update existing customer
+      const updater = (prev: Customer[]) => prev.map(c => c.id === customer.id ? customer : c);
+      setCustomers(updater);
+      setCachedCustomers(updater); // Sync with cache for other pages
     } else {
-      setCustomers(prev => [...prev, customer]);
+      // Add new customer
+      const updater = (prev: Customer[]) => [customer, ...prev];
+      setCustomers(updater); // Add to beginning so it's visible
+      setCachedCustomers(updater); // Sync with cache for other pages
     }
+    // Highlight the saved customer
+    setHighlightedCustomerId(customer.id);
+    setTimeout(() => setHighlightedCustomerId(null), 5000);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (customerToDelete) {
-      setCustomers(prev => prev.filter(c => c.id !== customerToDelete.id));
+      const deleteUpdater = (prev: Customer[]) => prev.filter(c => c.id !== customerToDelete.id);
+      try {
+        await customerService.delete(customerToDelete.id, effectiveShopId);
+        setCustomers(deleteUpdater);
+        setCachedCustomers(deleteUpdater); // Sync with cache for other pages
+      } catch (error) {
+        console.error('Failed to delete customer:', error);
+        // Still remove from UI for demo
+        setCustomers(deleteUpdater);
+        setCachedCustomers(deleteUpdater);
+      }
       setIsDeleteModalOpen(false);
       setCustomerToDelete(null);
     }
   };
 
   // Statement modal handlers
-  const handleViewStatement = (customer: Customer) => {
+  const handleViewStatement = async (customer: Customer) => {
     setCustomerForStatement(customer);
     setIsStatementModalOpen(true);
+    // Load invoices for this customer from API
+    await loadInvoices(customer.id);
+  };
+
+  // Bulk payment modal handlers
+  const handleOpenBulkPayment = async (customer: Customer) => {
+    setCustomerForPayment(customer);
+    setIsBulkPaymentModalOpen(true);
+    // Preload invoices for this customer
+    await loadInvoices(customer.id);
+  };
+
+  /**
+   * Handle bulk credit payment - Distributes payment across unpaid invoices
+   * This allows paying off total outstanding balance across multiple invoices
+   * Payment is distributed to oldest invoices first (FIFO)
+   */
+  const handleBulkPaymentSubmit = async (
+    customerId: string, 
+    amount: number, 
+    paymentMethod: 'cash' | 'bank' | 'card' | 'cheque', 
+    notes?: string
+  ): Promise<void> => {
+    // Map frontend payment method to API format
+    const apiPaymentMethod = {
+      'cash': 'CASH',
+      'bank': 'BANK_TRANSFER',
+      'card': 'CARD',
+      'cheque': 'CHEQUE',
+    }[paymentMethod] as 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE';
+
+    // Get customer's unpaid invoices from API (sorted by date - oldest first)
+    const { invoices: customerInvoices } = await invoiceService.getAll({
+      customerId,
+      limit: 100,
+      sortBy: 'date',
+      sortOrder: 'asc',
+      shopId: effectiveShopId,
+    });
+
+    // Filter unpaid invoices and calculate outstanding amounts
+    const unpaidInvoices = customerInvoices
+      .filter(inv => inv.status !== 'FULLPAID' && inv.status !== 'CANCELLED' && inv.status !== 'REFUNDED')
+      .map(inv => ({
+        ...inv,
+        outstanding: inv.total - inv.paidAmount,
+      }))
+      .filter(inv => inv.outstanding > 0)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Oldest first
+
+    // Distribute payment across invoices (FIFO - oldest first)
+    let remainingPayment = amount;
+    const paymentResults: { invoiceId: string; invoiceNumber: string; amountPaid: number }[] = [];
+
+    for (const invoice of unpaidInvoices) {
+      if (remainingPayment <= 0) break;
+
+      const paymentForThisInvoice = Math.min(remainingPayment, invoice.outstanding);
+      
+      try {
+        // Record payment via API
+        await invoiceService.addPayment(invoice.id, {
+          amount: paymentForThisInvoice,
+          paymentMethod: apiPaymentMethod,
+          notes: notes ? `${notes} (Bulk payment)` : 'Bulk credit payment from Customer section',
+        });
+
+        paymentResults.push({
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          amountPaid: paymentForThisInvoice,
+        });
+
+        remainingPayment -= paymentForThisInvoice;
+      } catch (error) {
+        console.error(`Failed to add payment to invoice ${invoice.invoiceNumber}:`, error);
+        // Continue with other invoices even if one fails
+      }
+    }
+
+    console.log('💰 Bulk payment distributed:', paymentResults);
+
+    // Reload invoices to get updated state
+    await loadInvoices(customerId);
+
+    // Reload customer to get updated credit balance
+    // Note: Backend's addPayment already updated customer.creditBalance automatically
+    try {
+      const updatedCustomer = await customerService.getById(customerId, effectiveShopId);
+
+      // Update local state with refreshed customer data
+      const updater = (prev: Customer[]) => prev.map(c => {
+        if (c.id === customerId) {
+          return {
+            ...c,
+            creditBalance: updatedCustomer.creditBalance,
+            creditStatus: (updatedCustomer.creditStatus?.toLowerCase() || 'clear') as 'clear' | 'active' | 'overdue',
+            totalSpent: updatedCustomer.totalSpent || c.totalSpent,
+          };
+        }
+        return c;
+      });
+      
+      setCustomers(updater);
+      setCachedCustomers(updater);
+
+      // Update customerForStatement if viewing the same customer
+      if (customerForStatement?.id === customerId) {
+        setCustomerForStatement(prev => prev ? {
+          ...prev,
+          creditBalance: updatedCustomer.creditBalance,
+          creditStatus: (updatedCustomer.creditStatus?.toLowerCase() || 'clear') as 'clear' | 'active' | 'overdue',
+          totalSpent: updatedCustomer.totalSpent || prev.totalSpent,
+        } : null);
+      }
+    } catch (error) {
+      console.error('Failed to reload customer:', error);
+    }
   };
 
   type PaymentMethod = 'cash' | 'bank' | 'card' | 'cheque';
 
   /**
-   * Handle payment from invoice - Updates both invoice and customer credit
+   * Handle payment from invoice - Updates both invoice and customer credit via API
    * This creates a bi-directional sync between invoice payments and customer credit
    */
-  const handleMarkInvoiceAsPaid = (invoiceId: string, amount: number, paymentMethod: PaymentMethod = 'cash', notes?: string) => {
+  const handleMarkInvoiceAsPaid = async (invoiceId: string, amount: number, paymentMethod: PaymentMethod = 'cash', notes?: string) => {
     const invoice = invoices.find(inv => inv.id === invoiceId);
     if (!invoice) return;
 
-    // Create payment entry with source tracking
-    const paymentEntry: CustomerPayment = {
-      id: `PAY-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      invoiceId,
-      amount,
-      paymentDate: new Date().toISOString(),
-      paymentMethod,
-      notes,
-      source: 'invoice', // Payment initiated from invoice
-      appliedToInvoices: [{ invoiceId, amount }]
+    // Get the actual database UUID for API call
+    const apiId = invoice.apiId || invoiceId;
+
+    // Map payment method to API format
+    const paymentMethodMap: Record<PaymentMethod, 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE'> = {
+      'cash': 'CASH',
+      'card': 'CARD',
+      'bank': 'BANK_TRANSFER',
+      'cheque': 'CHEQUE'
     };
 
-    // Update invoice with payment
-    setInvoices(prev => prev.map(inv => {
-      if (inv.id === invoiceId) {
-        const newPaidAmount = Math.min((inv.paidAmount || 0) + amount, inv.total);
-        const newStatus = newPaidAmount >= inv.total ? 'fullpaid' : newPaidAmount > 0 ? 'halfpay' : 'unpaid';
-        
-        return { 
-          ...inv, 
-          paidAmount: newPaidAmount, 
-          status: newStatus,
-          lastPaymentDate: new Date().toISOString(),
-          payments: [...(inv.payments || []), {
-            id: paymentEntry.id,
-            invoiceId,
-            amount,
-            paymentDate: new Date().toISOString(),
-            paymentMethod,
-            notes
-          }],
-          // Track credit settlement
-          creditSettlements: [...(inv.creditSettlements || []), {
-            paymentId: paymentEntry.id,
-            amount,
-            date: new Date().toISOString()
-          }]
-        };
-      }
-      return inv;
-    }));
-
-    // Bi-directional sync: Update customer credit balance
-    if (customerForStatement) {
-      setCustomers(prev => prev.map(c => {
-        if (c.id === customerForStatement.id) {
-          const newCreditBalance = Math.max(0, c.creditBalance - amount);
-          
-          // Determine new credit status
-          let newStatus: 'clear' | 'active' | 'overdue' = c.creditStatus;
-          if (newCreditBalance === 0) {
-            newStatus = 'clear';
-          }
-          
-          // Update creditInvoices - remove if fully paid
-          const updatedInvoice = invoices.find(inv => inv.id === invoiceId);
-          const isNowFullyPaid = updatedInvoice && ((updatedInvoice.paidAmount || 0) + amount >= updatedInvoice.total);
-          const newCreditInvoices = isNowFullyPaid 
-            ? (c.creditInvoices || []).filter(id => id !== invoiceId)
-            : c.creditInvoices || [];
-          
-          return { 
-            ...c, 
-            creditBalance: newCreditBalance, 
-            creditStatus: newStatus,
-            creditInvoices: newCreditInvoices,
-            paymentHistory: [...(c.paymentHistory || []), paymentEntry]
-          };
-        }
-        return c;
-      }));
-
-      // Update customerForStatement for immediate UI update
-      setCustomerForStatement(prev => {
-        if (!prev) return prev;
-        const newCreditBalance = Math.max(0, prev.creditBalance - amount);
-        const updatedInvoice = invoices.find(inv => inv.id === invoiceId);
-        const isNowFullyPaid = updatedInvoice && ((updatedInvoice.paidAmount || 0) + amount >= updatedInvoice.total);
-        
-        return {
-          ...prev,
-          creditBalance: newCreditBalance,
-          creditStatus: newCreditBalance === 0 ? 'clear' : prev.creditStatus,
-          creditInvoices: isNowFullyPaid 
-            ? (prev.creditInvoices || []).filter(id => id !== invoiceId)
-            : prev.creditInvoices || [],
-          paymentHistory: [...(prev.paymentHistory || []), paymentEntry]
-        };
+    try {
+      // Call API to record payment - this also updates customer credit automatically
+      await invoiceService.addPayment(apiId, {
+        amount,
+        paymentMethod: paymentMethodMap[paymentMethod],
+        notes: notes || `Payment recorded from Statement`
       });
+
+      // Reload invoices from API to get updated data
+      if (customerForStatement) {
+        await loadInvoices(customerForStatement.id);
+        
+        // Also update the global invoice cache
+        try {
+          const { invoices: apiInvoices } = await invoiceService.getAll({
+            customerId: customerForStatement.id,
+            limit: 100,
+            shopId: effectiveShopId,
+          });
+          const updatedInvoices = apiInvoices.map(convertAPIInvoiceToFrontend);
+          
+          // Update global cache with fresh invoice data
+          setCachedInvoices(prev => {
+            const otherInvoices = prev.filter(inv => inv.customerId !== customerForStatement.id);
+            return [...otherInvoices, ...updatedInvoices];
+          });
+        } catch (err) {
+          console.error('Failed to update invoice cache:', err);
+        }
+        
+        // Reload customer data to get updated credit balance
+        try {
+          const updatedCustomer = await customerService.getById(customerForStatement.id, effectiveShopId);
+          if (updatedCustomer) {
+            // Update statement modal customer
+            setCustomerForStatement(updatedCustomer);
+            // Update cache via helper
+            updateCustomer(updatedCustomer);
+          }
+        } catch (err) {
+          console.error('Failed to reload customer:', err);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to record payment:', error);
+      // Show error to user - could add toast notification here
     }
   };
 
@@ -649,8 +889,41 @@ export const Customers: React.FC = () => {
     window.location.href = whatsappUrl;
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className={`w-10 h-10 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+        <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Loading customers...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* API Error Alert */}
+      {apiError && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-amber-500 font-medium">Warning</p>
+            <p className={`text-sm ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+              {apiError}. Showing cached data.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Success Banner for newly saved customer */}
+      {highlightedCustomerId && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3 animate-pulse">
+          <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+          <p className={`font-medium ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+            Customer saved successfully! Highlighted below.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -1075,6 +1348,18 @@ export const Customers: React.FC = () => {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          {/* Record Payment Button - only show if has credit */}
+                          {hasCredit && (
+                            <button
+                              onClick={() => handleOpenBulkPayment(customer)}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                theme === 'dark' ? 'hover:bg-emerald-500/10 text-emerald-400' : 'hover:bg-emerald-50 text-emerald-600'
+                              }`}
+                              title="Record Payment"
+                            >
+                              <CreditCard className="w-4 h-4" />
+                            </button>
+                          )}
                           {/* Statement Button */}
                           <button
                             onClick={() => handleViewStatement(customer)}
@@ -1234,22 +1519,34 @@ export const Customers: React.FC = () => {
             const isOverdue = customer.creditStatus === 'overdue';
             const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue > 0;
             const hasCredit = (customer.creditBalance || 0) > 0;
+            const isHighlighted = highlightedCustomerId === customer.id;
 
             return (
               <div 
                 key={customer.id}
-                className={`rounded-2xl border overflow-hidden transition-all hover:shadow-lg ${
-                  isOverdue
-                    ? theme === 'dark' 
-                      ? 'bg-slate-800/30 border-red-500/50 shadow-red-500/10' 
-                      : 'bg-white border-red-300 shadow-red-100'
-                    : theme === 'dark' 
-                      ? 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/30' 
-                      : 'bg-white border-slate-200 hover:border-emerald-500/50'
+                className={`rounded-2xl border overflow-hidden transition-all duration-500 hover:shadow-lg ${
+                  isHighlighted
+                    ? theme === 'dark'
+                      ? 'bg-emerald-950/30 border-emerald-500/50 ring-2 ring-emerald-500/30 shadow-emerald-500/20 shadow-lg'
+                      : 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/30 shadow-emerald-500/20 shadow-lg'
+                    : isOverdue
+                      ? theme === 'dark' 
+                        ? 'bg-slate-800/30 border-red-500/50 shadow-red-500/10' 
+                        : 'bg-white border-red-300 shadow-red-100'
+                      : theme === 'dark' 
+                        ? 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/30' 
+                        : 'bg-white border-slate-200 hover:border-emerald-500/50'
                 }`}
               >
+                {/* Newly Saved Badge */}
+                {isHighlighted && (
+                  <div className="bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-medium px-3 py-1.5 flex items-center justify-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Successfully Saved!
+                  </div>
+                )}
                 {/* Overdue Warning Banner */}
-              {isOverdue && (
+              {isOverdue && !isHighlighted && (
                 <div className="bg-gradient-to-r from-red-500 to-rose-500 px-4 py-2 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-white" />
                   <span className="text-white text-sm font-medium">
@@ -1403,26 +1700,37 @@ export const Customers: React.FC = () => {
                   
                   {/* Quick Actions */}
                   {hasCredit && (
-                    <div className="flex gap-2">
+                    <div className="space-y-2">
+                      {/* Record Payment Button - Primary Action */}
                       <button 
-                        onClick={() => sendFriendlyReminder(customer)}
-                        className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
-                          theme === 'dark' ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-green-50 text-green-600 hover:bg-green-100'
-                        }`}
+                        onClick={() => handleOpenBulkPayment(customer)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
                       >
-                        <MessageCircle className="w-3.5 h-3.5" /> Remind
+                        <CreditCard className="w-4 h-4" /> Record Payment
                       </button>
-                      <button 
-                        onClick={() => sendUrgentReminder(customer)}
-                        className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
-                          isOverdue
-                            ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white'
-                            : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
-                        }`}
-                      >
-                        <Zap className="w-3.5 h-3.5" /> 
-                        Urgent!
-                      </button>
+                      
+                      {/* Reminder Buttons */}
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => sendFriendlyReminder(customer)}
+                          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
+                            theme === 'dark' ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-green-50 text-green-600 hover:bg-green-100'
+                          }`}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" /> Remind
+                        </button>
+                        <button 
+                          onClick={() => sendUrgentReminder(customer)}
+                          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
+                            isOverdue
+                              ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white'
+                              : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
+                          }`}
+                        >
+                          <Zap className="w-3.5 h-3.5" /> 
+                          Urgent!
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1577,6 +1885,7 @@ export const Customers: React.FC = () => {
         customer={selectedCustomer}
         onClose={() => setIsFormModalOpen(false)}
         onSave={handleSaveCustomer}
+        shopId={effectiveShopId}
       />
 
       <DeleteConfirmationModal
@@ -1592,12 +1901,23 @@ export const Customers: React.FC = () => {
         isOpen={isStatementModalOpen}
         customer={customerForStatement}
         invoices={invoices}
+        isLoading={invoicesLoading}
         onClose={() => {
           setIsStatementModalOpen(false);
           setCustomerForStatement(null);
         }}
         onMarkAsPaid={handleMarkInvoiceAsPaid}
         onSendReminder={handleSendInvoiceReminder}
+      />
+
+      <CustomerBulkPaymentModal
+        isOpen={isBulkPaymentModalOpen}
+        customer={customerForPayment}
+        onClose={() => {
+          setIsBulkPaymentModalOpen(false);
+          setCustomerForPayment(null);
+        }}
+        onSubmit={handleBulkPaymentSubmit}
       />
     </div>
   );
