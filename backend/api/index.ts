@@ -653,8 +653,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ==================== UPDATE INVOICE ====================
     const invoiceUpdateMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)$/);
     if (invoiceUpdateMatch && (method === 'PUT' || method === 'PATCH')) {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Require authentication for multi-tenant isolation (use effectiveShopId for SuperAdmin)
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
@@ -674,8 +674,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
-      // CRITICAL: Verify ownership before update
-      if (existingInvoice.shopId !== shopId) {
+      // CRITICAL: Verify ownership before update (use effectiveShopId for SuperAdmin viewing)
+      if (existingInvoice.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
       }
       
@@ -759,8 +759,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ==================== DELETE INVOICE ====================
     const invoiceDeleteMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)$/);
     if (invoiceDeleteMatch && method === 'DELETE') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Require authentication for multi-tenant isolation (use effectiveShopId for SuperAdmin)
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
@@ -779,8 +779,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
-      // CRITICAL: Verify ownership before deleting
-      if (existingInvoice.shopId !== shopId) {
+      // CRITICAL: Verify ownership before deleting (use effectiveShopId for SuperAdmin viewing)
+      if (existingInvoice.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
       }
       
@@ -795,8 +795,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ==================== ADD PAYMENT ====================
     const paymentMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/payments$/);
     if (paymentMatch && method === 'POST') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Require authentication for multi-tenant isolation (use effectiveShopId for SuperAdmin)
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
@@ -825,8 +825,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
-      // CRITICAL: Verify ownership before adding payment
-      if (existingInvoice.shopId !== shopId) {
+      // CRITICAL: Verify ownership before adding payment (use effectiveShopId for SuperAdmin viewing)
+      if (existingInvoice.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
       }
       
@@ -871,8 +871,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // GET reminders for an invoice
     const reminderGetMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/reminders$/);
     if (reminderGetMatch && method === 'GET') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Require authentication for multi-tenant isolation (use effectiveShopId for SuperAdmin)
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
@@ -891,8 +891,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
-      // CRITICAL: Verify ownership before returning reminders
-      if (existingInvoice.shopId !== shopId) {
+      // CRITICAL: Verify ownership before returning reminders (use effectiveShopId for SuperAdmin viewing)
+      if (existingInvoice.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
       }
       
@@ -911,13 +911,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // POST - Create a new reminder for an invoice
     const reminderPostMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/reminders$/);
     if (reminderPostMatch && method === 'POST') {
-      // Require shopId for multi-tenant isolation
-      if (!shopId) {
+      // Require authentication for multi-tenant isolation (use effectiveShopId for SuperAdmin)
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
       const invoiceId = reminderPostMatch[1];
-      // NOTE: Don't destructure shopId from body - use authenticated shopId
+      // NOTE: Don't destructure shopId from body - use effectiveShopId
       const { type, channel, message, customerPhone, customerName } = body;
       
       // Find invoice by ID or invoice number
@@ -942,16 +942,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(404).json({ success: false, error: 'Invoice not found' });
       }
       
-      // CRITICAL: Verify ownership before creating reminder
-      if (existingInvoice.shopId !== shopId) {
+      // CRITICAL: Verify ownership before creating reminder (use effectiveShopId for SuperAdmin viewing)
+      if (existingInvoice.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
       }
       
-      // Create the reminder - use authenticated shopId, not from request body
+      // Create the reminder - use effectiveShopId for SuperAdmin shop viewing
       const reminder = await db.invoiceReminder.create({
         data: {
           invoiceId: existingInvoice.id,
-          shopId: shopId, // CRITICAL: Always use authenticated shopId
+          shopId: effectiveShopId, // CRITICAL: Use effectiveShopId for SuperAdmin viewing
           type: type?.toUpperCase() === 'OVERDUE' ? 'OVERDUE' : 'PAYMENT',
           channel: channel || 'whatsapp',
           message: message || '',
