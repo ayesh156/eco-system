@@ -5,7 +5,7 @@ import {
   MessageCircle, Zap, Check, ChevronDown, ChevronUp, Receipt,
   Banknote, Building2, Wallet, History, Loader2
 } from 'lucide-react';
-import type { Customer, Invoice, CustomerPayment } from '../../data/mockData';
+import type { Customer, Invoice } from '../../data/mockData';
 
 type PaymentMethod = 'cash' | 'bank' | 'card' | 'cheque';
 
@@ -128,11 +128,12 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
     // Get payments from invoice.payments array (API data)
     if (invoice?.payments && invoice.payments.length > 0) {
       invoice.payments.forEach(p => {
+        const method = p.paymentMethod as string;
         entries.push({
           id: p.id,
           amount: p.amount,
           paymentDate: p.paymentDate,
-          paymentMethod: p.paymentMethod === 'bank_transfer' ? 'bank' : p.paymentMethod as PaymentHistoryEntry['paymentMethod'],
+          paymentMethod: method === 'bank_transfer' ? 'bank' : method as PaymentHistoryEntry['paymentMethod'],
           notes: p.notes,
           source: p.notes?.includes('Bulk payment') ? 'bulk' : 'direct'
         });
@@ -147,11 +148,12 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
           const existingEntry = entries.find(e => e.id === p.id);
           if (!existingEntry) {
             const appliedAmount = p.appliedToInvoices?.find(a => a.invoiceId === invoiceId)?.amount || p.amount;
+            const method = p.paymentMethod as string;
             entries.push({
               id: p.id,
               amount: appliedAmount,
               paymentDate: p.paymentDate,
-              paymentMethod: p.paymentMethod === 'bank_transfer' ? 'bank' : p.paymentMethod as PaymentHistoryEntry['paymentMethod'],
+              paymentMethod: method === 'bank_transfer' ? 'bank' : method as PaymentHistoryEntry['paymentMethod'],
               notes: p.notes,
               source: p.source === 'customer' ? 'bulk' : 'direct'
             });

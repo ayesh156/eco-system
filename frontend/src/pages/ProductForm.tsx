@@ -256,7 +256,6 @@ export const ProductForm: React.FC = () => {
       
       // Levenshtein distance based similarity
       const maxLen = Math.max(s1.length, s2.length);
-      let distance = 0;
       const len1 = s1.length;
       const len2 = s2.length;
       

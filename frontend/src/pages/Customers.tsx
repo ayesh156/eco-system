@@ -117,18 +117,6 @@ export const Customers: React.FC = () => {
     ));
   }, [setCachedCustomers]);
 
-  // Helper to update a single invoice in cache
-  const updateInvoice = useCallback((updatedInvoice: Invoice) => {
-    // Update local state
-    setInvoices(prev => prev.map(inv => 
-      inv.id === updatedInvoice.id || inv.apiId === updatedInvoice.apiId ? updatedInvoice : inv
-    ));
-    // Update global cache
-    setCachedInvoices(prev => prev.map(inv => 
-      inv.id === updatedInvoice.id || inv.apiId === updatedInvoice.apiId ? updatedInvoice : inv
-    ));
-  }, [setCachedInvoices]);
-
   // Load invoices from API
   const loadInvoices = async (customerId?: string) => {
     setInvoicesLoading(true);
@@ -730,10 +718,10 @@ export const Customers: React.FC = () => {
         try {
           const updatedCustomer = await customerService.getById(customerForStatement.id, effectiveShopId);
           if (updatedCustomer) {
-            // Update statement modal customer
-            setCustomerForStatement(updatedCustomer);
+            // Update statement modal customer - convert APICustomer to Customer type
+            setCustomerForStatement(updatedCustomer as unknown as Customer);
             // Update cache via helper
-            updateCustomer(updatedCustomer);
+            updateCustomer(updatedCustomer as unknown as Customer);
           }
         } catch (err) {
           console.error('Failed to reload customer:', err);

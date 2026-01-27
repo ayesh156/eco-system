@@ -55,7 +55,7 @@ export const CreateInvoice: React.FC = () => {
   const { settings: taxSettings } = useTaxSettings();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
-  const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts, invoices: cachedInvoices, setInvoices: setCachedInvoices, currentShopId } = useDataCache();
+  const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts, setInvoices: setCachedInvoices, currentShopId } = useDataCache();
   const { branding } = useShopBranding();
   
   // API data states - Start with empty arrays, will load from API
