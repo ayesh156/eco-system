@@ -33,22 +33,41 @@ const REFRESH_TOKEN_EXPIRES_IN = '7d';
 function createEmailTransporter() {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT || '587');
-  const secure = process.env.SMTP_SECURE === 'true';
+  const secure = port === 465; // Only use secure for port 465
   const user = process.env.SMTP_USER || '';
   const pass = process.env.SMTP_PASS || '';
 
+  console.log('📧 Creating email transporter:', { host, port, secure, userSet: !!user, passSet: !!pass });
+
   if (!user || !pass) {
-    console.warn('⚠️ SMTP credentials not configured. Email sending will fail.');
+    console.warn('⚠️ SMTP credentials not configured. SMTP_USER:', !!user, 'SMTP_PASS:', !!pass);
     return null;
   }
 
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: { user, pass },
-    tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' },
-  });
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { 
+        user, 
+        pass 
+      },
+      // Gmail specific settings
+      tls: {
+        rejectUnauthorized: false, // Allow self-signed certs
+        ciphers: 'SSLv3',
+      },
+      debug: true,
+      logger: true,
+    });
+    
+    console.log('📧 Email transporter created successfully');
+    return transporter;
+  } catch (error: any) {
+    console.error('❌ Failed to create email transporter:', error.message);
+    return null;
+  }
 }
 
 // Format currency for email
@@ -1596,56 +1615,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // POST - Send invoice email with PDF attachment
     const sendEmailWithPdfMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/send-email-with-pdf$/);
     if (sendEmailWithPdfMatch && method === 'POST') {
-      console.log('📧 send-email-with-pdf endpoint hit');
-      console.log('📧 effectiveShopId:', effectiveShopId);
-      
-      if (!effectiveShopId) {
-        return res.status(401).json({ success: false, message: 'Authentication required' });
-      }
-      
-      const invoiceId = sendEmailWithPdfMatch[1];
-      console.log('📧 invoiceId:', invoiceId);
-      
-      // For Vercel, redirect to the Express backend if configured (for full PDF support)
-      const backendUrl = process.env.BACKEND_URL || process.env.EXPRESS_API_URL;
-      if (backendUrl) {
-        console.log('📧 Redirecting to backend:', backendUrl);
-        return res.redirect(307, `${backendUrl}/api/v1/invoices/${invoiceId}/send-email-with-pdf`);
-      }
-      
-      console.log('📧 No backend URL, sending email directly from Vercel');
-      
-      // Fallback: Send email WITHOUT PDF attachment in serverless mode
-      // This is better than returning 501 error - customer still gets the invoice details
-      const invoice = await db.invoice.findFirst({
-        where: {
-          OR: [
-            { id: invoiceId },
-            { invoiceNumber: invoiceId },
-            { invoiceNumber: invoiceId.replace(/^INV-/, '') },
-          ],
-          shopId: effectiveShopId,
-        },
-        include: {
-          customer: true,
-          shop: true,
-          items: { include: { product: true } },
-        },
-      });
-      
-      if (!invoice) {
-        return res.status(404).json({ success: false, error: 'Invoice not found' });
-      }
-      
-      if (!invoice.customer) {
-        return res.status(400).json({ success: false, error: 'Invoice has no registered customer' });
-      }
-      
-      if (!invoice.customer.email) {
-        return res.status(400).json({ success: false, error: 'Customer does not have an email address' });
-      }
-      
       try {
+        console.log('📧 send-email-with-pdf endpoint hit');
+        console.log('📧 effectiveShopId:', effectiveShopId);
+        
+        if (!effectiveShopId) {
+          return res.status(401).json({ success: false, message: 'Authentication required' });
+        }
+        
+        const invoiceId = sendEmailWithPdfMatch[1];
+        console.log('📧 invoiceId:', invoiceId);
+        
+        // For Vercel, redirect to the Express backend if configured (for full PDF support)
+        const backendUrl = process.env.BACKEND_URL || process.env.EXPRESS_API_URL;
+        if (backendUrl) {
+          console.log('📧 Redirecting to backend:', backendUrl);
+          return res.redirect(307, `${backendUrl}/api/v1/invoices/${invoiceId}/send-email-with-pdf`);
+        }
+        
+        console.log('📧 No backend URL, sending email directly from Vercel');
+        console.log('📧 SMTP_USER configured:', !!process.env.SMTP_USER);
+        console.log('📧 SMTP_PASS configured:', !!process.env.SMTP_PASS);
+        
+        // Fallback: Send email WITHOUT PDF attachment in serverless mode
+        // This is better than returning 501 error - customer still gets the invoice details
+        console.log('📧 Fetching invoice from database...');
+        const invoice = await db.invoice.findFirst({
+          where: {
+            OR: [
+              { id: invoiceId },
+              { invoiceNumber: invoiceId },
+              { invoiceNumber: invoiceId.replace(/^INV-/, '') },
+            ],
+            shopId: effectiveShopId,
+          },
+          include: {
+            customer: true,
+            shop: true,
+            items: { include: { product: true } },
+          },
+        });
+        
+        console.log('📧 Invoice found:', !!invoice);
+        
+        if (!invoice) {
+          return res.status(404).json({ success: false, error: 'Invoice not found' });
+        }
+        
+        if (!invoice.customer) {
+          return res.status(400).json({ success: false, error: 'Invoice has no registered customer' });
+        }
+        
+        if (!invoice.customer.email) {
+          return res.status(400).json({ success: false, error: 'Customer does not have an email address' });
+        }
+        
+        console.log('📧 Customer email:', invoice.customer.email);
+        
         // Calculate invoice amounts
         const subtotal = invoice.items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0);
         const tax = invoice.tax || 0;
@@ -1654,6 +1680,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const paidAmount = invoice.paidAmount || 0;
         const dueAmount = total - paidAmount;
         
+        console.log('📧 Calling sendInvoiceEmail...');
+        
         // Send the actual email (without PDF attachment in serverless mode)
         const emailResult = await sendInvoiceEmail({
           to: invoice.customer.email,
@@ -1661,31 +1689,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           invoiceNumber: invoice.invoiceNumber,
           invoiceDate: new Date(invoice.date || invoice.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
           dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
-        items: invoice.items.map((item: any) => ({
-          productName: item.product?.name || item.productName || 'Item',
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          total: item.quantity * item.unitPrice,
-          warranty: item.warranty || item.product?.warranty || undefined,
-        })),
-        subtotal,
-        tax,
-        discount,
-        total,
-        paidAmount,
-        dueAmount,
-        status: invoice.status,
-        shopName: invoice.shop?.name || 'Your Shop',
-        shopPhone: invoice.shop?.phone || undefined,
-        shopEmail: invoice.shop?.email || undefined,
-        shopAddress: invoice.shop?.address || undefined,
+          items: invoice.items.map((item: any) => ({
+            productName: item.product?.name || item.productName || 'Item',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            total: item.quantity * item.unitPrice,
+            warranty: item.warranty || item.product?.warranty || undefined,
+          })),
+          subtotal,
+          tax,
+          discount,
+          total,
+          paidAmount,
+          dueAmount,
+          status: invoice.status,
+          shopName: invoice.shop?.name || 'Your Shop',
+          shopPhone: invoice.shop?.phone || undefined,
+          shopEmail: invoice.shop?.email || undefined,
+          shopAddress: invoice.shop?.address || undefined,
         });
+        
+        console.log('📧 Email result:', emailResult);
         
         if (!emailResult.success) {
           return res.status(500).json({
             success: false,
             error: emailResult.error || 'Failed to send email',
             message: 'Email sending failed. Please check SMTP configuration.',
+            smtpConfigured: !!process.env.SMTP_USER && !!process.env.SMTP_PASS,
           });
         }
         
@@ -1710,12 +1741,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             hasPdfAttachment: false, // PDF not attached in serverless mode - use Download PDF button
           },
         });
-      } catch (emailError: any) {
-        console.error('❌ Email sending error:', emailError);
+      } catch (error: any) {
+        console.error('❌ send-email-with-pdf error:', error.message, error.stack);
         return res.status(500).json({
           success: false,
-          error: emailError.message || 'Unknown email error',
-          message: 'Failed to send invoice email. Please check SMTP configuration in Vercel environment variables (SMTP_HOST, SMTP_USER, SMTP_PASS).',
+          error: error.message || 'Unknown error',
+          message: 'Failed to send invoice email',
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+          smtpConfigured: !!process.env.SMTP_USER && !!process.env.SMTP_PASS,
         });
       }
     }
