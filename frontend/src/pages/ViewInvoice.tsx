@@ -17,6 +17,7 @@ import {
   denormalizeStatus,
 } from '../services/invoiceService';
 import { reminderService } from '../services/reminderService';
+import { downloadPDFFromElement, openWhatsAppWithMessage } from '../services/clientPdfService';
 import {
   FileText, ArrowLeft, Printer, Edit3, User, Phone,
   Package, CheckCircle, Clock,
@@ -548,9 +549,9 @@ export const ViewInvoice: React.FC = () => {
     }
   };
 
-  // Send invoice PDF via WhatsApp - Simple approach: Download PDF + Open WhatsApp Web
+  // Send invoice PDF via WhatsApp - Download PDF locally + Open WhatsApp Web
   const handleWhatsAppPDF = async () => {
-    if (!invoice || !apiInvoiceId) {
+    if (!invoice) {
       toast.error('Cannot send via WhatsApp', {
         description: 'Invoice data is not available',
       });
@@ -565,22 +566,21 @@ export const ViewInvoice: React.FC = () => {
       return;
     }
 
-    try {
-      // Step 1: Download the PDF first
-      toast.loading('Downloading PDF...', { id: 'whatsapp-pdf' });
-      await invoiceService.downloadAndSavePDF(apiInvoiceId, invoice.id, effectiveShopId);
-      
-      // Step 2: Format phone number for WhatsApp
-      let phone = customerPhone.replace(/[-\s]/g, '');
-      if (phone.startsWith('0')) {
-        phone = '94' + phone.substring(1);
-      }
-      if (!phone.startsWith('94') && !phone.startsWith('+94')) {
-        phone = '94' + phone;
-      }
-      phone = phone.replace('+', '');
+    // Find the printable invoice element
+    const printElement = printRef.current;
+    if (!printElement) {
+      toast.error('Cannot generate PDF', {
+        description: 'Print area not found',
+      });
+      return;
+    }
 
-      // Step 3: Build WhatsApp message
+    try {
+      // Step 1: Download the PDF first (client-side generation)
+      toast.loading('Generating PDF...', { id: 'whatsapp-pdf' });
+      await downloadPDFFromElement(printElement, `Invoice-${invoice.id}.pdf`);
+      
+      // Step 2: Build WhatsApp message
       const dueAmount = invoice.total - (invoice.paidAmount || 0);
       const statusText = invoice.status === 'fullpaid' ? '✅ PAID' : 
                          invoice.status === 'halfpay' ? '⚠️ PARTIALLY PAID' : 
@@ -602,9 +602,8 @@ ${dueAmount > 0 ? `⚠️ *Balance Due:* Rs.${dueAmount.toLocaleString()}` : ''}
 
 Thank you for your business! 🙏`;
 
-      // Step 4: Open WhatsApp Web with message
-      const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
+      // Step 3: Open WhatsApp Web with message
+      openWhatsAppWithMessage(customerPhone, message);
       
       toast.success('PDF Downloaded! WhatsApp opened.', { 
         id: 'whatsapp-pdf',
@@ -621,11 +620,20 @@ Thank you for your business! 🙏`;
     }
   };
 
-  // Download invoice as PDF from backend
+  // Download invoice as PDF (client-side generation)
   const handleDownloadPDF = async () => {
-    if (!invoice || !apiInvoiceId) {
+    if (!invoice) {
       toast.error('Cannot download PDF', {
         description: 'Invoice data is not available',
+      });
+      return;
+    }
+    
+    // Find the printable invoice element
+    const printElement = printRef.current;
+    if (!printElement) {
+      toast.error('Cannot generate PDF', {
+        description: 'Print area not found',
       });
       return;
     }
@@ -633,7 +641,8 @@ Thank you for your business! 🙏`;
     try {
       toast.loading('Generating PDF...', { id: 'pdf-download' });
       
-      await invoiceService.downloadAndSavePDF(apiInvoiceId, invoice.id, effectiveShopId);
+      // Generate PDF from the PrintableInvoice component
+      await downloadPDFFromElement(printElement, `Invoice-${invoice.id}.pdf`);
       
       toast.success('PDF Downloaded!', { 
         id: 'pdf-download',
@@ -1642,6 +1651,16 @@ Thank you for your business! 🙏`;
         isSaving={isSaving}
         shopId={effectiveShopId}
       />
+
+      {/* Hidden PrintableInvoice for PDF generation (always rendered) */}
+      <div 
+        ref={printRef} 
+        className="fixed left-[-9999px] top-0"
+        style={{ width: '210mm', minHeight: '297mm', backgroundColor: 'white' }}
+        data-pdf-content
+      >
+        <PrintableInvoice invoice={invoice} customer={customer} branding={branding} />
+      </div>
     </div>
   );
 };
