@@ -79,6 +79,7 @@ export const Settings: React.FC = () => {
     { key: '{{daysOverdue}}', desc: 'Days past due date', example: '5' },
     { key: '{{shopName}}', desc: 'Your shop name', example: effectiveShopName },
     { key: '{{shopPhone}}', desc: 'Shop phone', example: effectiveShopPhone },
+    { key: '{{shopEmail}}', desc: 'Shop email', example: effectiveShopEmail },
     { key: '{{shopAddress}}', desc: 'Shop address', example: effectiveShopAddress },
     { key: '{{shopWebsite}}', desc: 'Shop website', example: effectiveShopWebsite || 'www.example.com' },
   ];

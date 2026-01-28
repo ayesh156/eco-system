@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Invoice, InvoiceItem, Product } from '../../data/mockData';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,7 +26,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   onClose,
   onSave,
   isSaving = false,
-  shopId,
+  shopId: _shopId, // Reserved for future SUPER_ADMIN operations
 }) => {
   const { theme } = useTheme();
   const { user } = useAuth();

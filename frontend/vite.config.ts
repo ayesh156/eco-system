@@ -13,16 +13,70 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Vendor chunks
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-popover', 'cmdk'],
-          'vendor-query': ['@tanstack/react-query'],
-          'vendor-lucide': ['lucide-react'],
-          'vendor-utils': ['clsx', 'class-variance-authority', 'tailwind-merge'],
+        manualChunks(id) {
+          // React core libraries (must be first to avoid circular deps)
+          if (id.includes('node_modules/react/') || 
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/scheduler/')) {
+            return 'vendor-react';
+          }
+          
+          // React Router
+          if (id.includes('node_modules/react-router') || 
+              id.includes('node_modules/@remix-run/router')) {
+            return 'vendor-router';
+          }
+          
+          // Radix UI components (largest UI library)
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'vendor-radix';
+          }
+          
+          // Lucide icons (heavy icon set)
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
+          
+          // TanStack Query
+          if (id.includes('node_modules/@tanstack/')) {
+            return 'vendor-query';
+          }
+          
+          // UI utilities
+          if (id.includes('node_modules/clsx') || 
+              id.includes('node_modules/class-variance-authority') || 
+              id.includes('node_modules/tailwind-merge')) {
+            return 'vendor-ui-utils';
+          }
+          
+          // Date/time libraries
+          if (id.includes('node_modules/date-fns')) {
+            return 'vendor-date';
+          }
+          
+          // Google Generative AI (AI Assistant dependency - large)
+          if (id.includes('node_modules/@google/generative-ai')) {
+            return 'vendor-ai';
+          }
+          
+          // PDF/Print libraries
+          if (id.includes('node_modules/jspdf') || 
+              id.includes('node_modules/html2canvas')) {
+            return 'vendor-pdf';
+          }
+          
+          // Command palette UI
+          if (id.includes('node_modules/cmdk')) {
+            return 'vendor-cmdk';
+          }
+          
+          // Remaining node_modules
+          if (id.includes('node_modules/')) {
+            return 'vendor-other';
+          }
         },
       },
     },
-    chunkSizeWarningLimit: 600, // Increased from 500kB to 600kB
+    chunkSizeWarningLimit: 1000, // Allow larger vendor chunks to avoid warnings
   },
 })
