@@ -45,6 +45,21 @@ function createEmailTransporter() {
   }
 
   try {
+    // Use Gmail service directly if using Gmail
+    if (host === 'smtp.gmail.com') {
+      console.log('📧 Using Gmail service configuration');
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { 
+          user, 
+          pass 
+        },
+      });
+      console.log('📧 Gmail transporter created successfully');
+      return transporter;
+    }
+    
+    // Generic SMTP configuration for other providers
     const transporter = nodemailer.createTransport({
       host,
       port,
@@ -53,13 +68,9 @@ function createEmailTransporter() {
         user, 
         pass 
       },
-      // Gmail specific settings
       tls: {
-        rejectUnauthorized: false, // Allow self-signed certs
-        ciphers: 'SSLv3',
+        rejectUnauthorized: false,
       },
-      debug: true,
-      logger: true,
     });
     
     console.log('📧 Email transporter created successfully');
@@ -275,6 +286,19 @@ async function sendInvoiceEmail(data: {
     const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@ecosys.com';
     
     console.log('📧 Sending email from:', fromEmail, 'to:', data.to);
+    
+    // Verify transporter connection first
+    try {
+      console.log('📧 Verifying SMTP connection...');
+      await transporter.verify();
+      console.log('📧 SMTP connection verified successfully');
+    } catch (verifyError: any) {
+      console.error('❌ SMTP verification failed:', verifyError.message);
+      return { 
+        success: false, 
+        error: `SMTP connection failed: ${verifyError.message}. Please check your SMTP credentials (SMTP_USER and SMTP_PASS) in Vercel environment variables.` 
+      };
+    }
     
     const result = await transporter.sendMail({
       from: `"${data.shopName}" <${fromEmail}>`,
