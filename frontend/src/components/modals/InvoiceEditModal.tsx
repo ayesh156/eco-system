@@ -26,7 +26,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   onClose,
   onSave,
   isSaving = false,
-  shopId: _shopId, // Reserved for future SUPER_ADMIN operations
+  shopId, // For SUPER_ADMIN viewing other shops
 }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -375,8 +375,9 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
     
     if (historyRecords.length > 0) {
       try {
-        console.log('📤 Sending history to API...', { targetId, changes: historyRecords });
-        const result = await invoiceItemHistoryService.createHistory(targetId, historyRecords);
+        console.log('📤 Sending history to API...', { targetId, changes: historyRecords, shopId });
+        // Pass shopId for SuperAdmin support
+        const result = await invoiceItemHistoryService.createHistory(targetId, historyRecords, shopId);
         console.log('✅ SUCCESS! Recorded', historyRecords.length, 'change(s) for invoice', invoiceId);
         console.log('✅ API Response:', result);
       } catch (error: any) {
@@ -444,11 +445,13 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
       id: invoice.id,
       apiId: invoice.apiId,
       targetId: invoice.apiId || invoice.id,
+      shopId: shopId,
     });
     try {
       const targetId = invoice.apiId || invoice.id;
-      console.log('📡 Fetching history from API with ID:', targetId);
-      const history = await invoiceItemHistoryService.getHistory(targetId);
+      console.log('📡 Fetching history from API with ID:', targetId, 'shopId:', shopId);
+      // Pass shopId for SuperAdmin viewing other shops
+      const history = await invoiceItemHistoryService.getHistory(targetId, shopId);
       console.log('📜 History loaded:', history.length, 'records', history);
       setHistoryRecords(history);
       setShowHistoryModal(true);

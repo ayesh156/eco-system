@@ -1640,6 +1640,7 @@ Thank you for your business! 🙏`;
         }}
         onSave={handleSaveEdit}
         isSaving={isSaving}
+        shopId={effectiveShopId}
       />
     </div>
   );

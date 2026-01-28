@@ -2200,6 +2200,7 @@ export const Invoices: React.FC = () => {
         }}
         onSave={handleSaveEdit}
         isSaving={isSaving}
+        shopId={effectiveShopId}
       />
 
       <DeleteConfirmationModal
