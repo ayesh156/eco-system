@@ -221,7 +221,7 @@ function generateInvoiceEmailHTML(data: {
   `;
 }
 
-// Send invoice email
+// Send invoice email with optional PDF attachment
 async function sendInvoiceEmail(data: {
   to: string;
   customerName: string;
@@ -240,10 +240,14 @@ async function sendInvoiceEmail(data: {
   shopPhone?: string;
   shopEmail?: string;
   shopAddress?: string;
-}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  pdfBase64?: string; // Optional: Base64-encoded PDF content
+}): Promise<{ success: boolean; messageId?: string; error?: string; hasPdfAttachment?: boolean }> {
+  console.log('📧 sendInvoiceEmail called for:', data.invoiceNumber, 'to:', data.to);
+  
   const transporter = createEmailTransporter();
   
   if (!transporter) {
+    console.error('❌ No transporter - SMTP credentials missing');
     return { success: false, error: 'SMTP not configured. Please set SMTP_USER and SMTP_PASS environment variables.' };
   }
 
@@ -251,17 +255,51 @@ async function sendInvoiceEmail(data: {
     const html = generateInvoiceEmailHTML(data);
     const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@ecosys.com';
     
-    const result = await transporter.sendMail({
+    console.log('📧 Sending email from:', fromEmail, 'to:', data.to);
+    
+    // Verify transporter connection first
+    try {
+      console.log('📧 Verifying SMTP connection...');
+      await transporter.verify();
+      console.log('📧 SMTP connection verified successfully');
+    } catch (verifyError: any) {
+      console.error('❌ SMTP verification failed:', verifyError.message);
+      return { 
+        success: false, 
+        error: `SMTP connection failed: ${verifyError.message}` 
+      };
+    }
+    
+    // Build email options
+    const mailOptions: any = {
       from: `"${data.shopName}" <${fromEmail}>`,
       to: data.to,
       subject: `📄 Invoice #${data.invoiceNumber} from ${data.shopName}`,
       html,
-    });
+    };
 
-    console.log('✅ Invoice email sent:', result.messageId);
-    return { success: true, messageId: result.messageId };
+    // Add PDF attachment if provided
+    let hasPdfAttachment = false;
+    if (data.pdfBase64) {
+      console.log('📧 Adding PDF attachment to email');
+      const base64Data = data.pdfBase64.includes('base64,')
+        ? data.pdfBase64.split('base64,')[1]
+        : data.pdfBase64;
+      
+      mailOptions.attachments = [{
+        filename: `Invoice-${data.invoiceNumber}.pdf`,
+        content: Buffer.from(base64Data, 'base64'),
+        contentType: 'application/pdf',
+      }];
+      hasPdfAttachment = true;
+    }
+
+    const result = await transporter.sendMail(mailOptions);
+
+    console.log('✅ Invoice email sent:', result.messageId, 'with PDF:', hasPdfAttachment);
+    return { success: true, messageId: result.messageId, hasPdfAttachment };
   } catch (error: any) {
-    console.error('❌ Failed to send invoice email:', error.message);
+    console.error('❌ Failed to send invoice email:', error.message, error.stack);
     return { success: false, error: error.message };
   }
 }
@@ -1587,118 +1625,147 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // POST - Send invoice email with PDF attachment
     const sendEmailWithPdfMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/send-email-with-pdf$/);
     if (sendEmailWithPdfMatch && method === 'POST') {
-      if (!effectiveShopId) {
-        return res.status(401).json({ success: false, message: 'Authentication required' });
-      }
-      
-      const invoiceId = sendEmailWithPdfMatch[1];
-      
-      // For Vercel, redirect to the Express backend if configured (for full PDF support)
-      const backendUrl = process.env.BACKEND_URL || process.env.EXPRESS_API_URL;
-      if (backendUrl) {
-        return res.redirect(307, `${backendUrl}/api/v1/invoices/${invoiceId}/send-email-with-pdf`);
-      }
-      
-      // Fallback: Send email WITHOUT PDF attachment in serverless mode
-      // This is better than returning 501 error - customer still gets the invoice details
-      const invoice = await db.invoice.findFirst({
-        where: {
-          OR: [
-            { id: invoiceId },
-            { invoiceNumber: invoiceId },
-            { invoiceNumber: invoiceId.replace(/^INV-/, '') },
-          ],
-          shopId: effectiveShopId,
-        },
-        include: {
-          customer: true,
-          shop: true,
-          items: { include: { product: true } },
-        },
-      });
-      
-      if (!invoice) {
-        return res.status(404).json({ success: false, error: 'Invoice not found' });
-      }
-      
-      if (!invoice.customer) {
-        return res.status(400).json({ success: false, error: 'Invoice has no registered customer' });
-      }
-      
-      if (!invoice.customer.email) {
-        return res.status(400).json({ success: false, error: 'Customer does not have an email address' });
-      }
-      
-      // Calculate invoice amounts
-      let subtotal = 0;
-      const invoiceItems = invoice.items.map((item: any) => {
-        const itemTotal = item.quantity * item.unitPrice;
-        subtotal += itemTotal;
-        return {
-          productName: item.product?.name || item.description || 'Unknown Item',
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          total: itemTotal,
-          warranty: item.warranty || 'No Warranty',
-        };
-      });
-      
-      const discount = Number(invoice.discount) || 0;
-      const tax = Number(invoice.tax) || 0;
-      const grandTotal = subtotal - discount + tax;
-      const paidAmount = Number(invoice.paidAmount) || 0;
-      const dueAmount = Math.max(0, grandTotal - paidAmount);
-      
-      // Send actual email (without PDF attachment in serverless mode)
-      const emailResult = await sendInvoiceEmail({
-        to: invoice.customer.email,
-        customerName: invoice.customer.name,
-        invoiceNumber: invoice.invoiceNumber,
-        invoiceDate: invoice.createdAt.toISOString().split('T')[0],
-        dueDate: invoice.dueDate ? invoice.dueDate.toISOString().split('T')[0] : 'Not Set',
-        items: invoiceItems,
-        subtotal,
-        discount,
-        tax,
-        total: grandTotal,
-        paidAmount,
-        dueAmount,
-        status: 'UNPAID',
-        shopName: invoice.shop?.name || 'Our Shop',
-        shopEmail: invoice.shop?.email || undefined,
-        shopPhone: invoice.shop?.phone || undefined,
-        shopAddress: invoice.shop?.address || undefined,
-      });
-      
-      if (!emailResult.success) {
+      try {
+        console.log('📧 send-email-with-pdf endpoint hit');
+        
+        if (!effectiveShopId) {
+          return res.status(401).json({ success: false, message: 'Authentication required' });
+        }
+        
+        const invoiceId = sendEmailWithPdfMatch[1];
+        console.log('📧 invoiceId:', invoiceId);
+        
+        // Get PDF from request body (generated by client-side)
+        const { pdfBase64 } = body || {};
+        console.log('📧 PDF attachment provided:', !!pdfBase64);
+        
+        // For Vercel, redirect to the Express backend if configured
+        const backendUrl = process.env.BACKEND_URL || process.env.EXPRESS_API_URL;
+        if (backendUrl) {
+          console.log('📧 Redirecting to backend:', backendUrl);
+          return res.redirect(307, `${backendUrl}/api/v1/invoices/${invoiceId}/send-email-with-pdf`);
+        }
+        
+        console.log('📧 Fetching invoice from database...');
+        const invoice = await db.invoice.findFirst({
+          where: {
+            OR: [
+              { id: invoiceId },
+              { invoiceNumber: invoiceId },
+              { invoiceNumber: invoiceId.replace(/^INV-/, '') },
+            ],
+            shopId: effectiveShopId,
+          },
+          include: {
+            customer: true,
+            shop: true,
+            items: { include: { product: true } },
+          },
+        });
+        
+        console.log('📧 Invoice found:', !!invoice);
+        
+        if (!invoice) {
+          return res.status(404).json({ success: false, error: 'Invoice not found' });
+        }
+        
+        if (!invoice.customer) {
+          return res.status(400).json({ success: false, error: 'Invoice has no registered customer' });
+        }
+        
+        if (!invoice.customer.email) {
+          return res.status(400).json({ success: false, error: 'Customer does not have an email address' });
+        }
+        
+        console.log('📧 Customer email:', invoice.customer.email);
+        
+        // Calculate invoice amounts
+        let subtotal = 0;
+        const invoiceItems = invoice.items.map((item: any) => {
+          const itemTotal = item.quantity * item.unitPrice;
+          subtotal += itemTotal;
+          return {
+            productName: item.product?.name || item.description || 'Unknown Item',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            total: itemTotal,
+            warranty: item.warranty || 'No Warranty',
+          };
+        });
+        
+        const discount = Number(invoice.discount) || 0;
+        const tax = Number(invoice.tax) || 0;
+        const grandTotal = subtotal - discount + tax;
+        const paidAmount = Number(invoice.paidAmount) || 0;
+        const dueAmount = Math.max(0, grandTotal - paidAmount);
+        
+        console.log('📧 Calling sendInvoiceEmail...');
+        
+        // Send email with PDF attachment if provided by client
+        const emailResult = await sendInvoiceEmail({
+          to: invoice.customer.email,
+          customerName: invoice.customer.name,
+          invoiceNumber: invoice.invoiceNumber,
+          invoiceDate: invoice.createdAt.toISOString().split('T')[0],
+          dueDate: invoice.dueDate ? invoice.dueDate.toISOString().split('T')[0] : 'Not Set',
+          items: invoiceItems,
+          subtotal,
+          discount,
+          tax,
+          total: grandTotal,
+          paidAmount,
+          dueAmount,
+          status: invoice.status || 'UNPAID',
+          shopName: invoice.shop?.name || 'Our Shop',
+          shopEmail: invoice.shop?.email || undefined,
+          shopPhone: invoice.shop?.phone || undefined,
+          shopAddress: invoice.shop?.address || undefined,
+          pdfBase64: pdfBase64 || undefined, // Pass PDF if client sent it
+        });
+        
+        console.log('📧 Email result:', emailResult);
+        
+        if (!emailResult.success) {
+          return res.status(500).json({
+            success: false,
+            error: emailResult.error || 'Failed to send email',
+            message: 'Email sending failed. Please check SMTP configuration.',
+            smtpConfigured: !!process.env.SMTP_USER && !!process.env.SMTP_PASS,
+          });
+        }
+        
+        // Update invoice email status
+        await db.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            emailSent: true,
+            emailSentAt: new Date(),
+          },
+        });
+        
+        // Return success
+        return res.status(200).json({
+          success: true,
+          message: emailResult.hasPdfAttachment 
+            ? 'Invoice email sent successfully with PDF attachment!' 
+            : 'Invoice email sent successfully (PDF can be downloaded separately)',
+          data: {
+            messageId: emailResult.messageId,
+            sentTo: invoice.customer.email,
+            invoiceNumber: invoice.invoiceNumber,
+            emailSentAt: new Date().toISOString(),
+            hasPdfAttachment: emailResult.hasPdfAttachment || false,
+          },
+        });
+      } catch (error: any) {
+        console.error('❌ send-email-with-pdf error:', error.message, error.stack);
         return res.status(500).json({
           success: false,
-          error: 'Failed to send email',
-          details: emailResult.error,
+          error: error.message || 'Unknown error',
+          message: 'Failed to send invoice email',
+          smtpConfigured: !!process.env.SMTP_USER && !!process.env.SMTP_PASS,
         });
       }
-      
-      // Update invoice email status
-      await db.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          emailSent: true,
-          emailSentAt: new Date(),
-        },
-      });
-      
-      // Return success - email sent (without PDF in serverless mode)
-      return res.status(200).json({
-        success: true,
-        message: 'Invoice email sent successfully (without PDF attachment in serverless mode)',
-        data: {
-          messageId: emailResult.messageId,
-          sentTo: invoice.customer.email,
-          invoiceNumber: invoice.invoiceNumber,
-          emailSentAt: new Date().toISOString(),
-          hasPdfAttachment: false, // Indicate no PDF in serverless mode
-        },
-      });
     }
 
     // ==================== CUSTOMERS (World-Class CRUD) ====================

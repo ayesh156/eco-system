@@ -17,7 +17,7 @@ import {
   denormalizeStatus,
 } from '../services/invoiceService';
 import { reminderService } from '../services/reminderService';
-import { downloadPDFFromElement, openWhatsAppWithMessage } from '../services/clientPdfService';
+import { downloadPDFFromElement, openWhatsAppWithMessage, generatePDFAsDataURL } from '../services/clientPdfService';
 import {
   FileText, ArrowLeft, Printer, Edit3, User, Phone,
   Package, CheckCircle, Clock,
@@ -515,12 +515,31 @@ export const ViewInvoice: React.FC = () => {
       return;
     }
 
+    // Find the printable invoice element
+    const printElement = printRef.current;
+    if (!printElement) {
+      toast.error('Cannot generate PDF', {
+        description: 'Print area not found',
+      });
+      return;
+    }
+
     setIsSendingEmail(true);
     try {
+      // Step 1: Generate PDF client-side as base64
+      toast.loading('Generating PDF...', { id: 'email-pdf' });
+      const pdfBase64 = await generatePDFAsDataURL(printElement, {
+        quality: 0.9,
+        scale: 2,
+        margin: 5,
+      });
+      
+      toast.loading('Sending email with PDF...', { id: 'email-pdf' });
+      
       const invoiceIdForApi = apiInvoiceId || invoice.apiId || invoice.id;
       
-      // Use the new sendEmailWithPDF function that attaches PDF
-      const result = await invoiceService.sendEmailWithPDF(invoiceIdForApi, effectiveShopId);
+      // Step 2: Send email with PDF attachment
+      const result = await invoiceService.sendEmailWithPDF(invoiceIdForApi, effectiveShopId, pdfBase64);
       
       // Update local state to reflect email sent
       const updateWithEmail = (prev: Invoice[]) => prev.map(inv => {
@@ -536,12 +555,18 @@ export const ViewInvoice: React.FC = () => {
       setInvoices(updateWithEmail);
       setCachedInvoices(updateWithEmail);
       
-      toast.success('Invoice sent with PDF attachment!', {
+      const successMessage = result.hasPdfAttachment 
+        ? 'Invoice sent with PDF attachment!' 
+        : 'Invoice sent (PDF download available)';
+      
+      toast.success(successMessage, {
+        id: 'email-pdf',
         description: `Invoice #${invoice.id} emailed to ${result.sentTo}`,
       });
     } catch (error) {
       console.error('❌ Failed to send invoice email:', error);
       toast.error('Failed to send email', {
+        id: 'email-pdf',
         description: error instanceof Error ? error.message : 'Please try again.',
       });
     } finally {

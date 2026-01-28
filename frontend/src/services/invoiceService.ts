@@ -426,8 +426,11 @@ export const invoiceService = {
 
   /**
    * Send invoice via email with PDF attachment
+   * @param invoiceId - Invoice ID or invoice number
+   * @param shopId - Optional shop ID for multi-tenant support
+   * @param pdfBase64 - Optional base64-encoded PDF (generated client-side)
    */
-  async sendEmailWithPDF(invoiceId: string, shopId?: string): Promise<{ 
+  async sendEmailWithPDF(invoiceId: string, shopId?: string, pdfBase64?: string): Promise<{ 
     messageId: string; 
     sentTo: string; 
     invoiceNumber: string; 
@@ -437,7 +440,11 @@ export const invoiceService = {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
     const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email-with-pdf${queryParams}`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pdfBase64 }),
     });
     const result = await handleResponse<APIResponse<{ 
       messageId: string; 
