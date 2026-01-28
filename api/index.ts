@@ -4,6 +4,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient, InvoiceStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
 
 // Global Prisma instance to reuse across requests (prevents cold start issues)
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
@@ -25,6 +26,247 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-change-in-production';
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
+
+// ==================== EMAIL SERVICE FOR VERCEL ====================
+
+// Create nodemailer transporter
+function createEmailTransporter() {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.SMTP_PORT || '587');
+  const secure = process.env.SMTP_SECURE === 'true';
+  const user = process.env.SMTP_USER || '';
+  const pass = process.env.SMTP_PASS || '';
+
+  if (!user || !pass) {
+    console.warn('⚠️ SMTP credentials not configured. Email sending will fail.');
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+    tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' },
+  });
+}
+
+// Format currency for email
+function formatCurrency(amount: number): string {
+  return `Rs. ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Format warranty code for email
+function formatWarrantyCode(warranty?: string): string {
+  if (!warranty) return '[N/W]';
+  const w = warranty.toLowerCase();
+  if (w.includes('lifetime')) return '[L/W]';
+  if (w.includes('year') || w.includes('yr')) {
+    const match = w.match(/(\d+)/);
+    return match ? `[${match[1]}Y]` : '[1Y]';
+  }
+  if (w.includes('month') || w.includes('mo')) {
+    const match = w.match(/(\d+)/);
+    return match ? `[${match[1]}M]` : '[6M]';
+  }
+  if (w === 'no warranty' || w === 'none') return '[N/W]';
+  return '[W]';
+}
+
+// Generate invoice email HTML
+function generateInvoiceEmailHTML(data: {
+  customerName: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  dueDate: string;
+  items: Array<{ productName: string; quantity: number; unitPrice: number; total: number; warranty?: string }>;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  paidAmount: number;
+  dueAmount: number;
+  status: string;
+  shopName: string;
+  shopPhone?: string;
+  shopEmail?: string;
+  shopAddress?: string;
+}): string {
+  const statusColors: Record<string, { bg: string; text: string; label: string }> = {
+    'PAID': { bg: '#10b981', text: '#ffffff', label: '✅ PAID' },
+    'FULLPAID': { bg: '#10b981', text: '#ffffff', label: '✅ PAID' },
+    'fullpaid': { bg: '#10b981', text: '#ffffff', label: '✅ PAID' },
+    'PARTIAL': { bg: '#f59e0b', text: '#ffffff', label: '⚠️ PARTIALLY PAID' },
+    'HALFPAY': { bg: '#f59e0b', text: '#ffffff', label: '⚠️ PARTIALLY PAID' },
+    'halfpay': { bg: '#f59e0b', text: '#ffffff', label: '⚠️ PARTIALLY PAID' },
+    'UNPAID': { bg: '#ef4444', text: '#ffffff', label: '❌ UNPAID' },
+    'unpaid': { bg: '#ef4444', text: '#ffffff', label: '❌ UNPAID' },
+  };
+
+  const statusStyle = statusColors[data.status] || statusColors['UNPAID'];
+  
+  const itemsHtml = data.items.map((item, index) => `
+    <tr style="background-color: ${index % 2 === 0 ? '#f8fafc' : '#ffffff'};">
+      <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">
+        ${item.productName} <span style="color: #10b981; font-size: 11px;">${formatWarrantyCode(item.warranty)}</span>
+      </td>
+      <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">${item.quantity}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">${formatCurrency(item.unitPrice)}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${formatCurrency(item.total)}</td>
+    </tr>
+  `).join('');
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice ${data.invoiceNumber}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border-radius: 16px 16px 0 0; padding: 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700;">📄 INVOICE</h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0; font-size: 16px;">#${data.invoiceNumber}</p>
+    </div>
+    
+    <!-- Main Content -->
+    <div style="background: white; padding: 30px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+      <!-- Shop & Customer Info -->
+      <div style="display: flex; justify-content: space-between; margin-bottom: 25px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px; margin-bottom: 15px;">
+          <h3 style="color: #10b981; margin: 0 0 10px; font-size: 14px; text-transform: uppercase;">From</h3>
+          <p style="margin: 0; font-weight: 600; color: #1e293b;">${data.shopName}</p>
+          ${data.shopAddress ? `<p style="margin: 5px 0 0; color: #64748b; font-size: 13px;">📍 ${data.shopAddress}</p>` : ''}
+          ${data.shopPhone ? `<p style="margin: 3px 0 0; color: #64748b; font-size: 13px;">📞 ${data.shopPhone}</p>` : ''}
+          ${data.shopEmail ? `<p style="margin: 3px 0 0; color: #64748b; font-size: 13px;">✉️ ${data.shopEmail}</p>` : ''}
+        </div>
+        <div style="flex: 1; min-width: 200px; text-align: right;">
+          <h3 style="color: #10b981; margin: 0 0 10px; font-size: 14px; text-transform: uppercase;">Bill To</h3>
+          <p style="margin: 0; font-weight: 600; color: #1e293b;">👤 ${data.customerName}</p>
+          <p style="margin: 8px 0 0; color: #64748b; font-size: 13px;">📅 Date: ${data.invoiceDate}</p>
+          <p style="margin: 3px 0 0; color: #64748b; font-size: 13px;">⏰ Due: ${data.dueDate}</p>
+        </div>
+      </div>
+      
+      <!-- Status Badge -->
+      <div style="text-align: center; margin-bottom: 25px;">
+        <span style="display: inline-block; background-color: ${statusStyle.bg}; color: ${statusStyle.text}; padding: 8px 20px; border-radius: 20px; font-weight: 600; font-size: 14px;">
+          ${statusStyle.label}
+        </span>
+      </div>
+      
+      <!-- Items Table -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+        <thead>
+          <tr style="background-color: #1e293b;">
+            <th style="padding: 12px; text-align: left; color: white; font-size: 13px;">Item</th>
+            <th style="padding: 12px; text-align: center; color: white; font-size: 13px;">Qty</th>
+            <th style="padding: 12px; text-align: right; color: white; font-size: 13px;">Price</th>
+            <th style="padding: 12px; text-align: right; color: white; font-size: 13px;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+      
+      <!-- Totals -->
+      <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: #64748b;">Subtotal:</span>
+          <span style="color: #1e293b;">${formatCurrency(data.subtotal)}</span>
+        </div>
+        ${data.discount > 0 ? `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: #64748b;">Discount:</span>
+          <span style="color: #10b981;">-${formatCurrency(data.discount)}</span>
+        </div>
+        ` : ''}
+        ${data.tax > 0 ? `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: #64748b;">Tax:</span>
+          <span style="color: #1e293b;">${formatCurrency(data.tax)}</span>
+        </div>
+        ` : ''}
+        <div style="display: flex; justify-content: space-between; padding-top: 12px; border-top: 2px solid #e2e8f0;">
+          <span style="font-weight: 700; font-size: 18px; color: #1e293b;">Total:</span>
+          <span style="font-weight: 700; font-size: 18px; color: #10b981;">${formatCurrency(data.total)}</span>
+        </div>
+        ${data.paidAmount > 0 ? `
+        <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+          <span style="color: #64748b;">Paid Amount:</span>
+          <span style="color: #10b981;">${formatCurrency(data.paidAmount)}</span>
+        </div>
+        ` : ''}
+        ${data.dueAmount > 0 ? `
+        <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+          <span style="color: #ef4444; font-weight: 600;">Balance Due:</span>
+          <span style="color: #ef4444; font-weight: 600;">${formatCurrency(data.dueAmount)}</span>
+        </div>
+        ` : ''}
+      </div>
+      
+      <!-- Footer -->
+      <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+        <p style="color: #64748b; font-size: 13px; margin: 0;">Thank you for your business! 🙏</p>
+        <p style="color: #94a3b8; font-size: 12px; margin: 10px 0 0;">This is an automated email from ${data.shopName}</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+// Send invoice email
+async function sendInvoiceEmail(data: {
+  to: string;
+  customerName: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  dueDate: string;
+  items: Array<{ productName: string; quantity: number; unitPrice: number; total: number; warranty?: string }>;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  paidAmount: number;
+  dueAmount: number;
+  status: string;
+  shopName: string;
+  shopPhone?: string;
+  shopEmail?: string;
+  shopAddress?: string;
+}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const transporter = createEmailTransporter();
+  
+  if (!transporter) {
+    return { success: false, error: 'SMTP not configured. Please set SMTP_USER and SMTP_PASS environment variables.' };
+  }
+
+  try {
+    const html = generateInvoiceEmailHTML(data);
+    const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@ecosys.com';
+    
+    const result = await transporter.sendMail({
+      from: `"${data.shopName}" <${fromEmail}>`,
+      to: data.to,
+      subject: `📄 Invoice #${data.invoiceNumber} from ${data.shopName}`,
+      html,
+    });
+
+    console.log('✅ Invoice email sent:', result.messageId);
+    return { success: true, messageId: result.messageId };
+  } catch (error: any) {
+    console.error('❌ Failed to send invoice email:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// ==================== END EMAIL SERVICE ====================
 
 // Cache headers for Vercel Edge Network (Pro feature)
 function setCacheHeaders(res: VercelResponse, maxAge: number = 10, staleWhileRevalidate: number = 59) {
@@ -1199,8 +1441,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ success: false, error: 'Customer does not have an email address' });
       }
       
-      // Note: In Vercel serverless, we'd need to implement email sending here
-      // For now, return a placeholder response - actual email sending happens in the Express backend
+      // Calculate invoice amounts
+      const subtotal = invoice.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+      const tax = invoice.tax || 0;
+      const discount = invoice.discount || 0;
+      const total = invoice.total || (subtotal + tax - discount);
+      const paidAmount = invoice.paidAmount || 0;
+      const dueAmount = total - paidAmount;
+      
+      // Send the actual email
+      const emailResult = await sendInvoiceEmail({
+        to: invoice.customer.email,
+        customerName: invoice.customer.name || invoice.customerName || 'Customer',
+        invoiceNumber: invoice.invoiceNumber,
+        invoiceDate: new Date(invoice.date || invoice.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+        items: invoice.items.map(item => ({
+          productName: item.product?.name || item.productName || 'Item',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.quantity * item.unitPrice,
+          warranty: item.warranty || item.product?.warranty || undefined,
+        })),
+        subtotal,
+        tax,
+        discount,
+        total,
+        paidAmount,
+        dueAmount,
+        status: invoice.status,
+        shopName: invoice.shop?.name || 'Your Shop',
+        shopPhone: invoice.shop?.phone || undefined,
+        shopEmail: invoice.shop?.email || undefined,
+        shopAddress: invoice.shop?.address || undefined,
+      });
+      
+      if (!emailResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: emailResult.error || 'Failed to send email',
+          message: 'Email sending failed. Please check SMTP configuration.',
+        });
+      }
+      
       // Update the invoice to mark as email sent
       await db.invoice.update({
         where: { id: invoice.id },
@@ -1212,9 +1495,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       return res.status(200).json({
         success: true,
-        message: 'Invoice email marked as sent',
+        message: 'Invoice email sent successfully',
         data: {
-          messageId: `vercel-${Date.now()}`,
+          messageId: emailResult.messageId,
           sentTo: invoice.customer.email,
           invoiceNumber: invoice.invoiceNumber,
           emailSentAt: new Date().toISOString(),
@@ -1340,6 +1623,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ success: false, error: 'Customer does not have an email address' });
       }
       
+      // Calculate invoice amounts
+      const subtotal = invoice.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+      const tax = invoice.tax || 0;
+      const discount = invoice.discount || 0;
+      const total = invoice.total || (subtotal + tax - discount);
+      const paidAmount = invoice.paidAmount || 0;
+      const dueAmount = total - paidAmount;
+      
+      // Send the actual email (without PDF attachment in serverless mode)
+      const emailResult = await sendInvoiceEmail({
+        to: invoice.customer.email,
+        customerName: invoice.customer.name || invoice.customerName || 'Customer',
+        invoiceNumber: invoice.invoiceNumber,
+        invoiceDate: new Date(invoice.date || invoice.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+        items: invoice.items.map(item => ({
+          productName: item.product?.name || item.productName || 'Item',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.quantity * item.unitPrice,
+          warranty: item.warranty || item.product?.warranty || undefined,
+        })),
+        subtotal,
+        tax,
+        discount,
+        total,
+        paidAmount,
+        dueAmount,
+        status: invoice.status,
+        shopName: invoice.shop?.name || 'Your Shop',
+        shopPhone: invoice.shop?.phone || undefined,
+        shopEmail: invoice.shop?.email || undefined,
+        shopAddress: invoice.shop?.address || undefined,
+      });
+      
+      if (!emailResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: emailResult.error || 'Failed to send email',
+          message: 'Email sending failed. Please check SMTP configuration.',
+        });
+      }
+      
       // Update invoice email status
       await db.invoice.update({
         where: { id: invoice.id },
@@ -1349,16 +1675,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
       
-      // Return success - email marked as sent (actual email would be sent via configured SMTP)
+      // Return success
       return res.status(200).json({
         success: true,
-        message: 'Invoice email sent successfully (without PDF attachment in serverless mode)',
+        message: 'Invoice email sent successfully (PDF can be downloaded separately)',
         data: {
-          messageId: `vercel-${Date.now()}`,
+          messageId: emailResult.messageId,
           sentTo: invoice.customer.email,
           invoiceNumber: invoice.invoiceNumber,
           emailSentAt: new Date().toISOString(),
-          hasPdfAttachment: false, // Indicate no PDF in serverless mode
+          hasPdfAttachment: false, // PDF not attached in serverless mode - use Download PDF button
         },
       });
     }
