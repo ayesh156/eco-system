@@ -1441,68 +1441,77 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ success: false, error: 'Customer does not have an email address' });
       }
       
-      // Calculate invoice amounts
-      const subtotal = invoice.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-      const tax = invoice.tax || 0;
-      const discount = invoice.discount || 0;
-      const total = invoice.total || (subtotal + tax - discount);
-      const paidAmount = invoice.paidAmount || 0;
-      const dueAmount = total - paidAmount;
-      
-      // Send the actual email
-      const emailResult = await sendInvoiceEmail({
-        to: invoice.customer.email,
-        customerName: invoice.customer.name || invoice.customerName || 'Customer',
-        invoiceNumber: invoice.invoiceNumber,
-        invoiceDate: new Date(invoice.date || invoice.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
-        items: invoice.items.map(item => ({
-          productName: item.product?.name || item.productName || 'Item',
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          total: item.quantity * item.unitPrice,
-          warranty: item.warranty || item.product?.warranty || undefined,
-        })),
-        subtotal,
-        tax,
-        discount,
-        total,
-        paidAmount,
-        dueAmount,
-        status: invoice.status,
-        shopName: invoice.shop?.name || 'Your Shop',
-        shopPhone: invoice.shop?.phone || undefined,
-        shopEmail: invoice.shop?.email || undefined,
-        shopAddress: invoice.shop?.address || undefined,
-      });
-      
-      if (!emailResult.success) {
+      try {
+        // Calculate invoice amounts
+        const subtotal = invoice.items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0);
+        const tax = invoice.tax || 0;
+        const discount = invoice.discount || 0;
+        const total = invoice.total || (subtotal + tax - discount);
+        const paidAmount = invoice.paidAmount || 0;
+        const dueAmount = total - paidAmount;
+        
+        // Send the actual email
+        const emailResult = await sendInvoiceEmail({
+          to: invoice.customer.email,
+          customerName: invoice.customer.name || invoice.customerName || 'Customer',
+          invoiceNumber: invoice.invoiceNumber,
+          invoiceDate: new Date(invoice.date || invoice.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+          items: invoice.items.map((item: any) => ({
+            productName: item.product?.name || item.productName || 'Item',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            total: item.quantity * item.unitPrice,
+            warranty: item.warranty || item.product?.warranty || undefined,
+          })),
+          subtotal,
+          tax,
+          discount,
+          total,
+          paidAmount,
+          dueAmount,
+          status: invoice.status,
+          shopName: invoice.shop?.name || 'Your Shop',
+          shopPhone: invoice.shop?.phone || undefined,
+          shopEmail: invoice.shop?.email || undefined,
+          shopAddress: invoice.shop?.address || undefined,
+        });
+        
+        if (!emailResult.success) {
+          return res.status(500).json({
+            success: false,
+            error: emailResult.error || 'Failed to send email',
+            message: 'Email sending failed. Please check SMTP configuration.',
+          });
+        }
+        
+        // Update the invoice to mark as email sent
+        await db.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            emailSent: true,
+            emailSentAt: new Date(),
+          },
+        });
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Invoice email sent successfully',
+          data: {
+            messageId: emailResult.messageId,
+            sentTo: invoice.customer.email,
+            invoiceNumber: invoice.invoiceNumber,
+            emailSentAt: new Date().toISOString(),
+          },
+        });
+      } catch (emailError: any) {
+        console.error('❌ Email sending error:', emailError);
         return res.status(500).json({
           success: false,
-          error: emailResult.error || 'Failed to send email',
-          message: 'Email sending failed. Please check SMTP configuration.',
+          error: emailError.message || 'Unknown email error',
+          message: 'Failed to send invoice email. Please check SMTP configuration in Vercel environment variables (SMTP_HOST, SMTP_USER, SMTP_PASS).',
         });
       }
-      
-      // Update the invoice to mark as email sent
-      await db.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          emailSent: true,
-          emailSentAt: new Date(),
-        },
-      });
-      
-      return res.status(200).json({
-        success: true,
-        message: 'Invoice email sent successfully',
-        data: {
-          messageId: emailResult.messageId,
-          sentTo: invoice.customer.email,
-          invoiceNumber: invoice.invoiceNumber,
-          emailSentAt: new Date().toISOString(),
-        },
-      });
     }
     
     // GET - Get invoice email status
@@ -1623,22 +1632,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ success: false, error: 'Customer does not have an email address' });
       }
       
-      // Calculate invoice amounts
-      const subtotal = invoice.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-      const tax = invoice.tax || 0;
-      const discount = invoice.discount || 0;
-      const total = invoice.total || (subtotal + tax - discount);
-      const paidAmount = invoice.paidAmount || 0;
-      const dueAmount = total - paidAmount;
-      
-      // Send the actual email (without PDF attachment in serverless mode)
-      const emailResult = await sendInvoiceEmail({
-        to: invoice.customer.email,
-        customerName: invoice.customer.name || invoice.customerName || 'Customer',
-        invoiceNumber: invoice.invoiceNumber,
-        invoiceDate: new Date(invoice.date || invoice.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
-        items: invoice.items.map(item => ({
+      try {
+        // Calculate invoice amounts
+        const subtotal = invoice.items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0);
+        const tax = invoice.tax || 0;
+        const discount = invoice.discount || 0;
+        const total = invoice.total || (subtotal + tax - discount);
+        const paidAmount = invoice.paidAmount || 0;
+        const dueAmount = total - paidAmount;
+        
+        // Send the actual email (without PDF attachment in serverless mode)
+        const emailResult = await sendInvoiceEmail({
+          to: invoice.customer.email,
+          customerName: invoice.customer.name || invoice.customerName || 'Customer',
+          invoiceNumber: invoice.invoiceNumber,
+          invoiceDate: new Date(invoice.date || invoice.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+        items: invoice.items.map((item: any) => ({
           productName: item.product?.name || item.productName || 'Item',
           quantity: item.quantity,
           unitPrice: item.unitPrice,
@@ -1656,37 +1666,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         shopPhone: invoice.shop?.phone || undefined,
         shopEmail: invoice.shop?.email || undefined,
         shopAddress: invoice.shop?.address || undefined,
-      });
-      
-      if (!emailResult.success) {
+        });
+        
+        if (!emailResult.success) {
+          return res.status(500).json({
+            success: false,
+            error: emailResult.error || 'Failed to send email',
+            message: 'Email sending failed. Please check SMTP configuration.',
+          });
+        }
+        
+        // Update invoice email status
+        await db.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            emailSent: true,
+            emailSentAt: new Date(),
+          },
+        });
+        
+        // Return success
+        return res.status(200).json({
+          success: true,
+          message: 'Invoice email sent successfully (PDF can be downloaded separately)',
+          data: {
+            messageId: emailResult.messageId,
+            sentTo: invoice.customer.email,
+            invoiceNumber: invoice.invoiceNumber,
+            emailSentAt: new Date().toISOString(),
+            hasPdfAttachment: false, // PDF not attached in serverless mode - use Download PDF button
+          },
+        });
+      } catch (emailError: any) {
+        console.error('❌ Email sending error:', emailError);
         return res.status(500).json({
           success: false,
-          error: emailResult.error || 'Failed to send email',
-          message: 'Email sending failed. Please check SMTP configuration.',
+          error: emailError.message || 'Unknown email error',
+          message: 'Failed to send invoice email. Please check SMTP configuration in Vercel environment variables (SMTP_HOST, SMTP_USER, SMTP_PASS).',
         });
       }
-      
-      // Update invoice email status
-      await db.invoice.update({
-        where: { id: invoice.id },
-        data: {
-          emailSent: true,
-          emailSentAt: new Date(),
-        },
-      });
-      
-      // Return success
-      return res.status(200).json({
-        success: true,
-        message: 'Invoice email sent successfully (PDF can be downloaded separately)',
-        data: {
-          messageId: emailResult.messageId,
-          sentTo: invoice.customer.email,
-          invoiceNumber: invoice.invoiceNumber,
-          emailSentAt: new Date().toISOString(),
-          hasPdfAttachment: false, // PDF not attached in serverless mode - use Download PDF button
-        },
-      });
     }
 
     // ==================== CUSTOMERS (cached for 30 seconds) ====================
