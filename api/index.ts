@@ -241,15 +241,21 @@ async function sendInvoiceEmail(data: {
   shopEmail?: string;
   shopAddress?: string;
 }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  console.log('📧 sendInvoiceEmail called for:', data.invoiceNumber, 'to:', data.to);
+  console.log('📧 SMTP config check - SMTP_USER set:', !!process.env.SMTP_USER, 'SMTP_PASS set:', !!process.env.SMTP_PASS);
+  
   const transporter = createEmailTransporter();
   
   if (!transporter) {
-    return { success: false, error: 'SMTP not configured. Please set SMTP_USER and SMTP_PASS environment variables.' };
+    console.error('❌ No transporter - SMTP credentials missing');
+    return { success: false, error: 'SMTP not configured. Please set SMTP_USER and SMTP_PASS environment variables in Vercel.' };
   }
 
   try {
     const html = generateInvoiceEmailHTML(data);
     const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@ecosys.com';
+    
+    console.log('📧 Sending email from:', fromEmail, 'to:', data.to);
     
     const result = await transporter.sendMail({
       from: `"${data.shopName}" <${fromEmail}>`,
@@ -261,7 +267,7 @@ async function sendInvoiceEmail(data: {
     console.log('✅ Invoice email sent:', result.messageId);
     return { success: true, messageId: result.messageId };
   } catch (error: any) {
-    console.error('❌ Failed to send invoice email:', error.message);
+    console.error('❌ Failed to send invoice email:', error.message, error.stack);
     return { success: false, error: error.message };
   }
 }
@@ -1590,17 +1596,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // POST - Send invoice email with PDF attachment
     const sendEmailWithPdfMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/send-email-with-pdf$/);
     if (sendEmailWithPdfMatch && method === 'POST') {
+      console.log('📧 send-email-with-pdf endpoint hit');
+      console.log('📧 effectiveShopId:', effectiveShopId);
+      
       if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
       
       const invoiceId = sendEmailWithPdfMatch[1];
+      console.log('📧 invoiceId:', invoiceId);
       
       // For Vercel, redirect to the Express backend if configured (for full PDF support)
       const backendUrl = process.env.BACKEND_URL || process.env.EXPRESS_API_URL;
       if (backendUrl) {
+        console.log('📧 Redirecting to backend:', backendUrl);
         return res.redirect(307, `${backendUrl}/api/v1/invoices/${invoiceId}/send-email-with-pdf`);
       }
+      
+      console.log('📧 No backend URL, sending email directly from Vercel');
       
       // Fallback: Send email WITHOUT PDF attachment in serverless mode
       // This is better than returning 501 error - customer still gets the invoice details
