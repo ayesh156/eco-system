@@ -48,3 +48,9 @@ next-env.d.ts
 # Prisma
 backend/prisma/migrations/*_migration_lock.toml
 .env*.local
+
+# WhatsApp Web.js (local session data - DO NOT COMMIT)
+.wwebjs_auth/
+.wwebjs_cache/
+backend/.wwebjs_auth/
+backend/.wwebjs_cache/

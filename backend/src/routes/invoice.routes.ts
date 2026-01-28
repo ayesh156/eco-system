@@ -12,6 +12,10 @@ import {
   createInvoiceReminder,
   getInvoiceItemHistory,
   createInvoiceItemHistory,
+  sendInvoiceViaEmail,
+  getInvoiceEmailStatus,
+  downloadInvoicePDF,
+  sendInvoiceEmailWithPDF,
 } from '../controllers/invoice.controller';
 import { validateInvoice, validateInvoiceUpdate, validatePayment } from '../validators/invoice.validator';
 
@@ -46,5 +50,19 @@ router.route('/:id/reminders')
 router.route('/:id/item-history')
   .get(getInvoiceItemHistory)
   .post(createInvoiceItemHistory);
+
+// PDF routes - Download invoice as PDF
+router.route('/:id/pdf')
+  .get(downloadInvoicePDF);
+
+// Email routes - Send invoice to customer email
+router.route('/:id/send-email')
+  .post(sendInvoiceViaEmail);
+
+router.route('/:id/send-email-with-pdf')
+  .post(sendInvoiceEmailWithPDF);
+
+router.route('/:id/email-status')
+  .get(getInvoiceEmailStatus);
 
 export default router;

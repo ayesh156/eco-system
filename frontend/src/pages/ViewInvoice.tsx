@@ -21,7 +21,7 @@ import {
   FileText, ArrowLeft, Printer, Edit3, User, Phone,
   Package, CheckCircle, Clock,
   XCircle, Mail, MapPin,
-  Copy, Download, Share2, MoreVertical, TrendingUp, Monitor, X, CircleDollarSign,
+  Copy, Download, MoreVertical, TrendingUp, Monitor, X, CircleDollarSign,
   AlertTriangle, Store, Globe, Shield, MessageCircle, Wallet
 } from 'lucide-react';
 
@@ -73,6 +73,7 @@ export const ViewInvoice: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUsingAPI, setIsUsingAPI] = useState(false);
   const [apiInvoiceId, setApiInvoiceId] = useState<string | null>(null); // Store actual API ID
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // Fetch invoice from API
   const fetchInvoice = useCallback(async () => {
@@ -500,6 +501,153 @@ export const ViewInvoice: React.FC = () => {
     }
   };
 
+  // Send invoice via email with PDF attachment
+  const handleSendEmail = async () => {
+    if (!invoice) return;
+    
+    // Check if customer has email
+    const customerEmail = invoice.customer?.email || customer?.email;
+    if (!customerEmail) {
+      toast.error('Customer email not found!', {
+        description: 'Please add an email address to the customer profile.',
+      });
+      return;
+    }
+
+    setIsSendingEmail(true);
+    try {
+      const invoiceIdForApi = apiInvoiceId || invoice.apiId || invoice.id;
+      
+      // Use the new sendEmailWithPDF function that attaches PDF
+      const result = await invoiceService.sendEmailWithPDF(invoiceIdForApi, effectiveShopId);
+      
+      // Update local state to reflect email sent
+      const updateWithEmail = (prev: Invoice[]) => prev.map(inv => {
+        if (inv.id === invoice.id || inv.apiId === apiInvoiceId) {
+          return {
+            ...inv,
+            emailSent: true,
+            emailSentAt: result.emailSentAt,
+          };
+        }
+        return inv;
+      });
+      setInvoices(updateWithEmail);
+      setCachedInvoices(updateWithEmail);
+      
+      toast.success('Invoice sent with PDF attachment!', {
+        description: `Invoice #${invoice.id} emailed to ${result.sentTo}`,
+      });
+    } catch (error) {
+      console.error('❌ Failed to send invoice email:', error);
+      toast.error('Failed to send email', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // Send invoice PDF via WhatsApp - Simple approach: Download PDF + Open WhatsApp Web
+  const handleWhatsAppPDF = async () => {
+    if (!invoice || !apiInvoiceId) {
+      toast.error('Cannot send via WhatsApp', {
+        description: 'Invoice data is not available',
+      });
+      return;
+    }
+
+    const customerPhone = customer?.phone || invoice.customer?.phone;
+    if (!customerPhone) {
+      toast.error('Customer phone number not found!', {
+        description: 'Please add a phone number to the customer profile.',
+      });
+      return;
+    }
+
+    try {
+      // Step 1: Download the PDF first
+      toast.loading('Downloading PDF...', { id: 'whatsapp-pdf' });
+      await invoiceService.downloadAndSavePDF(apiInvoiceId, invoice.id, effectiveShopId);
+      
+      // Step 2: Format phone number for WhatsApp
+      let phone = customerPhone.replace(/[-\s]/g, '');
+      if (phone.startsWith('0')) {
+        phone = '94' + phone.substring(1);
+      }
+      if (!phone.startsWith('94') && !phone.startsWith('+94')) {
+        phone = '94' + phone;
+      }
+      phone = phone.replace('+', '');
+
+      // Step 3: Build WhatsApp message
+      const dueAmount = invoice.total - (invoice.paidAmount || 0);
+      const statusText = invoice.status === 'fullpaid' ? '✅ PAID' : 
+                         invoice.status === 'halfpay' ? '⚠️ PARTIALLY PAID' : 
+                         '❌ UNPAID';
+
+      const message = `📄 *INVOICE #${invoice.id}*
+
+🏪 *${effectiveShopName}*
+📍 ${effectiveShopAddress}
+📞 ${effectiveShopPhone}
+
+👤 *Customer:* ${invoice.customerName}
+📅 *Date:* ${new Date(invoice.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+💵 *Total:* Rs.${invoice.total.toLocaleString()}
+${dueAmount > 0 ? `⚠️ *Balance Due:* Rs.${dueAmount.toLocaleString()}` : ''}
+📋 *Status:* ${statusText}
+
+📎 *Please find the invoice PDF attached.*
+
+Thank you for your business! 🙏`;
+
+      // Step 4: Open WhatsApp Web with message
+      const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+      
+      toast.success('PDF Downloaded! WhatsApp opened.', { 
+        id: 'whatsapp-pdf',
+        description: 'Please attach the downloaded PDF in WhatsApp',
+        duration: 5000,
+      });
+      setShowActions(false);
+    } catch (error) {
+      console.error('❌ Failed to send via WhatsApp:', error);
+      toast.error('Failed to prepare WhatsApp', { 
+        id: 'whatsapp-pdf',
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
+    }
+  };
+
+  // Download invoice as PDF from backend
+  const handleDownloadPDF = async () => {
+    if (!invoice || !apiInvoiceId) {
+      toast.error('Cannot download PDF', {
+        description: 'Invoice data is not available',
+      });
+      return;
+    }
+    
+    try {
+      toast.loading('Generating PDF...', { id: 'pdf-download' });
+      
+      await invoiceService.downloadAndSavePDF(apiInvoiceId, invoice.id, effectiveShopId);
+      
+      toast.success('PDF Downloaded!', { 
+        id: 'pdf-download',
+        description: `Invoice ${invoice.id} saved successfully` 
+      });
+    } catch (error) {
+      console.error('Failed to download PDF:', error);
+      toast.error('Failed to download PDF', { 
+        id: 'pdf-download',
+        description: error instanceof Error ? error.message : 'Please try again' 
+      });
+    }
+  };
+
   // Check if invoice needs reminder
   const needsReminder = invoice && invoice.status !== 'fullpaid';
   const isInvoiceOverdue = invoice && new Date(invoice.dueDate) < new Date() && invoice.status !== 'fullpaid';
@@ -629,17 +777,18 @@ export const ViewInvoice: React.FC = () => {
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - Keep minimal for clean UI */}
             <button
               onClick={handlePrint}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl font-medium transition-all ${
                 theme === 'dark'
                   ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
                   : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm'
               }`}
+              title="Print Invoice"
             >
               <Printer className="w-4 h-4" />
-              Print
+              <span className="hidden sm:inline">Print</span>
             </button>
 
             <button
@@ -647,59 +796,136 @@ export const ViewInvoice: React.FC = () => {
                 setSelectedInvoice(invoice);
                 setShowEditModal(true);
               }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20"
+              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20"
+              title="Edit Invoice"
             >
               <Edit3 className="w-4 h-4" />
-              Edit Invoice
+              <span className="hidden sm:inline">Edit</span>
             </button>
 
-            {/* WhatsApp Reminder Button - Only show when enabled in settings */}
-            {needsReminder && whatsAppSettings.enabled && (
-              <button
-                onClick={sendWhatsAppReminder}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all shadow-lg ${
-                  isInvoiceOverdue
-                    ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white shadow-red-500/20'
-                    : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-green-500/20'
-                }`}
-                title={isInvoiceOverdue ? 'Send Overdue Reminder via WhatsApp' : 'Send Payment Reminder via WhatsApp'}
-              >
-                <MessageCircle className="w-4 h-4" />
-                {isInvoiceOverdue ? 'Overdue Reminder' : 'WhatsApp Reminder'}
-              </button>
-            )}
-
-            {/* More Actions */}
+            {/* More Actions - Contains all sharing options */}
             <div className="relative">
               <button
                 onClick={() => setShowActions(!showActions)}
-                className={`p-2.5 rounded-xl border transition-all ${
+                className={`p-2 rounded-xl border transition-all ${
                   theme === 'dark'
                     ? 'border-slate-700 hover:bg-slate-800 text-slate-400'
                     : 'border-slate-200 hover:bg-slate-100 text-slate-600'
                 }`}
+                title="More Actions"
               >
                 <MoreVertical className="w-5 h-5" />
               </button>
               {showActions && (
-                <div className={`absolute right-0 mt-2 w-48 rounded-xl border shadow-xl z-10 ${
+                <div className={`absolute right-0 mt-2 w-64 rounded-xl border shadow-xl z-10 overflow-hidden ${
                   theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
                 }`}>
-                  <button className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                    theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
-                  }`}>
-                    <Download className="w-4 h-4" /> Download PDF
+                  {/* Download PDF */}
+                  <button 
+                    onClick={() => {
+                      handleDownloadPDF();
+                      setShowActions(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                      theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <Download className="w-4 h-4 text-blue-500" />
+                    <span>Download PDF</span>
                   </button>
-                  <button className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                    theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
-                  }`}>
-                    <Share2 className="w-4 h-4" /> Share Invoice
+
+                  {/* Email Invoice - Keep menu open while sending */}
+                  {(invoice.customer?.email || customer?.email) && (
+                    <button 
+                      onClick={() => {
+                        handleSendEmail();
+                        // Don't close menu immediately - let it stay open while sending
+                        // Menu will close after success/error via toast
+                      }}
+                      disabled={isSendingEmail}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                        theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                      } ${isSendingEmail ? 'opacity-50 cursor-wait' : ''}`}
+                    >
+                      {isSendingEmail ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                          <span className="flex-1 text-indigo-500">Sending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-4 h-4 text-indigo-500" />
+                          <span className="flex-1">{invoice.emailSent ? 'Resend Email' : 'Email Invoice'}</span>
+                          {invoice.emailSent && <CheckCircle className="w-4 h-4 text-emerald-500" />}
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Send PDF via WhatsApp - Downloads PDF then opens WhatsApp Web */}
+                  {(customer?.phone || invoice.customer?.phone) && (
+                    <button 
+                      onClick={() => handleWhatsAppPDF()}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                        theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <MessageCircle className="w-4 h-4 text-green-600" />
+                      <span className="flex-1">Send PDF via WhatsApp</span>
+                    </button>
+                  )}
+
+                  {/* WhatsApp Reminder - Only show when needed */}
+                  {needsReminder && whatsAppSettings.enabled && (
+                    <button 
+                      onClick={() => {
+                        sendWhatsAppReminder();
+                        setShowActions(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                        isInvoiceOverdue 
+                          ? 'text-red-400 hover:bg-red-500/10' 
+                          : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <MessageCircle className={`w-4 h-4 ${isInvoiceOverdue ? 'text-red-500' : 'text-green-500'}`} />
+                      <span>{isInvoiceOverdue ? 'Send Overdue Reminder' : 'Send Payment Reminder'}</span>
+                    </button>
+                  )}
+
+                  <div className={`border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`} />
+
+                  {/* Copy Invoice Number */}
+                  <button 
+                    onClick={() => {
+                      handleCopyInvoiceNumber();
+                      setShowActions(false);
+                      toast.success('Invoice number copied!');
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                      theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <Copy className="w-4 h-4 text-slate-400" />
+                    <span>Copy Invoice Number</span>
                   </button>
-                  <button className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                    theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
-                  }`}>
-                    <Copy className="w-4 h-4" /> Duplicate
-                  </button>
+
+                  {/* Email Sent Status */}
+                  {invoice.emailSent && invoice.emailSentAt && (
+                    <div className={`px-4 py-3 border-t ${
+                      theme === 'dark' ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'
+                    }`}>
+                      <div className="flex items-center gap-2 text-emerald-500 text-xs">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span>Emailed {new Date(invoice.emailSentAt).toLocaleDateString('en-GB', { 
+                          day: '2-digit', 
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -853,8 +1079,8 @@ export const ViewInvoice: React.FC = () => {
                         Warranty Alerts
                       </h4>
                       <div className="space-y-1">
-                        {warrantyAlerts.map((item: any) => (
-                          <div key={item.productId} className="flex items-center gap-2 text-sm">
+                        {warrantyAlerts.map((item: any, alertIndex: number) => (
+                          <div key={`warranty-alert-${alertIndex}`} className="flex items-center gap-2 text-sm">
                             <Shield className={`w-4 h-4 ${item.warrantyStatus.color === 'red' ? 'text-red-500' : 'text-amber-500'}`} />
                             <span className={theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
                               <strong>{item.productName}</strong>: {item.warrantyStatus.message}

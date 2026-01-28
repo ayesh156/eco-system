@@ -702,13 +702,15 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
             (01M) = 30 Days, (03M) = 90 Days, (06M) = 180 Days, (01Y) = 350 Days, (02Y) = 700 Days, (03Y) = 1050 Days, 
             (05Y) = 1750 Days, (10Y) = 3500 Days, (L/W) = Lifetime Warranty. (N/W) = No Warranty).
           </p>
-          <p>Notes</p>
+          {invoice.notes && (
+            <p style={{ marginTop: '8px', paddingTop: '4px', borderTop: '1px dotted #000' }}>
+              {invoice.notes}
+            </p>
+          )}
         </div>
 
         {/* Footer */}
         <div className="footer-section">
-          <h4>Footer:</h4>
-          <p>Footer</p>
           <p>We know the world is full of choices. Thank you for selecting us.</p>
         </div>
 

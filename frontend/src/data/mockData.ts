@@ -1814,12 +1814,15 @@ export interface Invoice {
   subtotal: number;
   tax: number;
   total: number;
+  discount?: number;
   status: 'unpaid' | 'fullpaid' | 'halfpay';
   paidAmount?: number; // Amount paid so far (for halfpay tracking)
+  dueAmount?: number; // Amount remaining to be paid
   date: string;
   dueDate: string;
   paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'credit';
   salesChannel?: 'on-site' | 'online';
+  notes?: string; // Invoice notes
   // Payment history tracking
   payments?: InvoicePayment[];
   lastPaymentDate?: string; // Last payment date
@@ -1831,6 +1834,9 @@ export interface Invoice {
   reminders?: InvoiceReminder[];
   reminderCount?: number; // Total reminders sent
   lastReminderDate?: string; // Last reminder date
+  // Email tracking
+  emailSent?: boolean; // Whether invoice has been emailed to customer
+  emailSentAt?: string; // ISO date when email was last sent
   // Customer object (from API) - minimal customer data embedded in invoice
   customer?: {
     id: string;

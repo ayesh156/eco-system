@@ -63,6 +63,8 @@ export interface APIInvoice {
   createdAt: string;
   updatedAt: string;
   reminderCount?: number;
+  emailSent?: boolean;
+  emailSentAt?: string;
   customer?: {
     id: string;
     name: string;
@@ -352,6 +354,117 @@ export const invoiceService = {
     const result = await handleResponse<APIResponse<APIInvoiceStats>>(response);
     return result.data;
   },
+
+  /**
+   * Send invoice via email to customer
+   */
+  async sendEmail(invoiceId: string, shopId?: string): Promise<{ messageId: string; sentTo: string; invoiceNumber: string; emailSentAt: string }> {
+    const queryParams = shopId ? `?shopId=${shopId}` : '';
+    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email${queryParams}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const result = await handleResponse<APIResponse<{ messageId: string; sentTo: string; invoiceNumber: string; emailSentAt: string }>>(response);
+    return result.data;
+  },
+
+  /**
+   * Get invoice email status
+   */
+  async getEmailStatus(invoiceId: string, shopId?: string): Promise<{ 
+    invoiceNumber: string; 
+    emailSent: boolean; 
+    emailSentAt: string | null; 
+    customerEmail: string | null;
+    customerName: string | null;
+    canSendEmail: boolean;
+  }> {
+    const queryParams = shopId ? `?shopId=${shopId}` : '';
+    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/email-status${queryParams}`, {
+      headers: getAuthHeaders(),
+    });
+    const result = await handleResponse<APIResponse<{ 
+      invoiceNumber: string; 
+      emailSent: boolean; 
+      emailSentAt: string | null; 
+      customerEmail: string | null;
+      customerName: string | null;
+      canSendEmail: boolean;
+    }>>(response);
+    return result.data;
+  },
+
+  /**
+   * Download invoice PDF
+   * Returns a Blob for the PDF file
+   */
+  async downloadPDF(invoiceId: string, shopId?: string): Promise<Blob> {
+    const queryParams = shopId ? `?shopId=${shopId}` : '';
+    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/pdf${queryParams}`, {
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Failed to download PDF' }));
+      throw new Error(errorData.message || 'Failed to download PDF');
+    }
+    
+    return response.blob();
+  },
+
+  /**
+   * Get invoice PDF URL for sharing
+   * Returns a URL that can be used to download the PDF
+   */
+  getPDFUrl(invoiceId: string, shopId?: string): string {
+    const queryParams = shopId ? `?shopId=${shopId}` : '';
+    const token = getAccessToken();
+    // Include token in URL for authenticated download
+    const authParams = token ? `${queryParams ? '&' : '?'}token=${token}` : '';
+    return `${API_BASE_URL}/invoices/${invoiceId}/pdf${queryParams}${authParams}`;
+  },
+
+  /**
+   * Send invoice via email with PDF attachment
+   */
+  async sendEmailWithPDF(invoiceId: string, shopId?: string): Promise<{ 
+    messageId: string; 
+    sentTo: string; 
+    invoiceNumber: string; 
+    emailSentAt: string;
+    hasPdfAttachment: boolean;
+  }> {
+    const queryParams = shopId ? `?shopId=${shopId}` : '';
+    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email-with-pdf${queryParams}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const result = await handleResponse<APIResponse<{ 
+      messageId: string; 
+      sentTo: string; 
+      invoiceNumber: string; 
+      emailSentAt: string;
+      hasPdfAttachment: boolean;
+    }>>(response);
+    return result.data;
+  },
+
+  /**
+   * Download invoice PDF and trigger browser download
+   */
+  async downloadAndSavePDF(invoiceId: string, invoiceNumber: string, shopId?: string): Promise<void> {
+    const blob = await this.downloadPDF(invoiceId, shopId);
+    
+    // Create a download link
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Invoice-${invoiceNumber}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
 };
 
 // ===================================
@@ -378,13 +491,16 @@ export const convertAPIInvoiceToFrontend = (apiInvoice: APIInvoice): Invoice => 
     })),
     subtotal: apiInvoice.subtotal,
     tax: apiInvoice.tax,
+    discount: apiInvoice.discount || 0,
     total: apiInvoice.total,
     status: normalizeStatus(apiInvoice.status),
     paidAmount: apiInvoice.paidAmount,
+    dueAmount: apiInvoice.dueAmount,
     date: apiInvoice.date,
     dueDate: apiInvoice.dueDate,
     paymentMethod: normalizePaymentMethod(apiInvoice.paymentMethod),
     salesChannel: normalizeSalesChannel(apiInvoice.salesChannel),
+    notes: apiInvoice.notes,
     payments: apiInvoice.payments?.map((payment): InvoicePayment => {
       // Normalize payment method from API format to frontend format
       let method: 'cash' | 'card' | 'bank' | 'cheque' = 'cash';
@@ -407,6 +523,8 @@ export const convertAPIInvoiceToFrontend = (apiInvoice: APIInvoice): Invoice => 
       ? apiInvoice.payments[0].paymentDate 
       : undefined,
     reminderCount: apiInvoice.reminderCount || 0,
+    emailSent: apiInvoice.emailSent || false,
+    emailSentAt: apiInvoice.emailSentAt,
     customer: apiInvoice.customer,
   };
 };

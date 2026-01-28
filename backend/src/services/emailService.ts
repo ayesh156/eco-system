@@ -68,6 +68,461 @@ interface OTPEmailData {
   userName?: string;
 }
 
+// Invoice Email Data Interface
+interface InvoiceEmailData {
+  email: string;
+  customerName: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  dueDate: string;
+  items: Array<{
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+    warranty?: string; // Product warranty (e.g., "1 year", "6 months")
+  }>;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  paidAmount: number;
+  dueAmount: number;
+  status: string;
+  shopName: string;
+  shopSubName?: string;
+  shopPhone?: string;
+  shopEmail?: string;
+  shopAddress?: string;
+  shopWebsite?: string;
+  shopLogo?: string;
+  notes?: string;
+}
+
+// Format warranty into short code (e.g., "1 year" -> "[1Y]", "6 months" -> "[6M]")
+const formatWarrantyCode = (warranty?: string): string => {
+  if (!warranty) return '';
+  const w = warranty.toLowerCase().trim();
+  if (w.includes('lifetime') || w.includes('life time')) return '[L/W]';
+  if (w.includes('no warranty') || w === 'n/w' || w === 'none') return '[N/W]';
+  const yearMatch = w.match(/(\d+)\s*y(ear)?s?/i);
+  if (yearMatch) return `[${yearMatch[1]}Y]`;
+  const monthMatch = w.match(/(\d+)\s*m(onth)?s?/i);
+  if (monthMatch) return `[${monthMatch[1]}M]`;
+  const weekMatch = w.match(/(\d+)\s*w(eek)?s?/i);
+  if (weekMatch) return `[${weekMatch[1]}W]`;
+  const dayMatch = w.match(/(\d+)\s*d(ay)?s?/i);
+  if (dayMatch) return `[${dayMatch[1]}D]`;
+  return warranty.length > 5 ? `[${warranty.substring(0, 5)}]` : `[${warranty}]`;
+};
+
+// Generate modern invoice email HTML - styled like forgot password theme with shop branding
+const generateInvoiceEmailHTML = (data: InvoiceEmailData): string => {
+  const currentYear = new Date().getFullYear();
+  const statusColor = data.status === 'FULLPAID' ? '#10b981' : data.status === 'HALFPAY' ? '#f59e0b' : '#ef4444';
+  const statusText = data.status === 'FULLPAID' ? 'Paid' : data.status === 'HALFPAY' ? 'Partially Paid' : 'Unpaid';
+  const shopInitial = data.shopName.charAt(0).toUpperCase();
+  
+  const itemRows = data.items.map(item => {
+    const warrantyBadge = item.warranty ? `<span style="margin-left: 6px; font-size: 11px; font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 2px 6px; border-radius: 4px;">${formatWarrantyCode(item.warranty)}</span>` : '';
+    return `
+    <tr>
+      <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 14px;">${item.productName}${warrantyBadge}</td>
+      <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 14px; text-align: center;">${item.quantity}</td>
+      <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 14px; text-align: right;">Rs. ${item.unitPrice.toLocaleString()}</td>
+      <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 14px; text-align: right; font-weight: 600;">Rs. ${item.total.toLocaleString()}</td>
+    </tr>
+  `;
+  }).join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice #${data.invoiceNumber} - ${data.shopName}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto;">
+          
+          <!-- Shop Logo & Name Section (Like Forgot Password Theme) -->
+          <tr>
+            <td style="text-align: center; padding-bottom: 32px;">
+              ${data.shopLogo 
+                ? `<img src="${data.shopLogo}" alt="${data.shopName}" style="max-width: 100px; max-height: 80px; margin-bottom: 16px;" />`
+                : `<div style="display: inline-block; width: 72px; height: 72px; background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border-radius: 18px; line-height: 72px; font-size: 32px; font-weight: bold; color: white; box-shadow: 0 12px 35px rgba(16, 185, 129, 0.25);">
+                    ${shopInitial}
+                  </div>`
+              }
+              <h1 style="margin: 16px 0 4px 0; color: #1e293b; font-size: 26px; font-weight: 700;">
+                ${data.shopName}
+              </h1>
+              ${data.shopSubName ? `<p style="margin: 0 0 8px 0; color: #64748b; font-size: 15px; font-weight: 500;">${data.shopSubName}</p>` : ''}
+              ${data.shopAddress ? `<p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 13px;">📍 ${data.shopAddress}</p>` : ''}
+              <div style="margin-top: 8px; color: #64748b; font-size: 13px;">
+                ${data.shopPhone ? `<span style="margin-right: 16px;">📞 ${data.shopPhone}</span>` : ''}
+                ${data.shopEmail ? `<span>✉️ ${data.shopEmail}</span>` : ''}
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Main Card (Like Forgot Password Theme) -->
+          <tr>
+            <td>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%); border: 2px solid #e2e8f0; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
+                
+                <!-- Gradient Header Line -->
+                <tr>
+                  <td style="height: 5px; background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%);"></td>
+                </tr>
+                
+                <!-- Invoice Header -->
+                <tr>
+                  <td style="padding: 32px 32px 24px 32px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td>
+                          <div style="display: inline-block; width: 56px; height: 56px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%); border-radius: 50%; line-height: 56px; text-align: center; margin-bottom: 12px;">
+                            <span style="font-size: 26px;">📄</span>
+                          </div>
+                          <h2 style="margin: 0; color: #1e293b; font-size: 26px; font-weight: 700;">
+                            Invoice
+                          </h2>
+                          <p style="margin: 6px 0 0 0; color: #64748b; font-size: 15px; font-weight: 500;">
+                            #${data.invoiceNumber}
+                          </p>
+                        </td>
+                        <td style="text-align: right; vertical-align: top;">
+                          <div style="display: inline-block; background: ${statusColor}15; color: ${statusColor}; padding: 10px 20px; border-radius: 25px; font-size: 14px; font-weight: 700; border: 2px solid ${statusColor}30;">
+                            ${statusText}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                
+                <!-- Customer & Date Info Box (Styled like OTP box) -->
+                <tr>
+                  <td style="padding: 0 32px 24px 32px;">
+                    <div style="background: linear-gradient(145deg, #f0fdf4 0%, #f0f9ff 100%); border: 2px solid rgba(16, 185, 129, 0.2); border-radius: 16px; padding: 20px;">
+                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                          <td style="width: 50%; vertical-align: top;">
+                            <p style="margin: 0 0 4px 0; color: #10b981; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">Bill To</p>
+                            <p style="margin: 0; color: #1e293b; font-size: 18px; font-weight: 700;">${data.customerName}</p>
+                          </td>
+                          <td style="width: 50%; vertical-align: top; text-align: right;">
+                            <p style="margin: 0 0 6px 0; color: #64748b; font-size: 13px;">
+                              📅 Invoice: <strong style="color: #334155;">${data.invoiceDate}</strong>
+                            </p>
+                            <p style="margin: 0; color: #64748b; font-size: 13px;">
+                              ⏰ Due: <strong style="color: #334155;">${data.dueDate}</strong>
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+                
+                <!-- Items Table -->
+                <tr>
+                  <td style="padding: 0 32px 24px 32px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+                      <thead>
+                        <tr style="background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);">
+                          <th style="padding: 14px 16px; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; text-align: left; border-bottom: 2px solid #e2e8f0; font-weight: 700;">Item</th>
+                          <th style="padding: 14px 16px; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; text-align: center; border-bottom: 2px solid #e2e8f0; font-weight: 700;">Qty</th>
+                          <th style="padding: 14px 16px; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; text-align: right; border-bottom: 2px solid #e2e8f0; font-weight: 700;">Price</th>
+                          <th style="padding: 14px 16px; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; text-align: right; border-bottom: 2px solid #e2e8f0; font-weight: 700;">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${itemRows}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+                
+                <!-- Totals (Styled like amount display) -->
+                <tr>
+                  <td style="padding: 0 32px 32px 32px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="width: 50%;"></td>
+                        <td style="width: 50%;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background: #f8fafc; border-radius: 12px; padding: 4px;">
+                            <tr>
+                              <td style="padding: 10px 16px; color: #64748b; font-size: 14px;">Subtotal</td>
+                              <td style="padding: 10px 16px; color: #334155; font-size: 14px; text-align: right; font-weight: 600;">Rs. ${data.subtotal.toLocaleString()}</td>
+                            </tr>
+                            ${data.tax > 0 ? `
+                            <tr>
+                              <td style="padding: 10px 16px; color: #64748b; font-size: 14px;">Tax</td>
+                              <td style="padding: 10px 16px; color: #334155; font-size: 14px; text-align: right; font-weight: 600;">Rs. ${data.tax.toLocaleString()}</td>
+                            </tr>
+                            ` : ''}
+                            ${data.discount > 0 ? `
+                            <tr>
+                              <td style="padding: 10px 16px; color: #10b981; font-size: 14px;">Discount</td>
+                              <td style="padding: 10px 16px; color: #10b981; font-size: 14px; text-align: right; font-weight: 600;">- Rs. ${data.discount.toLocaleString()}</td>
+                            </tr>
+                            ` : ''}
+                            <tr>
+                              <td colspan="2" style="padding: 0;"><div style="height: 2px; background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%); margin: 8px 0;"></div></td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 12px 16px; color: #1e293b; font-size: 18px; font-weight: 800;">Total</td>
+                              <td style="padding: 12px 16px; color: #1e293b; font-size: 18px; font-weight: 800; text-align: right;">Rs. ${data.total.toLocaleString()}</td>
+                            </tr>
+                            ${data.paidAmount > 0 ? `
+                            <tr>
+                              <td style="padding: 10px 16px; color: #10b981; font-size: 14px;">✓ Paid</td>
+                              <td style="padding: 10px 16px; color: #10b981; font-size: 14px; text-align: right; font-weight: 600;">Rs. ${data.paidAmount.toLocaleString()}</td>
+                            </tr>
+                            ` : ''}
+                            ${data.dueAmount > 0 ? `
+                            <tr>
+                              <td colspan="2" style="padding: 0;">
+                                <div style="margin-top: 8px; background: linear-gradient(145deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid rgba(239, 68, 68, 0.2); border-radius: 10px; padding: 14px 16px; text-align: center;">
+                                  <span style="color: #ef4444; font-size: 13px; font-weight: 600;">Balance Due: </span>
+                                  <span style="color: #ef4444; font-size: 20px; font-weight: 800;">Rs. ${data.dueAmount.toLocaleString()}</span>
+                                </div>
+                              </td>
+                            </tr>
+                            ` : ''}
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                
+                ${data.notes ? `
+                <!-- Notes Section -->
+                <tr>
+                  <td style="padding: 0 32px 32px 32px;">
+                    <div style="background: linear-gradient(145deg, rgba(245, 158, 11, 0.05) 0%, rgba(251, 191, 36, 0.05) 100%); border: 2px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 16px;">
+                      <p style="margin: 0 0 6px 0; color: #b45309; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">📝 Notes</p>
+                      <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.6;">${data.notes}</p>
+                    </div>
+                  </td>
+                </tr>
+                ` : ''}
+                
+                <!-- Thank You Message -->
+                <tr>
+                  <td style="padding: 0 32px 32px 32px; text-align: center;">
+                    <div style="background: linear-gradient(145deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%); border-radius: 16px; padding: 28px;">
+                      <p style="margin: 0; color: #10b981; font-size: 20px; font-weight: 700;">
+                        🙏 Thank you for your business!
+                      </p>
+                      <p style="margin: 10px 0 0 0; color: #64748b; font-size: 14px;">
+                        We appreciate your trust in ${data.shopName}.
+                      </p>
+                      <p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 12px;">
+                        For any queries, please contact us at ${data.shopPhone || data.shopEmail || 'our store'}.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+                
+                <!-- PDF Attachment Notice -->
+                <tr>
+                  <td style="padding: 0 32px 32px 32px; text-align: center;">
+                    <div style="background: #f1f5f9; border-radius: 10px; padding: 14px;">
+                      <p style="margin: 0; color: #64748b; font-size: 13px;">
+                        📎 <strong>Invoice PDF attached</strong> - Please keep for your records and warranty claims.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+                
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 32px 20px; text-align: center;">
+              <p style="margin: 0 0 8px 0; color: #64748b; font-size: 13px; font-weight: 600;">
+                ${data.shopName}${data.shopSubName ? ' ' + data.shopSubName : ''}
+              </p>
+              ${data.shopAddress ? `<p style="margin: 4px 0; color: #94a3b8; font-size: 12px;">📍 ${data.shopAddress}</p>` : ''}
+              ${data.shopWebsite ? `<p style="margin: 4px 0; color: #64748b; font-size: 12px;">🌐 ${data.shopWebsite}</p>` : ''}
+              <p style="margin: 12px 0 0 0; color: #94a3b8; font-size: 11px;">
+                © ${currentYear} ${data.shopName}. All rights reserved.
+              </p>
+              <p style="margin: 4px 0 0 0; color: #cbd5e1; font-size: 11px;">
+                This is an automated invoice email from our billing system.
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+};
+
+// Generate plain text version of invoice email
+const generateInvoiceEmailText = (data: InvoiceEmailData): string => {
+  const itemLines = data.items.map(item => 
+    `  - ${item.productName} x${item.quantity} @ Rs.${item.unitPrice.toLocaleString()} = Rs.${item.total.toLocaleString()}`
+  ).join('\n');
+
+  return `
+=====================================
+INVOICE #${data.invoiceNumber}
+=====================================
+
+${data.shopName}
+${data.shopAddress || ''}
+${data.shopPhone ? 'Phone: ' + data.shopPhone : ''}
+
+-------------------------------------
+Bill To: ${data.customerName}
+Invoice Date: ${data.invoiceDate}
+Due Date: ${data.dueDate}
+Status: ${data.status === 'FULLPAID' ? 'Paid' : data.status === 'HALFPAY' ? 'Partially Paid' : 'Unpaid'}
+-------------------------------------
+
+ITEMS:
+${itemLines}
+
+-------------------------------------
+Subtotal:     Rs. ${data.subtotal.toLocaleString()}
+${data.tax > 0 ? 'Tax:          Rs. ' + data.tax.toLocaleString() : ''}
+${data.discount > 0 ? 'Discount:     -Rs. ' + data.discount.toLocaleString() : ''}
+-------------------------------------
+TOTAL:        Rs. ${data.total.toLocaleString()}
+${data.paidAmount > 0 ? 'Paid:         Rs. ' + data.paidAmount.toLocaleString() : ''}
+${data.dueAmount > 0 ? 'BALANCE DUE:  Rs. ' + data.dueAmount.toLocaleString() : ''}
+-------------------------------------
+
+${data.notes ? 'Notes: ' + data.notes : ''}
+
+Thank you for your business!
+
+© ${new Date().getFullYear()} ${data.shopName}
+${data.shopWebsite || ''}
+  `.trim();
+};
+
+/**
+ * Send Invoice Email
+ */
+export const sendInvoiceEmail = async (data: InvoiceEmailData): Promise<{ success: boolean; messageId?: string; error?: string }> => {
+  try {
+    const config = getEmailConfig();
+    
+    // Check if SMTP is configured
+    if (!config.auth.user || !config.auth.pass) {
+      console.error('❌ SMTP not configured. Cannot send invoice email.');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('📧 [DEV MODE] Invoice email would be sent to:', data.email);
+        return { success: true, messageId: 'dev-mode-no-email-sent' };
+      }
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    const transport = getTransporter();
+    const fromName = process.env.SMTP_FROM_NAME || data.shopName;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
+
+    console.log(`📤 Sending invoice email to: ${data.email}`);
+
+    const mailOptions = {
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.email,
+      subject: `📄 Invoice #${data.invoiceNumber} from ${data.shopName}`,
+      text: generateInvoiceEmailText(data),
+      html: generateInvoiceEmailHTML(data),
+    };
+
+    const result = await transport.sendMail(mailOptions);
+    console.log('✅ Invoice email sent successfully to:', data.email);
+    
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown email error';
+    console.error('❌ Failed to send invoice email:', errorMessage);
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('📧 [DEV MODE - FALLBACK] Invoice email would be sent to:', data.email);
+      return { success: true, messageId: 'dev-fallback-logged' };
+    }
+    
+    return { success: false, error: errorMessage };
+  }
+};
+
+/**
+ * Send Invoice Email with PDF Attachment
+ */
+export const sendInvoiceWithPDF = async (
+  data: InvoiceEmailData,
+  pdfBuffer: Buffer
+): Promise<{ success: boolean; messageId?: string; error?: string }> => {
+  try {
+    const config = getEmailConfig();
+    
+    // Check if SMTP is configured
+    if (!config.auth.user || !config.auth.pass) {
+      console.error('❌ SMTP not configured. Cannot send invoice email with PDF.');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('📧 [DEV MODE] Invoice email with PDF would be sent to:', data.email);
+        return { success: true, messageId: 'dev-mode-no-email-sent' };
+      }
+      return { success: false, error: 'Email service not configured' };
+    }
+
+    const transport = getTransporter();
+    const fromName = process.env.SMTP_FROM_NAME || data.shopName;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
+
+    console.log(`📤 Sending invoice email with PDF attachment to: ${data.email}`);
+
+    const mailOptions = {
+      from: `"${fromName}" <${fromEmail}>`,
+      to: data.email,
+      subject: `📄 Invoice #${data.invoiceNumber} from ${data.shopName}`,
+      text: generateInvoiceEmailText(data),
+      html: generateInvoiceEmailHTML(data),
+      attachments: [
+        {
+          filename: `Invoice-${data.invoiceNumber}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    };
+
+    const result = await transport.sendMail(mailOptions);
+    console.log('✅ Invoice email with PDF sent successfully to:', data.email);
+    
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown email error';
+    console.error('❌ Failed to send invoice email with PDF:', errorMessage);
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('📧 [DEV MODE - FALLBACK] Invoice email with PDF would be sent to:', data.email);
+      return { success: true, messageId: 'dev-fallback-logged' };
+    }
+    
+    return { success: false, error: errorMessage };
+  }
+};
+
 const generateOTPEmailHTML = (data: OTPEmailData): string => {
   const { otp, userName } = data;
   const otpDigits = otp.split('');

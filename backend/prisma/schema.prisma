@@ -440,6 +440,10 @@ model Invoice {
   // Notes
   notes         String?
   
+  // Email tracking
+  emailSent     Boolean       @default(false)  // Whether invoice was emailed to customer
+  emailSentAt   DateTime?     // When invoice was emailed
+  
   // Audit
   createdById   String?
   createdBy     User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
