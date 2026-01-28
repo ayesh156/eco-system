@@ -7,11 +7,11 @@ export interface WhatsAppSettings {
   enabled: boolean;
 }
 
-// Default WhatsApp message templates with placeholders - English Modern Templates
+// Creative Default WhatsApp message templates with placeholders - Sri Lankan context
 export const mockWhatsAppSettings: WhatsAppSettings = {
   paymentReminderTemplate: `Hello {{customerName}}! 👋
 
-Greetings from *ECOTEC Computer Shop*!
+Greetings from *{{shopName}}*!
 
 This is a friendly reminder about your pending payment:
 
@@ -26,9 +26,11 @@ We kindly request you to settle your outstanding balance at your earliest conven
 If you've already made the payment, please disregard this message.
 
 Thank you for your continued trust! 🙏
-*ECOTEC Computer Shop*
-📞 011-2345678
-🌐 www.ecotec.lk`,
+
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}
+🌐 {{shopWebsite}}`,
   overdueReminderTemplate: `⚠️ *URGENT: Payment Overdue Notice*
 
 Dear {{customerName}},
@@ -36,19 +38,21 @@ Dear {{customerName}},
 We regret to inform you that your payment is now *OVERDUE*.
 
 📄 *Invoice:* #{{invoiceId}}
-📅 *Due Date:* {{dueDate}}
+📅 *Original Due Date:* {{dueDate}}
 ⏰ *Days Overdue:* {{daysOverdue}} days
 💰 *Outstanding Amount:* Rs. {{dueAmount}}
 
-*Immediate action is required.* Please settle this payment as soon as possible to avoid service interruption.
+*Immediate action is required.* Please settle this payment as soon as possible to avoid any inconvenience.
 
-For payment options or queries, please contact us.
+For payment assistance or queries, please contact us immediately.
 
-Thank you for your prompt attention.
+We value your business and appreciate your prompt attention to this matter.
 
-*ECOTEC Computer Shop*
-📞 011-2345678
-🌐 www.ecotec.lk`,
+Best regards,
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}
+🌐 {{shopWebsite}}`,
   enabled: true
 };
 
@@ -1855,6 +1859,7 @@ export interface InvoiceItem {
   originalPrice?: number; // Original price before discount
   total: number;
   warrantyDueDate?: string;
+  warranty?: string; // Warranty period (e.g., "1 year", "6 months") for display in invoices
 }
 
 // Sales History for tracking product sales

@@ -491,6 +491,62 @@ model InvoiceItem {
   @@map("invoice_items")
 }
 
+// ==========================================
+// INVOICE ITEM CHANGE HISTORY
+// Track all changes to invoice items (add, remove, qty change)
+// ==========================================
+
+model InvoiceItemHistory {
+  id              String              @id @default(cuid())
+  
+  // Invoice relation
+  invoiceId       String
+  
+  // Action type
+  action          ItemHistoryAction
+  
+  // Item details at time of change
+  productId       String?
+  productName     String
+  
+  // Quantity changes
+  oldQuantity     Int?                // null for ADD action
+  newQuantity     Int?                // null for REMOVE action
+  
+  // Price at time of change
+  unitPrice       Float
+  
+  // Calculated impact (positive = added cost, negative = reduced cost)
+  amountChange    Float               // e.g., +15000 for add, -15000 for remove
+  
+  // User who made the change
+  changedById     String?
+  changedByName   String?             // Denormalized for quick display
+  
+  // Additional context
+  reason          String?             // Optional reason for change
+  notes           String?
+  
+  // Shop relation for multi-tenant isolation
+  shopId          String
+  
+  createdAt       DateTime            @default(now())
+
+  @@index([invoiceId])
+  @@index([shopId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("invoice_item_history")
+}
+
+enum ItemHistoryAction {
+  ADDED           // New item added to invoice
+  REMOVED         // Item removed from invoice
+  QTY_INCREASED   // Quantity increased
+  QTY_DECREASED   // Quantity decreased
+  PRICE_CHANGED   // Unit price modified
+}
+
 model InvoicePayment {
   id            String        @id @default(cuid())
   

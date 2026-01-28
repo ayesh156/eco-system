@@ -1105,7 +1105,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               </button>
 
               {/* Profile Dropdown */}
-              <div className="relative">
+              <div className="relative z-50">
                 <button
                   onClick={(e) => { e.stopPropagation(); setProfileDropdownOpen(!profileDropdownOpen); }}
                   className={`flex items-center gap-3 px-3 py-2 rounded-xl border transition-all ${theme === 'dark'
@@ -1163,7 +1163,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
         {/* Viewing Shop Banner for SUPER_ADMIN */}
         {isViewingShop && viewingShop && (
-          <div className="sticky top-16 z-30 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2.5 shadow-lg">
+          <div className="sticky top-16 z-20 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2.5 shadow-lg">
             <div className="flex items-center justify-between max-w-screen-2xl mx-auto">
               <div className="flex items-center gap-3">
                 <Shield className="w-5 h-5" />

@@ -38,14 +38,14 @@ export const handleValidationErrors = (
 // ===================================
 
 /**
- * Sanitize string input - removes dangerous characters
+ * Sanitize string input - removes dangerous characters but preserves newlines/tabs
  */
 const sanitizeString = (value: string): string => {
   if (typeof value !== 'string') return value;
   return value
-    .trim()
     .replace(/[<>]/g, '') // Remove potential HTML tags
-    .replace(/[\x00-\x1F\x7F]/g, ''); // Remove control characters
+    // Remove control characters EXCEPT: \t (tab), \n (newline), \r (carriage return)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 };
 
 /**

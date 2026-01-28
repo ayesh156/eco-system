@@ -522,4 +522,160 @@ router.delete('/users/:id', sensitiveRateLimiter, async (req: Request, res: Resp
   }
 });
 
+// ===================================
+// WhatsApp Settings Management
+// ===================================
+
+// Creative Default Templates with Sri Lankan context
+const DEFAULT_PAYMENT_REMINDER_TEMPLATE = `Hello {{customerName}}! 👋
+
+Greetings from *{{shopName}}*!
+
+This is a friendly reminder about your pending payment:
+
+📄 *Invoice:* #{{invoiceId}}
+💰 *Total Amount:* Rs. {{totalAmount}}
+✅ *Paid:* Rs. {{paidAmount}}
+⏳ *Balance Due:* Rs. {{dueAmount}}
+📅 *Due Date:* {{dueDate}}
+
+We kindly request you to settle your outstanding balance at your earliest convenience.
+
+If you've already made the payment, please disregard this message.
+
+Thank you for your continued trust! 🙏
+
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}
+🌐 {{shopWebsite}}`;
+
+const DEFAULT_OVERDUE_REMINDER_TEMPLATE = `⚠️ *URGENT: Payment Overdue Notice*
+
+Dear {{customerName}},
+
+We regret to inform you that your payment is now *OVERDUE*.
+
+📄 *Invoice:* #{{invoiceId}}
+📅 *Original Due Date:* {{dueDate}}
+⏰ *Days Overdue:* {{daysOverdue}} days
+💰 *Outstanding Amount:* Rs. {{dueAmount}}
+
+*Immediate action is required.* Please settle this payment as soon as possible to avoid any inconvenience.
+
+For payment assistance or queries, please contact us immediately.
+
+We value your business and appreciate your prompt attention to this matter.
+
+Best regards,
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}
+🌐 {{shopWebsite}}`;
+
+/**
+ * @route   GET /api/v1/shop-admin/whatsapp-settings
+ * @desc    Get WhatsApp settings for the shop
+ * @access  Shop Admin or SUPER_ADMIN
+ */
+router.get('/whatsapp-settings', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const shopId = getEffectiveShopId(req);
+
+    if (!shopId) {
+      return res.status(403).json({ success: false, message: 'Shop ID required' });
+    }
+
+    const shop = await prisma.shop.findUnique({
+      where: { id: shopId },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        address: true,
+        reminderEnabled: true,
+        paymentReminderTemplate: true,
+        overdueReminderTemplate: true,
+      },
+    });
+
+    if (!shop) {
+      return res.status(404).json({ success: false, message: 'Shop not found' });
+    }
+
+    // Return saved templates or creative defaults if null/empty
+    res.json({
+      success: true,
+      data: {
+        enabled: shop.reminderEnabled ?? true,
+        paymentReminderTemplate: shop.paymentReminderTemplate || DEFAULT_PAYMENT_REMINDER_TEMPLATE,
+        overdueReminderTemplate: shop.overdueReminderTemplate || DEFAULT_OVERDUE_REMINDER_TEMPLATE,
+        shopDetails: {
+          name: shop.name || '',
+          phone: shop.phone || '',
+          email: shop.email || '',
+          address: shop.address || '',
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   PUT /api/v1/shop-admin/whatsapp-settings
+ * @desc    Update WhatsApp settings for the shop
+ * @access  Shop Admin or SUPER_ADMIN
+ */
+router.put('/whatsapp-settings', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const shopId = getEffectiveShopId(req);
+
+    if (!shopId) {
+      return res.status(403).json({ success: false, message: 'Shop ID required' });
+    }
+
+    const { enabled, paymentReminderTemplate, overdueReminderTemplate } = req.body;
+
+    const updatedShop = await prisma.shop.update({
+      where: { id: shopId },
+      data: {
+        ...(enabled !== undefined && { reminderEnabled: enabled }),
+        ...(paymentReminderTemplate !== undefined && { paymentReminderTemplate }),
+        ...(overdueReminderTemplate !== undefined && { overdueReminderTemplate }),
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        address: true,
+        reminderEnabled: true,
+        paymentReminderTemplate: true,
+        overdueReminderTemplate: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        enabled: updatedShop.reminderEnabled,
+        paymentReminderTemplate: updatedShop.paymentReminderTemplate || '',
+        overdueReminderTemplate: updatedShop.overdueReminderTemplate || '',
+        shopDetails: {
+          name: updatedShop.name || '',
+          phone: updatedShop.phone || '',
+          email: updatedShop.email || '',
+          address: updatedShop.address || '',
+        },
+      },
+      message: 'WhatsApp settings updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

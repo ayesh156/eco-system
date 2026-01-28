@@ -3,7 +3,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { 
   X, FileText, CreditCard, CheckCircle, AlertTriangle, Clock, 
   MessageCircle, Zap, Check, ChevronDown, ChevronUp, Receipt,
-  Banknote, Building2, Wallet, History, Loader2
+  Banknote, Building2, Wallet, History, Loader2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import type { Customer, Invoice } from '../../data/mockData';
 
@@ -101,6 +101,10 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set());
   const [showHistoryFor, setShowHistoryFor] = useState<string | null>(null);
   const [processingPayment, setProcessingPayment] = useState<string | null>(null); // Track which invoice is processing
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // Payment method options
   const paymentMethodOptions: { value: PaymentMethod; label: string; icon: React.ReactNode }[] = [
@@ -180,6 +184,21 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       });
   }, [customer, invoices]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(customerInvoices.length / itemsPerPage);
+  const paginatedInvoices = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return customerInvoices.slice(startIndex, endIndex);
+  }, [customerInvoices, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when invoices change
+  useMemo(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [customerInvoices.length]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -405,7 +424,7 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
                 <p>No invoices found for this customer</p>
               </div>
             ) : (
-              customerInvoices.map((invoice) => {
+              paginatedInvoices.map((invoice) => {
                 const outstanding = invoice.total - (invoice.paidAmount || 0);
                 const isOverdue = new Date(invoice.dueDate) < new Date() && invoice.status !== 'fullpaid';
                 const isExpanded = expandedInvoice === invoice.id;
@@ -809,6 +828,99 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
               })
             )}
           </div>
+
+          {/* Pagination */}
+          {!isLoading && customerInvoices.length > itemsPerPage && (
+            <div className={`flex items-center justify-between mt-6 pt-4 border-t ${
+              theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+            }`}>
+              {/* Page Info */}
+              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, customerInvoices.length)} of {customerInvoices.length}
+              </p>
+
+              {/* Pagination Controls */}
+              <div className="flex items-center gap-2">
+                {/* Previous Button */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded-lg transition-all ${
+                    currentPage === 1
+                      ? theme === 'dark'
+                        ? 'text-slate-600 cursor-not-allowed'
+                        : 'text-slate-300 cursor-not-allowed'
+                      : theme === 'dark'
+                        ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    // Show: first page, last page, current page, and pages around current
+                    const showPage = 
+                      page === 1 || 
+                      page === totalPages || 
+                      Math.abs(page - currentPage) <= 1;
+                    
+                    // Show ellipsis
+                    const showEllipsisBefore = page === currentPage - 2 && currentPage > 3;
+                    const showEllipsisAfter = page === currentPage + 2 && currentPage < totalPages - 2;
+
+                    if (showEllipsisBefore || showEllipsisAfter) {
+                      return (
+                        <span
+                          key={`ellipsis-${page}`}
+                          className={`px-2 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+
+                    if (!showPage) return null;
+
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`min-w-[36px] h-9 px-3 rounded-lg text-sm font-medium transition-all ${
+                          currentPage === page
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
+                            : theme === 'dark'
+                              ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Next Button */}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded-lg transition-all ${
+                    currentPage === totalPages
+                      ? theme === 'dark'
+                        ? 'text-slate-600 cursor-not-allowed'
+                        : 'text-slate-300 cursor-not-allowed'
+                      : theme === 'dark'
+                        ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

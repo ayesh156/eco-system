@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import { useTaxSettings } from '../contexts/TaxSettingsContext';
 import { 
   Bell, Palette, MessageCircle, Info, Copy, Check, 
   Globe, Moon, Sun, Sparkles,
   Mail, Phone, Building2, Save,
   RefreshCw, Eye, EyeOff, CheckCircle2, AlertCircle, Clock,
-  Smartphone, Laptop, SendHorizontal, Settings2
+  Smartphone, Laptop, SendHorizontal, Settings2, FileText, RotateCcw
 } from 'lucide-react';
 
 interface ReminderPreview {
@@ -24,7 +25,8 @@ interface ReminderPreview {
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, isViewingShop, viewingShop } = useAuth();
-  const { settings: whatsAppSettings, updateSettings, saveSettings } = useWhatsAppSettings();
+  const { settings: whatsAppSettings, shopDetails, updateSettings, saveSettings, resetToDefaults, isSaving: whatsAppSaving } = useWhatsAppSettings();
+  const { branding } = useShopBranding();
   const { settings: taxSettings, updateSettings: updateTaxSettings, saveSettings: saveTaxSettings } = useTaxSettings();
   
   // Check if user is Super Admin - hide business-specific settings unless viewing a shop
@@ -35,7 +37,7 @@ export const Settings: React.FC = () => {
   const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
   
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'whatsapp'>('appearance');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'invoice'>('appearance');
   const [showPreview, setShowPreview] = useState(false);
   const [previewType, setPreviewType] = useState<'payment' | 'overdue'>('payment');
   const [isSaving, setIsSaving] = useState(false);
@@ -60,6 +62,13 @@ export const Settings: React.FC = () => {
     }
   }, [effectiveShop?.id, effectiveShop?.name, effectiveShop?.email, effectiveShop?.phone, effectiveShop?.address, effectiveShop?.website]);
 
+  // Get effective shop details for preview - prioritize API data, fallback to branding, then effective shop
+  const effectiveShopName = shopDetails?.name || branding?.name || effectiveShop?.name || 'Your Shop Name';
+  const effectiveShopPhone = shopDetails?.phone || branding?.phone || effectiveShop?.phone || '0XX XXX XXXX';
+  const effectiveShopAddress = shopDetails?.address || branding?.address || effectiveShop?.address || 'Shop Address';
+  const effectiveShopEmail = shopDetails?.email || branding?.email || effectiveShop?.email || 'shop@example.com';
+  const effectiveShopWebsite = branding?.website || effectiveShop?.website || '';
+
   const placeholders = [
     { key: '{{customerName}}', desc: 'Customer name', example: 'John Doe' },
     { key: '{{invoiceId}}', desc: 'Invoice number', example: 'INV-10260019' },
@@ -68,6 +77,10 @@ export const Settings: React.FC = () => {
     { key: '{{dueAmount}}', desc: 'Balance to pay', example: '15,500' },
     { key: '{{dueDate}}', desc: 'Payment due date', example: '25/01/2026' },
     { key: '{{daysOverdue}}', desc: 'Days past due date', example: '5' },
+    { key: '{{shopName}}', desc: 'Your shop name', example: effectiveShopName },
+    { key: '{{shopPhone}}', desc: 'Shop phone', example: effectiveShopPhone },
+    { key: '{{shopAddress}}', desc: 'Shop address', example: effectiveShopAddress },
+    { key: '{{shopWebsite}}', desc: 'Shop website', example: effectiveShopWebsite || 'www.example.com' },
   ];
 
   const previewData: ReminderPreview = {
@@ -94,7 +107,11 @@ export const Settings: React.FC = () => {
       .replace(/\{\{paidAmount\}\}/g, previewData.paidAmount)
       .replace(/\{\{dueAmount\}\}/g, previewData.dueAmount)
       .replace(/\{\{dueDate\}\}/g, previewData.dueDate)
-      .replace(/\{\{daysOverdue\}\}/g, previewData.daysOverdue);
+      .replace(/\{\{daysOverdue\}\}/g, previewData.daysOverdue)
+      .replace(/\{\{shopName\}\}/g, effectiveShopName)
+      .replace(/\{\{shopPhone\}\}/g, effectiveShopPhone)
+      .replace(/\{\{shopAddress\}\}/g, effectiveShopAddress)
+      .replace(/\{\{shopWebsite\}\}/g, effectiveShopWebsite);
   };
 
   const handleSave = async () => {
@@ -107,11 +124,13 @@ export const Settings: React.FC = () => {
   };
 
   const handleWhatsAppSave = async () => {
-    setIsSaving(true);
-    await saveSettings();
-    setIsSaving(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    try {
+      await saveSettings();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('Failed to save WhatsApp settings:', error);
+    }
   };
 
   // All available tabs
@@ -119,7 +138,7 @@ export const Settings: React.FC = () => {
     { id: 'appearance' as const, label: 'Appearance', icon: Palette, color: 'emerald' },
     { id: 'profile' as const, label: 'Business Profile', icon: Building2, color: 'purple', businessOnly: true },
     { id: 'notifications' as const, label: 'Notifications', icon: Bell, color: 'amber', businessOnly: true },
-    { id: 'whatsapp' as const, label: 'WhatsApp Reminders', icon: MessageCircle, color: 'green', businessOnly: true },
+    { id: 'invoice' as const, label: 'Invoice Settings', icon: FileText, color: 'blue', businessOnly: true },
   ];
 
   // Filter tabs - hide business-specific tabs for Super Admin unless viewing a shop
@@ -356,8 +375,8 @@ export const Settings: React.FC = () => {
               </div>
             </div>
 
-            {/* Tax Configuration Card - Hidden for Super Admin */}
-            {!isSuperAdmin && (
+            {/* Tax Configuration Card - Show for shop admins AND SuperAdmin viewing a shop */}
+            {canViewBusinessSettings && (
               <div className={`rounded-3xl border overflow-hidden ${
                 theme === 'dark' 
                   ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
@@ -719,8 +738,8 @@ export const Settings: React.FC = () => {
           </div>
         )}
 
-        {/* WhatsApp Tab */}
-        {activeTab === 'whatsapp' && (
+        {/* Invoice Settings Tab */}
+        {activeTab === 'invoice' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Enable/Disable Card */}
             <div className={`rounded-3xl border overflow-hidden ${
@@ -728,15 +747,15 @@ export const Settings: React.FC = () => {
                 ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
                 : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
             }`}>
-              <div className="relative h-24 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600">
+              <div className="relative h-24 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">
                 <div className="absolute inset-0 flex items-center px-6">
                   <div className="flex items-center gap-4 flex-1">
                     <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
                       <MessageCircle className="w-8 h-8 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-white">WhatsApp Payment Reminders</h2>
-                      <p className="text-green-100 text-sm">Send automated payment reminders via WhatsApp</p>
+                      <h2 className="text-xl font-bold text-white">WhatsApp Reminder Templates</h2>
+                      <p className="text-blue-100 text-sm">Customize payment reminder messages sent to customers</p>
                     </div>
                   </div>
                   <button
@@ -753,7 +772,7 @@ export const Settings: React.FC = () => {
                         : 'translate-x-1 bg-white/60'
                     }`}>
                       {whatsAppSettings.enabled ? (
-                        <Check className="w-5 h-5 text-green-600" />
+                        <Check className="w-5 h-5 text-blue-600" />
                       ) : (
                         <span className="w-5 h-5" />
                       )}
@@ -766,15 +785,15 @@ export const Settings: React.FC = () => {
                 <div className="p-6 space-y-6">
                   {/* Placeholders Card */}
                   <div className={`rounded-2xl p-4 ${
-                    theme === 'dark' ? 'bg-slate-800/50' : 'bg-gradient-to-r from-green-50 to-emerald-50'
+                    theme === 'dark' ? 'bg-slate-800/50' : 'bg-gradient-to-r from-blue-50 to-indigo-50'
                   }`}>
                     <div className="flex items-center gap-2 mb-4">
-                      <Info className="w-5 h-5 text-green-500" />
+                      <Info className="w-5 h-5 text-blue-500" />
                       <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
                         Available Placeholders
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        theme === 'dark' ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'
+                        theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
                       }`}>
                         Click to copy
                       </span>
@@ -786,10 +805,10 @@ export const Settings: React.FC = () => {
                           onClick={() => copyPlaceholder(key)}
                           className={`group relative flex flex-col items-start px-3 py-2 rounded-xl text-sm font-mono transition-all ${
                             copiedPlaceholder === key
-                              ? 'bg-green-500 text-white scale-95'
+                              ? 'bg-blue-500 text-white scale-95'
                               : theme === 'dark' 
-                                ? 'bg-slate-700/50 text-emerald-400 hover:bg-slate-700 hover:scale-[1.02]' 
-                                : 'bg-white text-green-600 hover:shadow-md hover:scale-[1.02] border border-green-200'
+                                ? 'bg-slate-700/50 text-blue-400 hover:bg-slate-700 hover:scale-[1.02]' 
+                                : 'bg-white text-blue-600 hover:shadow-md hover:scale-[1.02] border border-blue-200'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 w-full">
@@ -806,12 +825,31 @@ export const Settings: React.FC = () => {
                             )}
                           </div>
                           <span className={`text-[10px] mt-0.5 ${
-                            copiedPlaceholder === key ? 'text-green-100' : 'text-slate-500'
+                            copiedPlaceholder === key ? 'text-blue-100' : 'text-slate-500'
                           }`}>
                             {desc}
                           </span>
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Formatting Tip */}
+                  <div className={`flex items-start gap-3 p-4 rounded-xl border ${
+                    theme === 'dark' 
+                      ? 'bg-blue-500/10 border-blue-500/20' 
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <Info className={`w-5 h-5 mt-0.5 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+                    <div className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>
+                      <p className="font-medium mb-1">💡 Formatting Tips for WhatsApp:</p>
+                      <ul className="space-y-1 text-xs opacity-90">
+                        <li>• Press <kbd className="px-1.5 py-0.5 rounded bg-white/20 dark:bg-black/20 font-mono text-[10px]">Enter</kbd> for new lines - they will appear in WhatsApp</li>
+                        <li>• Use <code className="px-1 rounded bg-white/20 dark:bg-black/20">*text*</code> for <strong>bold text</strong></li>
+                        <li>• Use <code className="px-1 rounded bg-white/20 dark:bg-black/20">_text_</code> for <em>italic text</em></li>
+                        <li>• Add emojis for visual appeal 🎉</li>
+                        <li>• Click <strong>Reset</strong> button to restore properly formatted default template</li>
+                      </ul>
                     </div>
                   </div>
 
@@ -821,7 +859,7 @@ export const Settings: React.FC = () => {
                       onClick={() => setPreviewType('payment')}
                       className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium transition-all ${
                         previewType === 'payment'
-                          ? 'bg-white dark:bg-slate-700 shadow-sm text-green-600 dark:text-green-400'
+                          ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400'
                           : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                       }`}
                     >
@@ -847,24 +885,40 @@ export const Settings: React.FC = () => {
                         <label className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
                           {previewType === 'payment' ? '💳 Payment Reminder Template' : '⚠️ Overdue Reminder Template'}
                         </label>
-                        <button
-                          onClick={() => setShowPreview(!showPreview)}
-                          className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all lg:hidden ${
-                            theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          {showPreview ? 'Hide' : 'Show'} Preview
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              if (confirm('Reset this template to the default? Your current template will be replaced.')) {
+                                resetToDefaults();
+                              }
+                            }}
+                            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all ${
+                              theme === 'dark' ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                            }`}
+                            title="Reset to default template with proper formatting"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                            Reset
+                          </button>
+                          <button
+                            onClick={() => setShowPreview(!showPreview)}
+                            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all lg:hidden ${
+                              theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            {showPreview ? 'Hide' : 'Show'} Preview
+                          </button>
+                        </div>
                       </div>
                       <textarea
                         value={previewType === 'payment' ? whatsAppSettings.paymentReminderTemplate : whatsAppSettings.overdueReminderTemplate}
                         onChange={(e) => updateSettings(previewType === 'payment' ? { paymentReminderTemplate: e.target.value } : { overdueReminderTemplate: e.target.value })}
                         rows={16}
-                        className={`w-full px-4 py-3 rounded-xl border font-mono text-sm leading-relaxed transition-all resize-none ${
+                        className={`w-full px-4 py-3 rounded-xl border font-mono text-sm leading-relaxed transition-all resize-none whitespace-pre-wrap ${
                           theme === 'dark' 
-                            ? 'bg-slate-800/50 border-slate-700 text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/20' 
-                            : 'bg-white border-slate-200 text-slate-900 focus:border-green-500 focus:ring-2 focus:ring-green-500/20'
+                            ? 'bg-slate-800/50 border-slate-700 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20' 
+                            : 'bg-white border-slate-200 text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
                         }`}
                         placeholder="Enter your reminder message template..."
                       />
@@ -872,16 +926,38 @@ export const Settings: React.FC = () => {
 
                     {/* Live Preview */}
                     <div className={`${showPreview ? 'block' : 'hidden'} lg:block`}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Eye className={`w-4 h-4 ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`} />
-                        <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
-                          Live Preview
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          theme === 'dark' ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'
-                        }`}>
-                          Auto-filled
-                        </span>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Eye className={`w-4 h-4 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+                          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                            Live Preview
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            Auto-filled with your shop details
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Shop Branding Preview Info - Always show with available data */}
+                      <div className={`mb-3 p-3 rounded-xl border ${
+                        theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <p className={`text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          📌 Your shop details that will appear in the message:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`text-xs px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                            🏪 {effectiveShopName}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
+                            📞 {effectiveShopPhone}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>
+                            📍 {effectiveShopAddress}
+                          </span>
+                        </div>
                       </div>
                       
                       {/* WhatsApp Style Preview */}
@@ -933,14 +1009,14 @@ export const Settings: React.FC = () => {
                   <div className="flex justify-end pt-4">
                     <button
                       onClick={handleWhatsAppSave}
-                      disabled={isSaving}
+                      disabled={whatsAppSaving}
                       className={`relative px-8 py-3 rounded-xl font-semibold text-white transition-all overflow-hidden ${
                         saveSuccess 
                           ? 'bg-green-500' 
-                          : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-lg hover:shadow-green-500/30'
+                          : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg hover:shadow-blue-500/30'
                       }`}
                     >
-                      {isSaving ? (
+                      {whatsAppSaving ? (
                         <span className="flex items-center gap-2">
                           <RefreshCw className="w-5 h-5 animate-spin" />
                           Saving...
@@ -972,7 +1048,7 @@ export const Settings: React.FC = () => {
                     WhatsApp Reminders Disabled
                   </h3>
                   <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Enable WhatsApp integration to send payment reminders to customers automatically.
+                    Enable WhatsApp reminders to customize message templates and send payment reminders to customers.
                   </p>
                 </div>
               )}
@@ -981,7 +1057,7 @@ export const Settings: React.FC = () => {
         )}
 
         {/* Global Save Button */}
-        {activeTab !== 'whatsapp' && (
+        {activeTab !== 'invoice' && (
           <div className="flex justify-end mt-8">
             <button
               onClick={handleSave}

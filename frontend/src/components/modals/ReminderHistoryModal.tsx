@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { reminderService, type InvoiceReminder } from '../../services/reminderService';
 import { 
@@ -9,15 +10,20 @@ import {
   CreditCard, 
   Phone,
   RefreshCw,
-  History
+  History,
+  FileText,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface ReminderHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  invoiceId: string;
-  invoiceNumber: string;
-  customerName: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  customerName?: string;
+  customerId?: string;
+  title?: string;
 }
 
 export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
@@ -26,37 +32,68 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
   invoiceId,
   invoiceNumber,
   customerName,
+  customerId,
+  title,
 }) => {
   const { theme } = useTheme();
+  const { isViewingShop, viewingShop, user } = useAuth();
   const [reminders, setReminders] = useState<InvoiceReminder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  const effectiveShopId = isViewingShop && viewingShop?.id ? viewingShop.id : user?.shop?.id;
 
   useEffect(() => {
-    if (isOpen && invoiceId) {
+    if (isOpen && (invoiceId || customerId)) {
       loadReminders();
+      setCurrentPage(1); // Reset to first page when modal opens
     }
-  }, [isOpen, invoiceId]);
+  }, [isOpen, invoiceId, customerId, effectiveShopId]);
 
   const loadReminders = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log('🔍 Loading reminders for invoice:', invoiceId);
-      const data = await reminderService.getByInvoice(invoiceId);
+      console.log('🔍 Loading reminders for:', invoiceId ? `invoice ${invoiceId}` : `customer ${customerId}`);
+      
+      let data: InvoiceReminder[];
+      if (invoiceId) {
+        data = await reminderService.getByInvoice(invoiceId, effectiveShopId);
+      } else if (customerId) {
+        data = await reminderService.getByCustomer(customerId, effectiveShopId);
+      } else {
+        data = [];
+      }
+      
       setReminders(data);
     } catch (err) {
       console.error('Failed to load reminders:', err);
-      // Provide more user-friendly error message
       const errorMessage = err instanceof Error ? err.message : 'Failed to load reminder history';
-      if (errorMessage.includes('Not Found') || errorMessage.includes('Invoice not found')) {
-        setError('No reminder history available for this invoice');
+      if (errorMessage.includes('Not Found') || errorMessage.includes('not found')) {
+        setError('No reminder history available');
       } else {
         setError(errorMessage);
       }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getModalTitle = () => {
+    if (title) return title;
+    if (invoiceNumber) return `${invoiceNumber}`;
+    if (customerName) return `${customerName}`;
+    return 'Reminder History';
+  };
+
+  const getSubtitle = () => {
+    if (invoiceNumber && customerName) return customerName;
+    if (customerId) return 'All invoices';
+    return '';
   };
 
   const formatDate = (dateString: string) => {
@@ -88,6 +125,14 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
     };
   };
 
+  // Pagination calculations
+  const totalPages = Math.ceil(reminders.length / itemsPerPage);
+  const paginatedReminders = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return reminders.slice(startIndex, endIndex);
+  }, [reminders, currentPage, itemsPerPage]);
+
   if (!isOpen) return null;
 
   return (
@@ -109,7 +154,7 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
               <div>
                 <h2 className="text-xl font-bold text-white">Reminder History</h2>
                 <p className="text-green-100 text-sm">
-                  {invoiceNumber} • {customerName}
+                  {getModalTitle()}{getSubtitle() ? ` • ${getSubtitle()}` : ''}
                 </p>
               </div>
             </div>
@@ -178,9 +223,11 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
 
               {/* Reminder List */}
               <div className="space-y-3">
-                {reminders.map((reminder, index) => {
+                {paginatedReminders.map((reminder, index) => {
                   const typeInfo = getReminderTypeInfo(reminder.type);
                   const TypeIcon = typeInfo.icon;
+                  // Calculate global index for numbering
+                  const globalIndex = (currentPage - 1) * itemsPerPage + index;
 
                   return (
                     <div 
@@ -207,11 +254,11 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
                               <span className={`text-xs px-2 py-1 rounded-full ${
                                 theme === 'dark' ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'
                               }`}>
-                                #{reminders.length - index}
+                                #{reminders.length - globalIndex}
                               </span>
                             </div>
 
-                            <div className="flex items-center gap-4 text-sm mb-2">
+                            <div className="flex flex-wrap items-center gap-3 text-sm mb-2">
                               <span className={`flex items-center gap-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                                 <Clock className="w-3.5 h-3.5" />
                                 {formatDate(reminder.sentAt)}
@@ -220,6 +267,15 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
                                 <span className={`flex items-center gap-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                                   <Phone className="w-3.5 h-3.5" />
                                   {reminder.customerPhone}
+                                </span>
+                              )}
+                              {/* Show invoice number when viewing customer reminders */}
+                              {customerId && (reminder as any).invoice?.invoiceNumber && (
+                                <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md ${
+                                  theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
+                                }`}>
+                                  <FileText className="w-3.5 h-3.5" />
+                                  {(reminder as any).invoice.invoiceNumber}
                                 </span>
                               )}
                             </div>
@@ -243,6 +299,99 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
                   );
                 })}
               </div>
+
+              {/* Pagination */}
+              {reminders.length > itemsPerPage && (
+                <div className={`flex items-center justify-between mt-6 pt-4 border-t ${
+                  theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+                }`}>
+                  {/* Page Info */}
+                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, reminders.length)} of {reminders.length}
+                  </p>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center gap-2">
+                    {/* Previous Button */}
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className={`p-2 rounded-lg transition-all ${
+                        currentPage === 1
+                          ? theme === 'dark'
+                            ? 'text-slate-600 cursor-not-allowed'
+                            : 'text-slate-300 cursor-not-allowed'
+                          : theme === 'dark'
+                            ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+
+                    {/* Page Numbers */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        // Show: first page, last page, current page, and pages around current
+                        const showPage = 
+                          page === 1 || 
+                          page === totalPages || 
+                          Math.abs(page - currentPage) <= 1;
+                        
+                        // Show ellipsis
+                        const showEllipsisBefore = page === currentPage - 2 && currentPage > 3;
+                        const showEllipsisAfter = page === currentPage + 2 && currentPage < totalPages - 2;
+
+                        if (showEllipsisBefore || showEllipsisAfter) {
+                          return (
+                            <span
+                              key={`ellipsis-${page}`}
+                              className={`px-2 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}
+                            >
+                              ...
+                            </span>
+                          );
+                        }
+
+                        if (!showPage) return null;
+
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`min-w-[36px] h-9 px-3 rounded-lg text-sm font-medium transition-all ${
+                              currentPage === page
+                                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
+                                : theme === 'dark'
+                                  ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Next Button */}
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className={`p-2 rounded-lg transition-all ${
+                        currentPage === totalPages
+                          ? theme === 'dark'
+                            ? 'text-slate-600 cursor-not-allowed'
+                            : 'text-slate-300 cursor-not-allowed'
+                          : theme === 'dark'
+                            ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

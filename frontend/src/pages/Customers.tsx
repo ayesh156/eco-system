@@ -3,23 +3,27 @@ import { useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDataCache } from '../contexts/DataCacheContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import { 
   mockCustomers, 
-  mockWhatsAppSettings, 
   mockInvoices
 } from '../data/mockData';
 import type { Customer, Invoice, CustomerPayment } from '../data/mockData';
 import { customerService, type APICustomer } from '../services/customerService';
 import { invoiceService, convertAPIInvoiceToFrontend } from '../services/invoiceService';
+import { reminderService } from '../services/reminderService';
 import { CustomerFormModal } from '../components/modals/CustomerFormModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { CustomerStatementModal } from '../components/modals/CustomerStatementModal';
 import { CustomerBulkPaymentModal } from '../components/modals/CustomerBulkPaymentModal';
+import { ReminderHistoryModal } from '../components/modals/ReminderHistoryModal';
+import { toast } from 'sonner';
 import { 
   Search, Plus, Edit, Trash2, Mail, Phone, AlertTriangle, CheckCircle, 
   Clock, CreditCard, Calendar, MessageCircle, Package, FileText,
   X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal,
-  List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc, Zap, Loader2, AlertCircle, CheckCircle2
+  List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc, Zap, Loader2, AlertCircle, CheckCircle2, History
 } from 'lucide-react';
 
 // Helper to convert API Customer to frontend Customer format
@@ -46,7 +50,7 @@ const convertAPICustomerToFrontend = (apiCustomer: APICustomer): Customer => ({
 export const Customers: React.FC = () => {
   const { theme } = useTheme();
   const { setCustomers: setCachedCustomers, setInvoices: setCachedInvoices } = useDataCache();
-  const { isViewingShop, viewingShop } = useAuth();
+  const { user, isViewingShop, viewingShop } = useAuth();
   
   // Get effective shopId for SUPER_ADMIN viewing a shop
   const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
@@ -82,10 +86,12 @@ export const Customers: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
   const [isBulkPaymentModalOpen, setIsBulkPaymentModalOpen] = useState(false);
+  const [isReminderHistoryOpen, setIsReminderHistoryOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>(undefined);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [customerForStatement, setCustomerForStatement] = useState<Customer | null>(null);
   const [customerForPayment, setCustomerForPayment] = useState<Customer | null>(null);
+  const [customerForReminders, setCustomerForReminders] = useState<Customer | null>(null);
   
   // Local customers state - loads from API
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -99,8 +105,34 @@ export const Customers: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
 
-  // WhatsApp settings
-  const whatsAppSettings = mockWhatsAppSettings;
+  // WhatsApp settings from context
+  const { settings: whatsAppSettings, shopDetails } = useWhatsAppSettings();
+  const { branding } = useShopBranding();
+  
+  // Get effective shop - use viewing shop for SUPER_ADMIN, otherwise user's shop
+  const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
+  
+  // Helper to get first non-empty value
+  const getFirstNonEmpty = (...values: (string | null | undefined)[]): string => {
+    for (const val of values) {
+      if (val && val.trim() !== '') return val;
+    }
+    return '';
+  };
+  
+  // Effective shop details with fallback chain: shopDetails (API) -> branding -> effectiveShop (auth) -> placeholder
+  const effectiveShopName = getFirstNonEmpty(shopDetails?.name, branding?.name, effectiveShop?.name) || 'Your Shop';
+  const effectiveShopPhone = getFirstNonEmpty(shopDetails?.phone, branding?.phone, effectiveShop?.phone) || 'N/A';
+  const effectiveShopAddress = getFirstNonEmpty(shopDetails?.address, branding?.address, effectiveShop?.address) || 'N/A';
+  const effectiveShopWebsite = getFirstNonEmpty(branding?.website, (effectiveShop as any)?.website) || '';
+  
+  // Debug log to trace shop details (remove in production)
+  console.log('🏪 Shop Details Debug:', {
+    shopDetails: { name: shopDetails?.name, phone: shopDetails?.phone, address: shopDetails?.address },
+    branding: { name: branding?.name, phone: branding?.phone, address: branding?.address },
+    effectiveShop: { name: effectiveShop?.name, phone: effectiveShop?.phone, address: effectiveShop?.address },
+    resolved: { name: effectiveShopName, phone: effectiveShopPhone, address: effectiveShopAddress, website: effectiveShopWebsite }
+  });
   
   // Location for receiving navigation state
   const location = useLocation();
@@ -307,6 +339,9 @@ export const Customers: React.FC = () => {
   }, [customers]);
 
   const formatCurrency = (amount: number | undefined | null) => `Rs. ${(amount ?? 0).toLocaleString('en-LK')}`;
+  
+  // For WhatsApp templates - format number without Rs. prefix (template already has Rs.)
+  const formatNumber = (amount: number | undefined | null) => (amount ?? 0).toLocaleString('en-LK');
 
   const formatDateDisplay = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -409,16 +444,20 @@ export const Customers: React.FC = () => {
 
     const message = whatsAppSettings.paymentReminderTemplate
       .replace(/{{customerName}}/g, customer.name)
-      .replace(/{{dueAmount}}/g, formatCurrency(customer.creditBalance))
+      .replace(/{{dueAmount}}/g, formatNumber(customer.creditBalance))
       .replace(/{{dueDate}}/g, customer.creditDueDate ? new Date(customer.creditDueDate).toLocaleDateString('en-GB') : 'N/A')
-      .replace(/{{totalAmount}}/g, formatCurrency(customer.creditBalance))
-      .replace(/{{paidAmount}}/g, 'Rs. 0')
-      .replace(/{{invoiceId}}/g, 'N/A');
+      .replace(/{{totalAmount}}/g, formatNumber(customer.creditBalance))
+      .replace(/{{paidAmount}}/g, '0')
+      .replace(/{{invoiceId}}/g, 'N/A')
+      .replace(/{{shopName}}/g, effectiveShopName)
+      .replace(/{{shopPhone}}/g, effectiveShopPhone)
+      .replace(/{{shopAddress}}/g, effectiveShopAddress)
+      .replace(/{{shopWebsite}}/g, effectiveShopWebsite);
 
     const phone = customer.phone.replace(/[^0-9]/g, '');
     const formattedPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
-    window.location.href = whatsappUrl;
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   const sendUrgentReminder = (customer: Customer) => {
@@ -433,15 +472,19 @@ export const Customers: React.FC = () => {
 
     const message = whatsAppSettings.overdueReminderTemplate
       .replace(/{{customerName}}/g, customer.name)
-      .replace(/{{dueAmount}}/g, formatCurrency(customer.creditBalance))
+      .replace(/{{dueAmount}}/g, formatNumber(customer.creditBalance))
       .replace(/{{dueDate}}/g, customer.creditDueDate ? new Date(customer.creditDueDate).toLocaleDateString('en-GB') : 'N/A')
       .replace(/{{daysOverdue}}/g, String(daysOverdue))
-      .replace(/{{invoiceId}}/g, 'N/A');
+      .replace(/{{invoiceId}}/g, 'N/A')
+      .replace(/{{shopName}}/g, effectiveShopName)
+      .replace(/{{shopPhone}}/g, effectiveShopPhone)
+      .replace(/{{shopAddress}}/g, effectiveShopAddress)
+      .replace(/{{shopWebsite}}/g, effectiveShopWebsite);
 
     const phone = customer.phone.replace(/[^0-9]/g, '');
     const formattedPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
-    window.location.href = whatsappUrl;
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   const getDaysUntilDue = (dueDate?: string) => {
@@ -553,6 +596,12 @@ export const Customers: React.FC = () => {
     setIsBulkPaymentModalOpen(true);
     // Preload invoices for this customer
     await loadInvoices(customer.id);
+  };
+
+  // Reminder history modal handlers
+  const handleOpenReminderHistory = (customer: Customer) => {
+    setCustomerForReminders(customer);
+    setIsReminderHistoryOpen(true);
   };
 
   /**
@@ -686,15 +735,28 @@ export const Customers: React.FC = () => {
 
     try {
       // Call API to record payment - this also updates customer credit automatically
-      await invoiceService.addPayment(apiId, {
+      // Pass effectiveShopId for SuperAdmin shop viewing support
+      const result = await invoiceService.addPayment(apiId, {
         amount,
         paymentMethod: paymentMethodMap[paymentMethod],
         notes: notes || `Payment recorded from Statement`
-      });
+      }, effectiveShopId);
 
-      // Reload invoices from API to get updated data
+      // Immediately update local state with the returned invoice data for instant UI feedback
+      if (result.invoice) {
+        const updatedInvoice = convertAPIInvoiceToFrontend(result.invoice);
+        setInvoices(prev => prev.map(inv => 
+          inv.id === invoiceId || inv.apiId === apiId ? updatedInvoice : inv
+        ));
+        // Also update cached invoices
+        setCachedInvoices(prev => prev.map(inv => 
+          inv.id === invoiceId || inv.apiId === apiId ? updatedInvoice : inv
+        ));
+      }
+
+      // Reload invoices from API to get updated data (background refresh)
       if (customerForStatement) {
-        await loadInvoices(customerForStatement.id);
+        loadInvoices(customerForStatement.id);
         
         // Also update the global invoice cache
         try {
@@ -846,17 +908,26 @@ export const Customers: React.FC = () => {
     return paymentDistribution;
   }, [customers, invoices, customerForStatement]);
 
-  const handleSendInvoiceReminder = (invoice: Invoice, type: 'friendly' | 'urgent') => {
+  const handleSendInvoiceReminder = async (invoice: Invoice, type: 'friendly' | 'urgent') => {
     if (!whatsAppSettings.enabled) {
-      alert('WhatsApp reminders are disabled. Please enable them in settings.');
+      toast.error('WhatsApp reminders are disabled. Please enable them in settings.');
       return;
     }
 
     const customer = customers.find(c => c.id === invoice.customerId);
-    if (!customer) return;
+    if (!customer) {
+      toast.error('Customer not found');
+      return;
+    }
+
+    if (!customer.phone) {
+      toast.error('Customer phone number not found');
+      return;
+    }
 
     const outstanding = invoice.total - (invoice.paidAmount || 0);
     const daysOverdue = Math.max(0, Math.ceil((new Date().getTime() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24)));
+    const isOverdue = type === 'urgent';
 
     const template = type === 'friendly' 
       ? whatsAppSettings.paymentReminderTemplate 
@@ -865,16 +936,58 @@ export const Customers: React.FC = () => {
     const message = template
       .replace(/{{customerName}}/g, customer.name)
       .replace(/{{invoiceId}}/g, invoice.id)
-      .replace(/{{totalAmount}}/g, formatCurrency(invoice.total))
-      .replace(/{{paidAmount}}/g, formatCurrency(invoice.paidAmount || 0))
-      .replace(/{{dueAmount}}/g, formatCurrency(outstanding))
+      .replace(/{{totalAmount}}/g, formatNumber(invoice.total))
+      .replace(/{{paidAmount}}/g, formatNumber(invoice.paidAmount || 0))
+      .replace(/{{dueAmount}}/g, formatNumber(outstanding))
       .replace(/{{dueDate}}/g, new Date(invoice.dueDate).toLocaleDateString('en-GB'))
-      .replace(/{{daysOverdue}}/g, String(daysOverdue));
+      .replace(/{{daysOverdue}}/g, String(daysOverdue))
+      .replace(/{{shopName}}/g, effectiveShopName)
+      .replace(/{{shopPhone}}/g, effectiveShopPhone)
+      .replace(/{{shopAddress}}/g, effectiveShopAddress)
+      .replace(/{{shopWebsite}}/g, effectiveShopWebsite);
 
     const phone = customer.phone.replace(/[^0-9]/g, '');
     const formattedPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
-    window.location.href = whatsappUrl;
+
+    // Try to save reminder to database (using apiId if available, or invoice.id)
+    let reminderCount = (invoice.reminderCount || 0) + 1;
+    const invoiceApiId = invoice.apiId || invoice.id;
+    
+    try {
+      const result = await reminderService.create(invoiceApiId, {
+        type: isOverdue ? 'overdue' : 'payment',
+        channel: 'whatsapp',
+        message: message,
+        customerPhone: formattedPhone,
+        customerName: customer.name,
+        shopId: effectiveShopId, // For SUPER_ADMIN viewing shops
+      });
+      reminderCount = result.reminderCount;
+      console.log('✅ Reminder saved to database, count:', reminderCount);
+
+      // Update invoice in state with new reminder count
+      setInvoices(prev => prev.map(inv => 
+        (inv.id === invoice.id || inv.apiId === invoiceApiId) 
+          ? { ...inv, reminderCount, lastReminderDate: new Date().toISOString() } 
+          : inv
+      ));
+      setCachedInvoices(prev => prev.map(inv => 
+        (inv.id === invoice.id || inv.apiId === invoiceApiId) 
+          ? { ...inv, reminderCount, lastReminderDate: new Date().toISOString() } 
+          : inv
+      ));
+    } catch (error) {
+      console.warn('⚠️ Could not save reminder to database:', error);
+      // Continue anyway - message will still be sent
+    }
+
+    // Open WhatsApp
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+
+    toast.success(`${type === 'urgent' ? 'Urgent' : 'Friendly'} reminder sent to ${customer.name}`, {
+      description: `Reminder #${reminderCount} sent via WhatsApp`,
+    });
   };
 
   // Loading state
@@ -1358,8 +1471,8 @@ export const Customers: React.FC = () => {
                           >
                             <FileText className="w-4 h-4" />
                           </button>
-                          {/* WhatsApp Reminders - only show if has credit */}
-                          {hasCredit && (
+                          {/* WhatsApp Reminders - only show if has credit and WhatsApp enabled */}
+                          {hasCredit && whatsAppSettings.enabled && (
                             <>
                               <button
                                 onClick={() => sendUrgentReminder(customer)}
@@ -1378,6 +1491,15 @@ export const Customers: React.FC = () => {
                                 title="Send Friendly Reminder (WhatsApp)"
                               >
                                 <MessageCircle className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenReminderHistory(customer)}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
+                                }`}
+                                title="View Reminder History"
+                              >
+                                <History className="w-4 h-4" />
                               </button>
                             </>
                           )}
@@ -1461,7 +1583,7 @@ export const Customers: React.FC = () => {
                           >
                             <FileText className="w-4 h-4" />
                           </button>
-                          {hasCredit && (
+                          {hasCredit && whatsAppSettings.enabled && (
                             <>
                               <button
                                 onClick={() => sendUrgentReminder(customer)}
@@ -1474,6 +1596,12 @@ export const Customers: React.FC = () => {
                                 className={`p-1.5 rounded-lg ${theme === 'dark' ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-500'}`}
                               >
                                 <MessageCircle className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenReminderHistory(customer)}
+                                className={`p-1.5 rounded-lg ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}`}
+                              >
+                                <History className="w-4 h-4" />
                               </button>
                             </>
                           )}
@@ -1631,7 +1759,7 @@ export const Customers: React.FC = () => {
                   }`}>
                     <div className="flex items-center justify-between mb-2">
                       <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Credit (Naya)
+                        Credit
                       </span>
                       <span className={`text-sm font-bold ${isOverdue ? 'text-red-500' : 'text-blue-500'}`}>
                         {formatCurrency(customer.creditBalance || 0)}
@@ -1697,28 +1825,40 @@ export const Customers: React.FC = () => {
                         <CreditCard className="w-4 h-4" /> Record Payment
                       </button>
                       
-                      {/* Reminder Buttons */}
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => sendFriendlyReminder(customer)}
-                          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
-                            theme === 'dark' ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-green-50 text-green-600 hover:bg-green-100'
-                          }`}
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" /> Remind
-                        </button>
-                        <button 
-                          onClick={() => sendUrgentReminder(customer)}
-                          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
-                            isOverdue
-                              ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white'
-                              : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
-                          }`}
-                        >
-                          <Zap className="w-3.5 h-3.5" /> 
-                          Urgent!
-                        </button>
-                      </div>
+                      {/* Reminder Buttons - Only show if WhatsApp enabled */}
+                      {whatsAppSettings.enabled && (
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => sendFriendlyReminder(customer)}
+                            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
+                              theme === 'dark' ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-green-50 text-green-600 hover:bg-green-100'
+                            }`}
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" /> Remind
+                          </button>
+                          <button 
+                            onClick={() => sendUrgentReminder(customer)}
+                            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
+                              isOverdue
+                                ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white'
+                                : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
+                            }`}
+                          >
+                            <Zap className="w-3.5 h-3.5" /> 
+                            Urgent!
+                          </button>
+                          {/* Reminder History Button */}
+                          <button 
+                            onClick={() => handleOpenReminderHistory(customer)}
+                            className={`flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-medium ${
+                              theme === 'dark' ? 'bg-slate-700/50 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                            title="View reminder history"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1906,6 +2046,17 @@ export const Customers: React.FC = () => {
           setCustomerForPayment(null);
         }}
         onSubmit={handleBulkPaymentSubmit}
+      />
+
+      {/* Reminder History Modal */}
+      <ReminderHistoryModal
+        isOpen={isReminderHistoryOpen}
+        onClose={() => {
+          setIsReminderHistoryOpen(false);
+          setCustomerForReminders(null);
+        }}
+        customerId={customerForReminders?.id}
+        customerName={customerForReminders?.name}
       />
     </div>
   );

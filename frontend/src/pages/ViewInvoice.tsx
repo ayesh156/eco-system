@@ -29,10 +29,28 @@ export const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { theme } = useTheme();
-  const { isViewingShop, viewingShop } = useAuth();
+  const { user, isViewingShop, viewingShop } = useAuth();
   const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
-  const { settings: whatsAppSettings } = useWhatsAppSettings();
+  const { settings: whatsAppSettings, shopDetails } = useWhatsAppSettings();
   const { branding } = useShopBranding();
+  
+  // Get effective shop - use viewing shop for SUPER_ADMIN, otherwise user's shop
+  const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
+  
+  // Helper to get first non-empty value
+  const getFirstNonEmpty = (...values: (string | null | undefined)[]): string => {
+    for (const val of values) {
+      if (val && val.trim() !== '') return val;
+    }
+    return '';
+  };
+  
+  // Effective shop details with fallback chain: shopDetails (API) -> branding -> effectiveShop (auth) -> placeholder
+  const effectiveShopName = getFirstNonEmpty(shopDetails?.name, branding?.name, effectiveShop?.name) || 'Your Shop';
+  const effectiveShopPhone = getFirstNonEmpty(shopDetails?.phone, branding?.phone, effectiveShop?.phone) || 'N/A';
+  const effectiveShopAddress = getFirstNonEmpty(shopDetails?.address, branding?.address, effectiveShop?.address) || 'N/A';
+  const effectiveShopWebsite = getFirstNonEmpty(branding?.website, (effectiveShop as any)?.website) || '';
+  
   const { 
     customers: cachedCustomers, 
     loadCustomers, 
@@ -90,6 +108,31 @@ export const ViewInvoice: React.FC = () => {
     }
   }, [id, loadCustomers, effectiveShopId]);
 
+  // Enrich invoice items with warranty data from products
+  const enrichInvoiceWithWarranty = useCallback((inv: Invoice): Invoice => {
+    return {
+      ...inv,
+      items: inv.items.map(item => {
+        // If item already has warranty, keep it
+        if (item.warranty) return item;
+        
+        // Otherwise try to get warranty from cached products
+        const product = cachedProducts.find(p => p.id === item.productId);
+        return {
+          ...item,
+          warranty: product?.warranty
+        };
+      })
+    };
+  }, [cachedProducts]);
+
+  useEffect(() => {
+    // Load products to enrich items with warranty
+    if (invoices.length > 0 && cachedProducts.length === 0) {
+      loadProducts();
+    }
+  }, [invoices.length, cachedProducts.length, loadProducts]);
+
   useEffect(() => {
     fetchInvoice();
   }, [fetchInvoice]);
@@ -108,10 +151,11 @@ export const ViewInvoice: React.FC = () => {
     }
   }, [showEditModal, cachedProducts.length, loadProducts]);
 
-  // Find the invoice
+  // Find the invoice and enrich with warranty data
   const invoice = useMemo(() => {
-    return invoices.find(inv => inv.id === id) || null;
-  }, [id, invoices]);
+    const foundInvoice = invoices.find(inv => inv.id === id) || null;
+    return foundInvoice ? enrichInvoiceWithWarranty(foundInvoice) : null;
+  }, [id, invoices, enrichInvoiceWithWarranty]);
 
   // Find the customer
   const customer = useMemo(() => {
@@ -246,7 +290,11 @@ export const ViewInvoice: React.FC = () => {
         month: 'short',
         year: 'numeric'
       }))
-      .replace(/\{\{daysOverdue\}\}/g, daysOverdue.toString());
+      .replace(/\{\{daysOverdue\}\}/g, daysOverdue.toString())
+      .replace(/\{\{shopName\}\}/g, effectiveShopName)
+      .replace(/\{\{shopPhone\}\}/g, effectiveShopPhone)
+      .replace(/\{\{shopAddress\}\}/g, effectiveShopAddress)
+      .replace(/\{\{shopWebsite\}\}/g, effectiveShopWebsite);
 
     // Format phone number (remove dashes and ensure country code)
     let phone = customer.phone.replace(/[-\s]/g, '');
@@ -268,6 +316,7 @@ export const ViewInvoice: React.FC = () => {
           message: message,
           customerPhone: phone,
           customerName: invoice.customerName,
+          shopId: effectiveShopId,
         });
         reminderCount = result.reminderCount;
         console.log('✅ Reminder saved to database, count:', reminderCount);
@@ -864,6 +913,15 @@ export const ViewInvoice: React.FC = () => {
                                 <div>
                                   <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                                     {item.productName}
+                                    {product?.warranty && (
+                                      <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
+                                        [{product.warranty.toLowerCase().includes('no') ? 'N/W' : 
+                                          product.warranty.toLowerCase().includes('lifetime') ? 'L/W' :
+                                          product.warranty.match(/(\d+)\s*y/i) ? `${product.warranty.match(/(\d+)\s*y/i)?.[1]}Y` :
+                                          product.warranty.match(/(\d+)\s*m/i) ? `${product.warranty.match(/(\d+)\s*m/i)?.[1]}M` :
+                                          product.warranty.substring(0, 5)}]
+                                      </span>
+                                    )}
                                   </p>
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {product && (

@@ -108,6 +108,22 @@ function getUserRoleFromToken(req: VercelRequest): string | null {
   }
 }
 
+// Get user ID from JWT token
+function getUserIdFromToken(req: VercelRequest): string | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  const token = authHeader.substring(7);
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { id?: string };
+    return decoded.id || null;
+  } catch {
+    return null;
+  }
+}
+
 // Get effective shopId for SuperAdmin shop viewing
 // SuperAdmin can view any shop by passing shopId query parameter
 function getEffectiveShopId(req: VercelRequest, query: Record<string, string>): string | null {
@@ -182,7 +198,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const user = await db.user.findUnique({
         where: { email: email.toLowerCase() },
-        include: { shop: { select: { id: true, name: true, slug: true } } },
+        include: { shop: { select: { id: true, name: true, slug: true, logo: true, email: true, phone: true, address: true, website: true } } },
       });
 
       if (!user) {
@@ -258,7 +274,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           shopId,
           role: 'STAFF',
         },
-        include: { shop: { select: { id: true, name: true, slug: true } } },
+        include: { shop: { select: { id: true, name: true, slug: true, logo: true, email: true, phone: true, address: true, website: true } } },
       });
 
       const tokenPayload = {
@@ -303,7 +319,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         const user = await db.user.findUnique({
           where: { id: decoded.id },
-          include: { shop: { select: { id: true, name: true, slug: true } } },
+          include: { shop: { select: { id: true, name: true, slug: true, logo: true, email: true, phone: true, address: true, website: true } } },
         });
 
         if (!user) {
@@ -358,7 +374,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
         const user = await db.user.findUnique({
           where: { id: decoded.id },
-          include: { shop: { select: { id: true, name: true, slug: true } } },
+          include: { shop: { select: { id: true, name: true, slug: true, logo: true, email: true, phone: true, address: true, website: true } } },
         });
 
         if (!user) {
@@ -968,7 +984,129 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(201).json({ 
         success: true, 
         data: reminder,
-        meta: { reminderCount }
+        reminderCount,
+      });
+    }
+
+    // ==================== INVOICE ITEM HISTORY ====================
+    
+    // GET - Get item change history for an invoice
+    const itemHistoryGetMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/item-history$/);
+    if (itemHistoryGetMatch && method === 'GET') {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const invoiceId = itemHistoryGetMatch[1];
+      
+      // Find invoice by ID or invoice number
+      let invoice = await db.invoice.findUnique({ 
+        where: { id: invoiceId },
+        select: { id: true, shopId: true, invoiceNumber: true },
+      });
+      if (!invoice) {
+        const invoiceNum = invoiceId.startsWith('INV-') ? invoiceId : `INV-${invoiceId}`;
+        invoice = await db.invoice.findFirst({ 
+          where: { invoiceNumber: invoiceNum },
+          select: { id: true, shopId: true, invoiceNumber: true },
+        });
+      }
+      if (!invoice) {
+        return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+      
+      // Verify ownership
+      if (invoice.shopId !== effectiveShopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      
+      const history = await db.invoiceItemHistory.findMany({
+        where: { invoiceId: invoice.id },
+        orderBy: { createdAt: 'desc' },
+      });
+      
+      return res.status(200).json({ 
+        success: true, 
+        data: history,
+        meta: { count: history.length, invoiceNumber: invoice.invoiceNumber },
+      });
+    }
+    
+    // POST - Create item change history record(s)
+    const itemHistoryPostMatch = path.match(/^\/api\/v1\/invoices\/([^/]+)\/item-history$/);
+    if (itemHistoryPostMatch && method === 'POST') {
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      
+      const invoiceId = itemHistoryPostMatch[1];
+      const changes = Array.isArray(body) ? body : [body];
+      
+      // Find invoice by ID or invoice number
+      let invoice = await db.invoice.findUnique({ 
+        where: { id: invoiceId },
+        select: { id: true, shopId: true, invoiceNumber: true },
+      });
+      if (!invoice) {
+        const invoiceNum = invoiceId.startsWith('INV-') ? invoiceId : `INV-${invoiceId}`;
+        invoice = await db.invoice.findFirst({ 
+          where: { invoiceNumber: invoiceNum },
+          select: { id: true, shopId: true, invoiceNumber: true },
+        });
+      }
+      if (!invoice) {
+        return res.status(404).json({ success: false, error: 'Invoice not found' });
+      }
+      
+      // Verify ownership
+      if (invoice.shopId !== effectiveShopId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
+      
+      // Get user info from token for audit trail
+      const userId = getUserIdFromToken(req);
+      
+      // Create history records
+      const historyRecords = await db.invoiceItemHistory.createMany({
+        data: changes.map((change: {
+          action: string;
+          productId?: string;
+          productName: string;
+          oldQuantity?: number;
+          newQuantity?: number;
+          unitPrice: number;
+          amountChange: number;
+          reason?: string;
+          notes?: string;
+          changedByName?: string;
+        }) => ({
+          invoiceId: invoice!.id,
+          shopId: effectiveShopId,
+          action: change.action as 'ADDED' | 'REMOVED' | 'QTY_INCREASED' | 'QTY_DECREASED' | 'PRICE_CHANGED',
+          productId: change.productId || null,
+          productName: change.productName,
+          oldQuantity: change.oldQuantity ?? null,
+          newQuantity: change.newQuantity ?? null,
+          unitPrice: change.unitPrice,
+          amountChange: change.amountChange,
+          changedById: userId || null,
+          changedByName: change.changedByName || 'Unknown',
+          reason: change.reason || null,
+          notes: change.notes || null,
+        })),
+      });
+      
+      // Fetch the created records
+      const createdHistory = await db.invoiceItemHistory.findMany({
+        where: { invoiceId: invoice.id },
+        orderBy: { createdAt: 'desc' },
+        take: changes.length,
+      });
+      
+      return res.status(201).json({ 
+        success: true, 
+        data: createdHistory,
+        meta: { created: historyRecords.count, invoiceNumber: invoice.invoiceNumber },
       });
     }
 
@@ -2225,7 +2363,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const users = await db.user.findMany({
         orderBy: { createdAt: 'desc' },
-        include: { shop: { select: { id: true, name: true, slug: true } } },
+        include: { shop: { select: { id: true, name: true, slug: true, logo: true, email: true, phone: true, address: true, website: true } } },
       });
 
       return res.status(200).json({
@@ -2263,7 +2401,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ...(typeof isActive === 'boolean' && { isActive }),
           ...(newShopId !== undefined && { shopId: newShopId || null }),
         },
-        include: { shop: { select: { id: true, name: true, slug: true } } },
+        include: { shop: { select: { id: true, name: true, slug: true, logo: true, email: true, phone: true, address: true, website: true } } },
       });
 
       return res.status(200).json({ success: true, data: updatedUser });
@@ -2307,7 +2445,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           isActive,
           shopId: userShopId || null,
         },
-        include: { shop: { select: { id: true, name: true, slug: true } } },
+        include: { shop: { select: { id: true, name: true, slug: true, logo: true, email: true, phone: true, address: true, website: true } } },
       });
 
       return res.status(201).json({
@@ -2407,6 +2545,187 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
 
       return res.status(200).json({ success: true, data: updatedShop });
+    }
+
+    // ========================================
+    // SHOP WHATSAPP SETTINGS (for shop admins and SuperAdmin viewing shops)
+    // ========================================
+
+    // Creative Default Templates with Sri Lankan context
+    const DEFAULT_PAYMENT_REMINDER = `Hello {{customerName}}! 👋
+
+Greetings from *{{shopName}}*!
+
+This is a friendly reminder about your pending payment:
+
+📄 *Invoice:* #{{invoiceId}}
+💰 *Total Amount:* Rs. {{totalAmount}}
+✅ *Paid:* Rs. {{paidAmount}}
+⏳ *Balance Due:* Rs. {{dueAmount}}
+📅 *Due Date:* {{dueDate}}
+
+We kindly request you to settle your outstanding balance at your earliest convenience.
+
+If you've already made the payment, please disregard this message.
+
+Thank you for your continued trust! 🙏
+
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}
+🌐 {{shopWebsite}}`;
+
+    const DEFAULT_OVERDUE_REMINDER = `⚠️ *URGENT: Payment Overdue Notice*
+
+Dear {{customerName}},
+
+We regret to inform you that your payment is now *OVERDUE*.
+
+📄 *Invoice:* #{{invoiceId}}
+📅 *Original Due Date:* {{dueDate}}
+⏰ *Days Overdue:* {{daysOverdue}} days
+💰 *Outstanding Amount:* Rs. {{dueAmount}}
+
+*Immediate action is required.* Please settle this payment as soon as possible to avoid any inconvenience.
+
+For payment assistance or queries, please contact us immediately.
+
+We value your business and appreciate your prompt attention to this matter.
+
+Best regards,
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}
+🌐 {{shopWebsite}}`;
+
+    // GET WhatsApp settings for a shop
+    if (path === '/api/v1/shop-admin/whatsapp-settings' && method === 'GET') {
+      // Support both shop admin and SuperAdmin viewing a shop
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+
+      const shop = await db.shop.findUnique({
+        where: { id: effectiveShopId },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          email: true,
+          address: true,
+          reminderEnabled: true,
+          paymentReminderTemplate: true,
+          overdueReminderTemplate: true,
+        },
+      });
+
+      if (!shop) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
+      }
+
+      // Return saved templates or creative defaults if null/empty
+      return res.status(200).json({
+        success: true,
+        data: {
+          enabled: shop.reminderEnabled ?? true,
+          paymentReminderTemplate: shop.paymentReminderTemplate || DEFAULT_PAYMENT_REMINDER,
+          overdueReminderTemplate: shop.overdueReminderTemplate || DEFAULT_OVERDUE_REMINDER,
+          shopDetails: {
+            name: shop.name,
+            phone: shop.phone || '',
+            email: shop.email || '',
+            address: shop.address || '',
+          },
+        },
+      });
+    }
+
+    // PUT/PATCH WhatsApp settings for a shop
+    if (path === '/api/v1/shop-admin/whatsapp-settings' && (method === 'PUT' || method === 'PATCH')) {
+      // Support both shop admin and SuperAdmin viewing a shop
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+
+      const { enabled, paymentReminderTemplate, overdueReminderTemplate } = body;
+
+      const updatedShop = await db.shop.update({
+        where: { id: effectiveShopId },
+        data: {
+          ...(enabled !== undefined && { reminderEnabled: enabled }),
+          ...(paymentReminderTemplate !== undefined && { paymentReminderTemplate }),
+          ...(overdueReminderTemplate !== undefined && { overdueReminderTemplate }),
+        },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          email: true,
+          address: true,
+          reminderEnabled: true,
+          paymentReminderTemplate: true,
+          overdueReminderTemplate: true,
+        },
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          enabled: updatedShop.reminderEnabled,
+          paymentReminderTemplate: updatedShop.paymentReminderTemplate || '',
+          overdueReminderTemplate: updatedShop.overdueReminderTemplate || '',
+          shopDetails: {
+            name: updatedShop.name,
+            phone: updatedShop.phone || '',
+            email: updatedShop.email || '',
+            address: updatedShop.address || '',
+          },
+        },
+        message: 'WhatsApp settings updated successfully',
+      });
+    }
+
+    // GET reminder history for a customer (aggregated from all their invoices)
+    if (path === '/api/v1/customers/reminders' && method === 'GET') {
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+
+      const customerId = query.customerId as string;
+      if (!customerId) {
+        return res.status(400).json({ success: false, message: 'customerId is required' });
+      }
+
+      // Get all reminders for invoices belonging to this customer
+      const reminders = await db.invoiceReminder.findMany({
+        where: {
+          shopId: effectiveShopId,
+          invoice: {
+            customerId: customerId,
+          },
+        },
+        include: {
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              total: true,
+              paidAmount: true,
+              dueAmount: true,
+            },
+          },
+        },
+        orderBy: { sentAt: 'desc' },
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: reminders,
+        meta: { count: reminders.length },
+      });
     }
 
     // ========================================

@@ -1050,3 +1050,174 @@ export const createInvoiceReminder = async (
     next(error);
   }
 };
+
+// ==========================================
+// INVOICE ITEM HISTORY
+// ==========================================
+
+/**
+ * Get item change history for an invoice
+ */
+export const getInvoiceItemHistory = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const userRole = (req.user as any)?.role;
+    const effectiveShopId = getEffectiveShopId(req);
+    
+    // SUPER_ADMIN can access any invoice, regular users need a shopId
+    const isSuperAdmin = userRole === 'SUPER_ADMIN';
+    
+    if (!isSuperAdmin && !effectiveShopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+
+    // Try to find invoice by ID first, then by invoice number
+    let invoice = await prisma.invoice.findUnique({
+      where: { id },
+      select: { id: true, shopId: true, invoiceNumber: true },
+    });
+
+    // If not found by ID, try by invoice number
+    if (!invoice) {
+      const invoiceNumber = id.startsWith('INV-') ? id : `INV-${id}`;
+      invoice = await prisma.invoice.findFirst({
+        where: { invoiceNumber },
+        select: { id: true, shopId: true, invoiceNumber: true },
+      });
+    }
+
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404);
+    }
+
+    // SUPER_ADMIN can view any invoice, regular users must own the invoice
+    if (!isSuperAdmin && invoice.shopId !== effectiveShopId) {
+      throw new AppError('You do not have permission to view this invoice history', 403);
+    }
+
+    const history = await prisma.invoiceItemHistory.findMany({
+      where: { invoiceId: invoice.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      data: history,
+      meta: { 
+        count: history.length,
+        invoiceNumber: invoice.invoiceNumber,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Create item change history record(s) for an invoice
+ * Supports batch creation for multiple changes at once
+ */
+export const createInvoiceItemHistory = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const userRole = (req.user as any)?.role;
+    const effectiveShopId = getEffectiveShopId(req);
+    
+    // SUPER_ADMIN can access any invoice, regular users need a shopId
+    const isSuperAdmin = userRole === 'SUPER_ADMIN';
+    
+    if (!isSuperAdmin && !effectiveShopId) {
+      throw new AppError('User is not associated with any shop', 403);
+    }
+
+    // Request body can be a single change or array of changes
+    const changes = Array.isArray(req.body) ? req.body : [req.body];
+
+    // Try to find invoice by ID first, then by invoice number
+    let invoice = await prisma.invoice.findUnique({
+      where: { id },
+      select: { id: true, shopId: true, invoiceNumber: true },
+    });
+
+    // If not found by ID, try by invoice number
+    if (!invoice) {
+      const invoiceNumber = id.startsWith('INV-') ? id : `INV-${id}`;
+      invoice = await prisma.invoice.findFirst({
+        where: { invoiceNumber },
+        select: { id: true, shopId: true, invoiceNumber: true },
+      });
+    }
+
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404);
+    }
+
+    // SUPER_ADMIN can modify any invoice, regular users must own the invoice
+    if (!isSuperAdmin && invoice.shopId !== effectiveShopId) {
+      throw new AppError('You do not have permission to modify this invoice history', 403);
+    }
+
+    // Get user info for audit trail
+    const user = req.user as { id: string; name?: string; email?: string } | undefined;
+    const changedById = user?.id || null;
+    const changedByName = user?.name || user?.email || 'Unknown';
+    
+    // Use invoice's shopId for the history record (not user's shopId)
+    const historyShopId = invoice.shopId;
+
+    // Create all history records
+    const historyRecords = await prisma.invoiceItemHistory.createMany({
+      data: changes.map((change: {
+        action: string;
+        productId?: string;
+        productName: string;
+        oldQuantity?: number;
+        newQuantity?: number;
+        unitPrice: number;
+        amountChange: number;
+        reason?: string;
+        notes?: string;
+      }) => ({
+        invoiceId: invoice!.id,
+        shopId: historyShopId,
+        action: change.action as 'ADDED' | 'REMOVED' | 'QTY_INCREASED' | 'QTY_DECREASED' | 'PRICE_CHANGED',
+        productId: change.productId || null,
+        productName: change.productName,
+        oldQuantity: change.oldQuantity ?? null,
+        newQuantity: change.newQuantity ?? null,
+        unitPrice: change.unitPrice,
+        amountChange: change.amountChange,
+        changedById,
+        changedByName,
+        reason: change.reason || null,
+        notes: change.notes || null,
+      })),
+    });
+
+    // Fetch the created records
+    const createdHistory = await prisma.invoiceItemHistory.findMany({
+      where: { invoiceId: invoice.id },
+      orderBy: { createdAt: 'desc' },
+      take: changes.length,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: createdHistory,
+      meta: { 
+        created: historyRecords.count,
+        invoiceNumber: invoice.invoiceNumber,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -41,24 +41,24 @@ router.post('/create-for-user', protect, sensitiveRateLimiter, createShopForUser
 // Get shop by ID - requires auth and shop access validation
 router.get('/:id', protect, requireShopAccess, getShopById);
 
-// Update shop settings (admin only)
-router.put('/:id', protect, requireShopAccess, authorize('ADMIN'), sensitiveRateLimiter, updateShop);
+// Update shop settings (admin or super admin)
+router.put('/:id', protect, requireShopAccess, authorize('ADMIN', 'SUPER_ADMIN'), sensitiveRateLimiter, updateShop);
 
 // Get shop statistics
-router.get('/:id/stats', protect, requireShopAccess, authorize('ADMIN', 'MANAGER'), getShopStats);
+router.get('/:id/stats', protect, requireShopAccess, authorize('ADMIN', 'MANAGER', 'SUPER_ADMIN'), getShopStats);
 
 // ==========================================
 // USER MANAGEMENT (admin only)
 // ==========================================
 
 // Get all users in shop
-router.get('/:id/users', protect, requireShopAccess, authorize('ADMIN'), getShopUsers);
+router.get('/:id/users', protect, requireShopAccess, authorize('ADMIN', 'SUPER_ADMIN'), getShopUsers);
 
 // Add new user to shop
-router.post('/:id/users', protect, requireShopAccess, authorize('ADMIN'), sensitiveRateLimiter, addShopUser);
+router.post('/:id/users', protect, requireShopAccess, authorize('ADMIN', 'SUPER_ADMIN'), sensitiveRateLimiter, addShopUser);
 
 // Update user role/status
-router.put('/:id/users/:userId', protect, requireShopAccess, authorize('ADMIN'), sensitiveRateLimiter, updateUserRole);
+router.put('/:id/users/:userId', protect, requireShopAccess, authorize('ADMIN', 'SUPER_ADMIN'), sensitiveRateLimiter, updateUserRole);
 
 // ==========================================
 // SUPER ADMIN ROUTES (platform-wide)

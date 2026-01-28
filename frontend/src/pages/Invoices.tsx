@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useDataCache } from '../contexts/DataCacheContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import { toast } from 'sonner';
 import type { Invoice, InvoicePayment, Customer, CustomerPayment, Product } from '../data/mockData';
 import { 
@@ -32,8 +33,9 @@ type ViewMode = 'grid' | 'table';
 export const Invoices: React.FC = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const { settings: whatsAppSettings } = useWhatsAppSettings();
-  const { isViewingShop, viewingShop } = useAuth();
+  const { settings: whatsAppSettings, shopDetails } = useWhatsAppSettings();
+  const { branding } = useShopBranding();
+  const { user, isViewingShop, viewingShop } = useAuth();
   const { 
     invoices: cachedInvoices, 
     loadInvoices, 
@@ -46,6 +48,23 @@ export const Invoices: React.FC = () => {
   
   // Get effective shopId for SUPER_ADMIN viewing a shop
   const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
+  
+  // Get effective shop - use viewing shop for SUPER_ADMIN, otherwise user's shop
+  const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
+  
+  // Helper to get first non-empty value
+  const getFirstNonEmpty = (...values: (string | null | undefined)[]): string => {
+    for (const val of values) {
+      if (val && val.trim() !== '') return val;
+    }
+    return '';
+  };
+  
+  // Effective shop details with fallback chain: shopDetails (API) -> branding -> effectiveShop (auth) -> placeholder
+  const effectiveShopName = getFirstNonEmpty(shopDetails?.name, branding?.name, effectiveShop?.name) || 'Your Shop';
+  const effectiveShopPhone = getFirstNonEmpty(shopDetails?.phone, branding?.phone, effectiveShop?.phone) || 'N/A';
+  const effectiveShopAddress = getFirstNonEmpty(shopDetails?.address, branding?.address, effectiveShop?.address) || 'N/A';
+  const effectiveShopWebsite = getFirstNonEmpty(branding?.website, (effectiveShop as any)?.website) || '';
   
   // Start with empty arrays - will load from API
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -402,11 +421,12 @@ export const Invoices: React.FC = () => {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
       }))
-      .replace(/\{\{daysOverdue\}\}/g, daysOverdue.toString());
+      .replace(/\{\{daysOverdue\}\}/g, daysOverdue.toString())
+      .replace(/\{\{shopName\}\}/g, effectiveShopName)
+      .replace(/\{\{shopPhone\}\}/g, effectiveShopPhone)
+      .replace(/\{\{shopAddress\}\}/g, effectiveShopAddress)
+      .replace(/\{\{shopWebsite\}\}/g, effectiveShopWebsite);
 
     // Format phone number (remove dashes and ensure country code)
     let phone = customerPhone.replace(/[-\s]/g, '');
@@ -430,6 +450,7 @@ export const Invoices: React.FC = () => {
           message: message,
           customerPhone: phone,
           customerName: invoice.customerName,
+          shopId: effectiveShopId, // For SUPER_ADMIN viewing shops
         });
         reminderCount = result.reminderCount;
         console.log('✅ Reminder saved to database, count:', reminderCount);

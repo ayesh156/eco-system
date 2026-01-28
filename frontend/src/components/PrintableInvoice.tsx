@@ -11,6 +11,7 @@ interface InvoiceItemWithWarranty {
   originalPrice?: number;
   total: number;
   warrantyDueDate?: string;
+  warranty?: string; // Product warranty period (e.g., "1 year", "6 months")
 }
 
 // Branding settings for PDF header
@@ -330,13 +331,13 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
           }
 
           .items-table thead th:nth-child(2) {
-            width: 15%;
+            width: 10%;
             text-align: center;
           }
 
           .items-table thead th:nth-child(3),
           .items-table thead th:nth-child(4) {
-            width: 17.5%;
+            width: 20%;
             text-align: right;
           }
 
@@ -607,36 +608,63 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
           <thead>
             <tr>
               <th>Items</th>
-              <th>Quantity</th>
+              <th>Qty</th>
               <th>Price</th>
               <th>Amount</th>
             </tr>
           </thead>
           <tbody>
-            {invoice.items.map((item, index) => (
-              <tr key={index}>
-                <td>
-                  <div className="product-name">{item.productName}</div>
-                  <div className="product-desc">A large, high-resolution monitor for immersive viewing experience.</div>
-                </td>
-                <td>{item.quantity}</td>
-                <td>
-                  {item.originalPrice && item.originalPrice !== item.unitPrice ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                      <span style={{ textDecoration: 'line-through', fontSize: '7pt' }}>
-                        {formatCurrency(item.originalPrice)}
-                      </span>
-                      <span style={{ fontWeight: '600' }}>
-                        {formatCurrency(item.unitPrice)}
-                      </span>
+            {invoice.items.map((item, index) => {
+              // Format warranty into short code (e.g., "1 year" -> "1Y", "6 months" -> "6M", "No Warranty" -> "N/W")
+              const formatWarrantyCode = (warranty?: string): string => {
+                if (!warranty) return 'N/W';
+                const w = warranty.toLowerCase().trim();
+                if (w.includes('lifetime') || w.includes('life time')) return 'L/W';
+                if (w.includes('no warranty') || w === 'n/w' || w === 'none') return 'N/W';
+                // Match patterns like "1 year", "2 years", "6 months", "3 month"
+                const yearMatch = w.match(/(\d+)\s*y(ear)?s?/i);
+                if (yearMatch) return `${yearMatch[1]}Y`;
+                const monthMatch = w.match(/(\d+)\s*m(onth)?s?/i);
+                if (monthMatch) return `${monthMatch[1]}M`;
+                const weekMatch = w.match(/(\d+)\s*w(eek)?s?/i);
+                if (weekMatch) return `${weekMatch[1]}W`;
+                const dayMatch = w.match(/(\d+)\s*d(ay)?s?/i);
+                if (dayMatch) return `${dayMatch[1]}D`;
+                // If can't parse, return abbreviated version
+                return warranty.length > 5 ? warranty.substring(0, 5) : warranty;
+              };
+              
+              return (
+                <tr key={index}>
+                  <td>
+                    <div className="product-name">
+                      {item.productName}
+                      {item.warranty && (
+                        <span style={{ marginLeft: '8px', fontSize: '7pt', fontWeight: '600', color: '#333', background: '#f0f0f0', padding: '1px 4px', borderRadius: '3px' }}>
+                          [{formatWarrantyCode(item.warranty)}]
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    formatCurrency(item.unitPrice)
-                  )}
-                </td>
-                <td>{formatCurrency(item.total)}</td>
-              </tr>
-            ))}
+                  </td>
+                  <td>{item.quantity}</td>
+                  <td>
+                    {item.originalPrice && item.originalPrice !== item.unitPrice ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                        <span style={{ textDecoration: 'line-through', fontSize: '7pt' }}>
+                          {formatCurrency(item.originalPrice)}
+                        </span>
+                        <span style={{ fontWeight: '600' }}>
+                          {formatCurrency(item.unitPrice)}
+                        </span>
+                      </div>
+                    ) : (
+                      formatCurrency(item.unitPrice)
+                    )}
+                  </td>
+                  <td>{formatCurrency(item.total)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 

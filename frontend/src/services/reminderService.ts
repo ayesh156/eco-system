@@ -48,15 +48,19 @@ export interface ReminderListResponse {
 export interface CreateReminderResponse {
   success: boolean;
   data: InvoiceReminder;
-  reminderCount: number;
+  reminderCount?: number;
+  meta?: { reminderCount: number };
 }
 
 export const reminderService = {
   /**
    * Get all reminders for an invoice
    */
-  async getByInvoice(invoiceId: string): Promise<InvoiceReminder[]> {
-    const url = `${API_BASE_URL}/api/v1/invoices/${invoiceId}/reminders`;
+  async getByInvoice(invoiceId: string, shopId?: string): Promise<InvoiceReminder[]> {
+    let url = `${API_BASE_URL}/api/v1/invoices/${invoiceId}/reminders`;
+    if (shopId) {
+      url += `?shopId=${shopId}`;
+    }
     console.log('🔍 Fetching reminders from:', url);
     
     const response = await fetch(url, {
@@ -81,10 +85,47 @@ export const reminderService = {
   },
 
   /**
+   * Get all reminders for a customer (across all their invoices)
+   */
+  async getByCustomer(customerId: string, shopId?: string): Promise<InvoiceReminder[]> {
+    let url = `${API_BASE_URL}/api/v1/customers/reminders?customerId=${customerId}`;
+    if (shopId) {
+      url += `&shopId=${shopId}`;
+    }
+    console.log('🔍 Fetching customer reminders from:', url);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Failed to fetch customer reminders:', response.status, errorData);
+      throw new Error(errorData.error || `Failed to fetch reminders: ${response.statusText}`);
+    }
+    
+    const data: ReminderListResponse = await response.json();
+    console.log('✅ Customer reminders loaded:', data);
+    
+    if (!data.success) {
+      throw new Error('Failed to fetch reminders');
+    }
+    
+    return data.data;
+  },
+
+  /**
    * Create a new reminder for an invoice
    */
   async create(invoiceId: string, reminder: CreateReminderRequest): Promise<{ reminder: InvoiceReminder; reminderCount: number }> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/invoices/${invoiceId}/reminders`, {
+    // Build URL with optional shopId query param (for SUPER_ADMIN viewing shops)
+    let url = `${API_BASE_URL}/api/v1/invoices/${invoiceId}/reminders`;
+    if (reminder.shopId) {
+      url += `?shopId=${reminder.shopId}`;
+    }
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(reminder),
@@ -101,9 +142,12 @@ export const reminderService = {
       throw new Error('Failed to create reminder');
     }
     
+    // Handle both response formats (root level or meta object)
+    const count = data.reminderCount ?? data.meta?.reminderCount ?? 1;
+    
     return {
       reminder: data.data,
-      reminderCount: data.reminderCount,
+      reminderCount: count,
     };
   },
 };

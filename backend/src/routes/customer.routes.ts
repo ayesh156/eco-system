@@ -125,6 +125,56 @@ router.get('/', async (req, res, next) => {
 });
 
 // ==========================================
+// GET /customers/reminders - Get reminder history for a customer
+// ==========================================
+router.get('/reminders', async (req, res, next) => {
+  try {
+    const authReq = req as AuthRequest;
+    const shopId = getEffectiveShopId(authReq);
+    
+    if (!shopId) {
+      return res.status(403).json({ success: false, message: 'Shop access required' });
+    }
+
+    const { customerId } = req.query;
+    
+    if (!customerId || typeof customerId !== 'string') {
+      return res.status(400).json({ success: false, message: 'customerId is required' });
+    }
+
+    // Get all reminders for invoices belonging to this customer
+    const reminders = await prisma.invoiceReminder.findMany({
+      where: {
+        shopId,
+        invoice: {
+          customerId: customerId,
+        },
+      },
+      include: {
+        invoice: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            total: true,
+            paidAmount: true,
+            dueAmount: true,
+          },
+        },
+      },
+      orderBy: { sentAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      data: reminders,
+      meta: { count: reminders.length },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==========================================
 // GET /customers/stats - Customer statistics
 // ==========================================
 router.get('/stats', async (req, res, next) => {

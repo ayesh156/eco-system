@@ -10,6 +10,8 @@ import {
   getInvoiceStats,
   getInvoiceReminders,
   createInvoiceReminder,
+  getInvoiceItemHistory,
+  createInvoiceItemHistory,
 } from '../controllers/invoice.controller';
 import { validateInvoice, validateInvoiceUpdate, validatePayment } from '../validators/invoice.validator';
 
@@ -39,5 +41,10 @@ router.route('/:id/payments')
 router.route('/:id/reminders')
   .get(getInvoiceReminders)
   .post(createInvoiceReminder);
+
+// Item history routes - Track changes to invoice items
+router.route('/:id/item-history')
+  .get(getInvoiceItemHistory)
+  .post(createInvoiceItemHistory);
 
 export default router;
