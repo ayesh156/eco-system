@@ -1458,7 +1458,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const discount = Number(invoice.discount) || 0;
       const tax = Number(invoice.tax) || 0;
       const grandTotal = subtotal - discount + tax;
-      const paidAmount = Number(invoice.amountPaid) || 0;
+      const paidAmount = Number(invoice.paidAmount) || 0;
       const dueAmount = Math.max(0, grandTotal - paidAmount);
       
       // Send actual email
@@ -1646,7 +1646,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const discount = Number(invoice.discount) || 0;
       const tax = Number(invoice.tax) || 0;
       const grandTotal = subtotal - discount + tax;
-      const paidAmount = Number(invoice.amountPaid) || 0;
+      const paidAmount = Number(invoice.paidAmount) || 0;
       const dueAmount = Math.max(0, grandTotal - paidAmount);
       
       // Send actual email (without PDF attachment in serverless mode)
