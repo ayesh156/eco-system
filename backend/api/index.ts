@@ -29,26 +29,50 @@ const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 // ==================== EMAIL SERVICE FOR VERCEL ====================
 
-// Create nodemailer transporter
+// Create nodemailer transporter - optimized for Gmail App Passwords
 function createEmailTransporter() {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT || '587');
-  const secure = process.env.SMTP_SECURE === 'true';
+  const secure = process.env.SMTP_SECURE === 'true'; // false for port 587, true for 465
   const user = process.env.SMTP_USER || '';
   const pass = process.env.SMTP_PASS || '';
+
+  console.log('📧 Creating email transporter:', { 
+    host, 
+    port, 
+    secure, 
+    userSet: !!user, 
+    passSet: !!pass,
+    passLength: pass ? pass.length : 0
+  });
 
   if (!user || !pass) {
     console.warn('⚠️ SMTP credentials not configured. Email sending will fail.');
     return null;
   }
 
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: { user, pass },
-    tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' },
-  });
+  try {
+    // For Gmail with App Password - use service configuration (most reliable)
+    if (host === 'smtp.gmail.com' || host.includes('gmail')) {
+      console.log('📧 Using Gmail service configuration with App Password');
+      return nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user, pass },
+      });
+    }
+    
+    // Generic SMTP configuration for other providers
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' },
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to create email transporter:', error.message);
+    return null;
+  }
 }
 
 // Format currency for email

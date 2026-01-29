@@ -525,21 +525,37 @@ export const ViewInvoice: React.FC = () => {
     }
 
     setIsSendingEmail(true);
+    const invoiceIdForApi = apiInvoiceId || invoice.apiId || invoice.id;
+    
     try {
       // Step 1: Generate PDF client-side as base64
       toast.loading('Generating PDF...', { id: 'email-pdf' });
-      const pdfBase64 = await generatePDFAsDataURL(printElement, {
-        quality: 0.9,
-        scale: 2,
-        margin: 5,
-      });
+      let pdfBase64: string | undefined;
       
-      toast.loading('Sending email with PDF...', { id: 'email-pdf' });
+      try {
+        pdfBase64 = await generatePDFAsDataURL(printElement, {
+          quality: 0.8, // Reduced quality for smaller file size
+          scale: 1.5,   // Reduced scale for smaller file size
+          margin: 5,
+        });
+        console.log('📧 PDF generated, size:', pdfBase64?.length || 0, 'bytes');
+      } catch (pdfError) {
+        console.warn('⚠️ PDF generation failed, will send email without PDF:', pdfError);
+        pdfBase64 = undefined;
+      }
       
-      const invoiceIdForApi = apiInvoiceId || invoice.apiId || invoice.id;
+      toast.loading('Sending email...', { id: 'email-pdf' });
       
-      // Step 2: Send email with PDF attachment
-      const result = await invoiceService.sendEmailWithPDF(invoiceIdForApi, effectiveShopId, pdfBase64);
+      // Step 2: Try sending email with PDF
+      let result;
+      try {
+        result = await invoiceService.sendEmailWithPDF(invoiceIdForApi, effectiveShopId, pdfBase64);
+      } catch (firstError) {
+        console.warn('⚠️ Email with PDF failed, retrying without PDF:', firstError);
+        // Step 3: Retry without PDF if first attempt failed
+        toast.loading('Retrying without PDF...', { id: 'email-pdf' });
+        result = await invoiceService.sendEmailWithPDF(invoiceIdForApi, effectiveShopId, undefined);
+      }
       
       // Update local state to reflect email sent
       const updateWithEmail = (prev: Invoice[]) => prev.map(inv => {
@@ -557,7 +573,7 @@ export const ViewInvoice: React.FC = () => {
       
       const successMessage = result.hasPdfAttachment 
         ? 'Invoice sent with PDF attachment!' 
-        : 'Invoice sent (PDF download available)';
+        : 'Invoice sent (PDF available to download)';
       
       toast.success(successMessage, {
         id: 'email-pdf',
@@ -567,7 +583,7 @@ export const ViewInvoice: React.FC = () => {
       console.error('❌ Failed to send invoice email:', error);
       toast.error('Failed to send email', {
         id: 'email-pdf',
-        description: error instanceof Error ? error.message : 'Please try again.',
+        description: error instanceof Error ? error.message : 'Please check SMTP settings.',
       });
     } finally {
       setIsSendingEmail(false);
