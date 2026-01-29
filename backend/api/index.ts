@@ -1936,6 +1936,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(201).json({ success: true, data: customer });
     }
 
+    // GET reminder history for a customer (aggregated from all their invoices)
+    if (path === '/api/v1/customers/reminders' && method === 'GET') {
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+
+      const customerId = query.customerId as string;
+      if (!customerId) {
+        return res.status(400).json({ success: false, message: 'customerId is required' });
+      }
+
+      // Get all reminders for invoices belonging to this customer
+      const reminders = await db.invoiceReminder.findMany({
+        where: {
+          shopId: effectiveShopId,
+          invoice: {
+            customerId: customerId,
+          },
+        },
+        include: {
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              total: true,
+              paidAmount: true,
+              dueAmount: true,
+            },
+          },
+        },
+        orderBy: { sentAt: 'desc' },
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: reminders,
+        meta: { count: reminders.length },
+      });
+    }
+
     const customerMatch = path.match(/^\/api\/v1\/customers\/([^/]+)$/);
     
     // GET /customers/:id - Get single customer
