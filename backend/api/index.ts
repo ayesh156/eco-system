@@ -1713,7 +1713,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             total: itemTotal,
-            warranty: item.warranty || 'No Warranty',
+            // Get warranty from product - InvoiceItem doesn't have warranty field
+            warranty: item.product?.warranty || undefined,
           };
         });
         

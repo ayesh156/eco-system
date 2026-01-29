@@ -1732,6 +1732,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         console.log('📧 Calling sendInvoiceEmail...');
         
+        // Debug: Log warranty info for each item
+        console.log('📧 Items with warranty info:', invoice.items.map((item: any) => ({
+          productName: item.product?.name || item.productName,
+          productWarranty: item.product?.warranty,
+          hasProduct: !!item.product,
+        })));
+        
         // Send email with PDF attachment if provided by client
         const emailResult = await sendInvoiceEmail({
           to: invoice.customer.email,
@@ -1744,7 +1751,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             total: item.quantity * item.unitPrice,
-            warranty: item.warranty || item.product?.warranty || undefined,
+            // Get warranty from product - InvoiceItem doesn't have warranty field directly
+            warranty: item.product?.warranty || undefined,
           })),
           subtotal,
           tax,
