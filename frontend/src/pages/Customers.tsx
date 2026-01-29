@@ -214,6 +214,8 @@ export const Customers: React.FC = () => {
     };
     
     loadCustomers();
+    // Also load all invoices for overdue calculations
+    loadInvoices();
   }, [location.state, effectiveShopId, setCachedCustomers]);
 
   // Update itemsPerPage when view mode changes
@@ -348,6 +350,45 @@ export const Customers: React.FC = () => {
     return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  // Helper function to calculate total credit balance and overdue amount from invoices for a customer
+  const getCustomerInvoiceStats = useCallback((customerId: string): { 
+    totalCredit: number; 
+    creditInvoiceCount: number;
+    totalOverdue: number; 
+    overdueCount: number 
+  } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const customerInvoices = invoices.filter(inv => inv.customerId === customerId);
+    let totalCredit = 0;
+    let creditInvoiceCount = 0;
+    let totalOverdue = 0;
+    let overdueCount = 0;
+    
+    customerInvoices.forEach(invoice => {
+      if (invoice.status !== 'fullpaid') {
+        const dueAmount = invoice.dueAmount ?? (invoice.total - (invoice.paidAmount || 0));
+        if (dueAmount > 0) {
+          // Count all unpaid amounts as credit balance
+          totalCredit += dueAmount;
+          creditInvoiceCount++;
+          
+          // Check if overdue
+          const dueDate = new Date(invoice.dueDate);
+          dueDate.setHours(0, 0, 0, 0);
+          
+          if (dueDate < today) {
+            totalOverdue += dueAmount;
+            overdueCount++;
+          }
+        }
+      }
+    });
+    
+    return { totalCredit, creditInvoiceCount, totalOverdue, overdueCount };
+  }, [invoices]);
+
   // Calendar helper functions
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -442,17 +483,62 @@ export const Customers: React.FC = () => {
       return;
     }
 
-    const message = whatsAppSettings.paymentReminderTemplate
-      .replace(/{{customerName}}/g, customer.name)
-      .replace(/{{dueAmount}}/g, formatNumber(customer.creditBalance))
-      .replace(/{{dueDate}}/g, customer.creditDueDate ? new Date(customer.creditDueDate).toLocaleDateString('en-GB') : 'N/A')
-      .replace(/{{totalAmount}}/g, formatNumber(customer.creditBalance))
-      .replace(/{{paidAmount}}/g, '0')
-      .replace(/{{invoiceId}}/g, 'N/A')
-      .replace(/{{shopName}}/g, effectiveShopName)
-      .replace(/{{shopPhone}}/g, effectiveShopPhone)
-      .replace(/{{shopAddress}}/g, effectiveShopAddress)
-      .replace(/{{shopWebsite}}/g, effectiveShopWebsite);
+    // Get ONLY overdue invoices for this customer
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const customerInvoices = invoices.filter(inv => 
+      inv.customerId === customer.id && inv.status !== 'fullpaid'
+    );
+    const overdueInvoices = customerInvoices.filter(inv => {
+      const dueDate = new Date(inv.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate < today;
+    });
+    
+    // Calculate totals from OVERDUE invoices only
+    const totalOverdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.dueAmount ?? (inv.total - (inv.paidAmount || 0))), 0);
+    
+    // Build overdue invoice list for message
+    let invoiceDetails = '';
+    if (overdueInvoices.length > 0) {
+      invoiceDetails = overdueInvoices.map(inv => {
+        const dueAmt = inv.dueAmount ?? (inv.total - (inv.paidAmount || 0));
+        const dueDate = new Date(inv.dueDate);
+        const daysOver = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        return `• ${inv.id}: Rs. ${dueAmt.toLocaleString('en-LK')} (${daysOver} days)`;
+      }).join('\n');
+    }
+    
+    // Create custom message with ONLY overdue invoice details
+    let message = `Hello ${customer.name}! 👋\n\n`;
+    message += `Greetings from *${effectiveShopName}*!\n\n`;
+    
+    if (overdueInvoices.length > 0) {
+      message += `This is a friendly reminder about your overdue payment${overdueInvoices.length > 1 ? 's' : ''}:\n\n`;
+      
+      if (overdueInvoices.length > 1) {
+        message += `📋 *${overdueInvoices.length} Overdue Invoices:*\n${invoiceDetails}\n\n`;
+      } else {
+        message += `📋 *Invoice:* #${overdueInvoices[0].id}\n`;
+        const dueAmt = overdueInvoices[0].dueAmount ?? (overdueInvoices[0].total - (overdueInvoices[0].paidAmount || 0));
+        message += `💰 *Amount Due:* Rs. ${dueAmt.toLocaleString('en-LK')}\n\n`;
+      }
+      
+      message += `⏳ *Total Overdue:* Rs. ${totalOverdueAmount.toLocaleString('en-LK')}\n\n`;
+    } else {
+      // No overdue invoices - shouldn't happen but handle gracefully
+      message += `This is a friendly reminder about your account.\n\n`;
+    }
+    
+    message += `We kindly request you to settle your outstanding balance at your earliest convenience.\n\n`;
+    message += `If you've already made the payment, please disregard this message.\n\n`;
+    message += `Thank you for your continued trust! 🙏\n\n`;
+    message += `*${effectiveShopName}*\n`;
+    message += `📞 ${effectiveShopPhone}\n`;
+    message += `📍 ${effectiveShopAddress}`;
+    if (effectiveShopWebsite) {
+      message += `\n🌐 ${effectiveShopWebsite}`;
+    }
 
     const phone = customer.phone.replace(/[^0-9]/g, '');
     const formattedPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
@@ -466,20 +552,70 @@ export const Customers: React.FC = () => {
       return;
     }
 
-    const daysOverdue = customer.creditDueDate 
-      ? Math.max(0, Math.ceil((new Date().getTime() - new Date(customer.creditDueDate).getTime()) / (1000 * 60 * 60 * 24)))
-      : 0;
-
-    const message = whatsAppSettings.overdueReminderTemplate
-      .replace(/{{customerName}}/g, customer.name)
-      .replace(/{{dueAmount}}/g, formatNumber(customer.creditBalance))
-      .replace(/{{dueDate}}/g, customer.creditDueDate ? new Date(customer.creditDueDate).toLocaleDateString('en-GB') : 'N/A')
-      .replace(/{{daysOverdue}}/g, String(daysOverdue))
-      .replace(/{{invoiceId}}/g, 'N/A')
-      .replace(/{{shopName}}/g, effectiveShopName)
-      .replace(/{{shopPhone}}/g, effectiveShopPhone)
-      .replace(/{{shopAddress}}/g, effectiveShopAddress)
-      .replace(/{{shopWebsite}}/g, effectiveShopWebsite);
+    // Get overdue invoices for this customer
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const customerInvoices = invoices.filter(inv => 
+      inv.customerId === customer.id && inv.status !== 'fullpaid'
+    );
+    const overdueInvoices = customerInvoices.filter(inv => {
+      const dueDate = new Date(inv.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate < today;
+    });
+    
+    // Calculate overdue totals
+    const totalOverdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.dueAmount ?? (inv.total - (inv.paidAmount || 0))), 0);
+    
+    // Calculate max days overdue
+    let maxDaysOverdue = 0;
+    overdueInvoices.forEach(inv => {
+      const dueDate = new Date(inv.dueDate);
+      const days = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (days > maxDaysOverdue) maxDaysOverdue = days;
+    });
+    
+    // Build overdue invoice list
+    let overdueDetails = '';
+    if (overdueInvoices.length > 0) {
+      overdueDetails = overdueInvoices.map(inv => {
+        const dueAmt = inv.dueAmount ?? (inv.total - (inv.paidAmount || 0));
+        const dueDate = new Date(inv.dueDate);
+        const daysOver = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        return `• ${inv.id}: Rs. ${dueAmt.toLocaleString('en-LK')} (${daysOver} days overdue)`;
+      }).join('\n');
+    }
+    
+    // Create urgent message with all overdue invoice details
+    let message = `⚠️ *URGENT: Payment Overdue Notice*\n\n`;
+    message += `Dear ${customer.name},\n\n`;
+    message += `We regret to inform you that your payment${overdueInvoices.length > 1 ? 's are' : ' is'} now *OVERDUE*.\n\n`;
+    
+    if (overdueInvoices.length > 1) {
+      message += `🚨 *${overdueInvoices.length} OVERDUE Invoices:*\n${overdueDetails}\n\n`;
+      message += `📊 *Total Overdue:* Rs. ${totalOverdueAmount.toLocaleString('en-LK')}\n`;
+      message += `⏰ *Longest Overdue:* ${maxDaysOverdue} days\n\n`;
+    } else if (overdueInvoices.length === 1) {
+      const inv = overdueInvoices[0];
+      const dueAmt = inv.dueAmount ?? (inv.total - (inv.paidAmount || 0));
+      message += `📋 *Invoice:* #${inv.id}\n`;
+      message += `📅 *Original Due Date:* ${new Date(inv.dueDate).toLocaleDateString('en-GB')}\n`;
+      message += `⏰ *Days Overdue:* ${maxDaysOverdue} days\n`;
+      message += `💸 *Outstanding Amount:* Rs. ${dueAmt.toLocaleString('en-LK')}\n\n`;
+    } else {
+      // No overdue invoices, use credit balance
+      message += `💸 *Outstanding Amount:* Rs. ${(customer.creditBalance || 0).toLocaleString('en-LK')}\n\n`;
+    }
+    
+    message += `*Immediate action is required.* Please settle this payment as soon as possible to avoid any inconvenience.\n\n`;
+    message += `For payment assistance or queries, please contact us immediately.\n\n`;
+    message += `We value your business and appreciate your prompt attention to this matter.\n\n`;
+    message += `Best regards,\n*${effectiveShopName}*\n`;
+    message += `📞 ${effectiveShopPhone}\n`;
+    message += `📍 ${effectiveShopAddress}`;
+    if (effectiveShopWebsite) {
+      message += `\n🌐 ${effectiveShopWebsite}`;
+    }
 
     const phone = customer.phone.replace(/[^0-9]/g, '');
     const formattedPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
@@ -523,12 +659,6 @@ export const Customers: React.FC = () => {
       case 'overdue': return <AlertTriangle className="w-4 h-4" />;
       default: return null;
     }
-  };
-
-  const getProgressColor = (percentage: number) => {
-    if (percentage >= 90) return 'from-red-500 to-red-600';
-    if (percentage >= 70) return 'from-amber-500 to-orange-500';
-    return 'from-emerald-500 to-teal-500';
   };
 
   // Handlers
@@ -1385,25 +1515,34 @@ export const Customers: React.FC = () => {
               </thead>
               <tbody>
                 {paginatedCustomers.map((customer) => {
-                  const isOverdue = customer.creditStatus === 'overdue';
-                  const hasCredit = customer.creditBalance > 0;
+                  // Calculate stats from actual invoices
+                  const { totalCredit, creditInvoiceCount, totalOverdue, overdueCount } = getCustomerInvoiceStats(customer.id);
+                  const actualCreditBalance = totalCredit;
+                  const isOverdue = customer.creditStatus === 'overdue' || overdueCount > 0;
+                  const hasCredit = actualCreditBalance > 0;
+                  const hasOverdueInvoices = totalOverdue > 0;
+                  const isCreditLimitExceeded = customer.creditLimit > 0 && actualCreditBalance > customer.creditLimit;
                   return (
                     <tr 
                       key={customer.id}
                       className={`border-b transition-colors ${
-                        isOverdue
+                        isCreditLimitExceeded
                           ? theme === 'dark'
-                            ? 'border-red-900/30 bg-red-950/20 hover:bg-red-950/30'
-                            : 'border-red-100 bg-red-50/50 hover:bg-red-50'
-                          : theme === 'dark' 
-                            ? 'border-slate-700/30 hover:bg-slate-800/30' 
-                            : 'border-slate-100 hover:bg-slate-50'
+                            ? 'border-orange-900/30 bg-orange-950/20 hover:bg-orange-950/30'
+                            : 'border-orange-100 bg-orange-50/50 hover:bg-orange-50'
+                          : hasOverdueInvoices || isOverdue
+                            ? theme === 'dark'
+                              ? 'border-red-900/30 bg-red-950/20 hover:bg-red-950/30'
+                              : 'border-red-100 bg-red-50/50 hover:bg-red-50'
+                            : theme === 'dark' 
+                              ? 'border-slate-700/30 hover:bg-slate-800/30' 
+                              : 'border-slate-100 hover:bg-slate-50'
                       }`}
                     >
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
-                            isOverdue 
+                            hasOverdueInvoices || isOverdue 
                               ? 'bg-gradient-to-br from-red-500 to-rose-600' 
                               : 'bg-gradient-to-br from-emerald-500 to-teal-600'
                           }`}>
@@ -1431,8 +1570,41 @@ export const Customers: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td className={`px-3 py-3 text-right font-medium text-sm ${isOverdue ? 'text-red-500' : theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                        {formatCurrency(customer.creditBalance)}
+                      <td className="px-3 py-3 text-right">
+                        <div className="space-y-1">
+                          {/* Credit Limit Exceeded Warning */}
+                          {isCreditLimitExceeded && (
+                            <div className="flex items-center justify-end gap-1 text-orange-500">
+                              <AlertTriangle className="w-3 h-3 animate-pulse" />
+                              <span className="font-bold text-xs">LIMIT EXCEEDED</span>
+                            </div>
+                          )}
+                          {hasOverdueInvoices && (
+                            <div className="flex items-center justify-end gap-1 text-red-500">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span className="font-bold text-sm">{formatCurrency(totalOverdue)}</span>
+                              <span className="text-xs">({overdueCount})</span>
+                            </div>
+                          )}
+                          <div className={`font-medium text-sm ${isCreditLimitExceeded ? 'text-orange-500' : hasOverdueInvoices || isOverdue ? 'text-red-400' : theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                            {hasOverdueInvoices ? (
+                              <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                Balance: {formatCurrency(actualCreditBalance)} {creditInvoiceCount > 0 && `(${creditInvoiceCount})`}
+                              </span>
+                            ) : (
+                              <>
+                                {formatCurrency(actualCreditBalance)}
+                                {creditInvoiceCount > 0 && <span className="text-xs ml-1 opacity-60">({creditInvoiceCount})</span>}
+                              </>
+                            )}
+                          </div>
+                          {/* Show limit info if exceeded */}
+                          {isCreditLimitExceeded && (
+                            <div className={`text-xs ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>
+                              +{formatCurrency(actualCreditBalance - customer.creditLimit)} over
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-center">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${getCreditStatusStyle(customer.creditStatus)}`}>
@@ -1631,11 +1803,16 @@ export const Customers: React.FC = () => {
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {paginatedCustomers.map((customer) => {
             const daysUntilDue = getDaysUntilDue(customer.creditDueDate);
-            const creditPercentage = customer.creditLimit ? (customer.creditBalance || 0) / customer.creditLimit * 100 : 0;
-            const isOverdue = customer.creditStatus === 'overdue';
+            // Calculate real credit balance from invoices
+            const { totalCredit, creditInvoiceCount, totalOverdue, overdueCount } = getCustomerInvoiceStats(customer.id);
+            const actualCreditBalance = totalCredit; // Use invoice-calculated balance
+            const creditPercentage = customer.creditLimit ? actualCreditBalance / customer.creditLimit * 100 : 0;
+            const isCreditLimitExceeded = customer.creditLimit > 0 && actualCreditBalance > customer.creditLimit;
+            const isOverdue = customer.creditStatus === 'overdue' || overdueCount > 0;
             const isDueSoon = daysUntilDue !== null && daysUntilDue <= 7 && daysUntilDue > 0;
-            const hasCredit = (customer.creditBalance || 0) > 0;
+            const hasCredit = actualCreditBalance > 0;
             const isHighlighted = highlightedCustomerId === customer.id;
+            const hasOverdueInvoices = totalOverdue > 0;
 
             return (
               <div 
@@ -1751,38 +1928,85 @@ export const Customers: React.FC = () => {
                 </div>
 
                 {/* Credit Section */}
-                {hasCredit && (
+                {(hasCredit || hasOverdueInvoices) && (
                   <div className={`p-3 rounded-xl mb-4 ${
-                    isOverdue
-                      ? theme === 'dark' ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'
-                      : theme === 'dark' ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-slate-50 border border-slate-200'
+                    isCreditLimitExceeded
+                      ? theme === 'dark' ? 'bg-orange-500/10 border-2 border-orange-500/50' : 'bg-orange-50 border-2 border-orange-300'
+                      : hasOverdueInvoices
+                        ? theme === 'dark' ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'
+                        : isOverdue
+                          ? theme === 'dark' ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'
+                          : theme === 'dark' ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-slate-50 border border-slate-200'
                   }`}>
+                    {/* Credit Limit Exceeded Warning */}
+                    {isCreditLimitExceeded && (
+                      <div className={`mb-3 pb-3 border-b ${theme === 'dark' ? 'border-orange-500/30' : 'border-orange-300'}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="animate-pulse">
+                            <AlertTriangle className="w-4 h-4 text-orange-500" />
+                          </div>
+                          <span className="text-xs font-bold text-orange-500 uppercase tracking-wide">
+                            ⚠️ Credit Limit Exceeded!
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs ${theme === 'dark' ? 'text-orange-300' : 'text-orange-600'}`}>
+                            Over limit by:
+                          </span>
+                          <span className="text-sm font-bold text-orange-500">
+                            +{formatCurrency(actualCreditBalance - customer.creditLimit)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Overdue Amount - Prominent Display */}
+                    {hasOverdueInvoices && (
+                      <div className={`mb-3 pb-3 border-b ${theme === 'dark' ? 'border-red-500/30' : 'border-red-200'}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-red-500 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            OVERDUE ({overdueCount} invoice{overdueCount > 1 ? 's' : ''})
+                          </span>
+                        </div>
+                        <span className="text-lg font-bold text-red-500">
+                          {formatCurrency(totalOverdue)}
+                        </span>
+                      </div>
+                    )}
+                    
                     <div className="flex items-center justify-between mb-2">
                       <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Credit
+                        Credit Balance {creditInvoiceCount > 0 && `(${creditInvoiceCount})`}
                       </span>
-                      <span className={`text-sm font-bold ${isOverdue ? 'text-red-500' : 'text-blue-500'}`}>
-                        {formatCurrency(customer.creditBalance || 0)}
+                      <span className={`text-sm font-bold ${isCreditLimitExceeded ? 'text-orange-500' : isOverdue || hasOverdueInvoices ? 'text-red-500' : 'text-blue-500'}`}>
+                        {formatCurrency(actualCreditBalance)}
                       </span>
                     </div>
                     
                     {/* Credit Limit Progress Bar */}
-                    {customer.creditLimit && (
+                    {customer.creditLimit > 0 && (
                       <div className="mb-2">
                         <div className="flex justify-between text-xs mb-1">
                           <span className={theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}>Limit Used</span>
-                          <span className={theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}>
+                          <span className={`font-medium ${creditPercentage > 100 ? 'text-orange-500' : creditPercentage > 80 ? 'text-amber-500' : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             {creditPercentage.toFixed(0)}%
                           </span>
                         </div>
-                        <div className={`h-1.5 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                        <div className={`h-2 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
                           <div 
-                            className={`h-full rounded-full bg-gradient-to-r ${getProgressColor(creditPercentage)} transition-all`}
+                            className={`h-full rounded-full transition-all ${
+                              creditPercentage > 100 
+                                ? 'bg-gradient-to-r from-orange-500 to-red-500 animate-pulse' 
+                                : creditPercentage > 80 
+                                  ? 'bg-gradient-to-r from-amber-400 to-orange-500' 
+                                  : 'bg-gradient-to-r from-emerald-400 to-teal-500'
+                            }`}
                             style={{ width: `${Math.min(creditPercentage, 100)}%` }}
                           />
                         </div>
                         <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                          Max: {formatCurrency(customer.creditLimit)}
+                          Limit: {formatCurrency(customer.creditLimit)}
                         </p>
                       </div>
                     )}
