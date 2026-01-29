@@ -287,7 +287,9 @@ export const CreateInvoice: React.FC = () => {
     const availableStock = product.stock;
     
     if (existingQtyInInvoice >= availableStock) {
-      alert(`Cannot add more. Only ${availableStock} available in stock and you already have ${existingQtyInInvoice} in the invoice.`);
+      toast.error('Stock Unavailable', {
+        description: `Cannot add more. Only ${availableStock} available and you already have ${existingQtyInInvoice} in the invoice.`,
+      });
       return;
     }
 
@@ -388,6 +390,21 @@ export const CreateInvoice: React.FC = () => {
       removeItem(productId);
       return;
     }
+
+    // Stock validation: Check available stock before allowing quantity increase
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      const existingQtyInInvoice = items.filter(i => i.productId === productId).reduce((sum, i) => sum + i.quantity, 0);
+      const availableStock = product.stock;
+      
+      if (newQuantity > availableStock) {
+        toast.error('Stock Limit Exceeded', {
+          description: `Cannot set quantity to ${newQuantity}. Only ${availableStock} available in stock.`,
+        });
+        return;
+      }
+    }
+
     setItems(items.map(item => 
       item.productId === productId 
         ? { ...item, quantity: newQuantity, total: newQuantity * item.unitPrice }

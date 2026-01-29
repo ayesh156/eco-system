@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from '../ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { SearchableSelect } from '../ui/searchable-select';
+import { toast } from 'sonner';
 import { invoiceItemHistoryService, type CreateHistoryRequest, type ItemHistoryAction } from '../../services/invoiceItemHistoryService';
 
 interface InvoiceEditModalProps {
@@ -176,7 +177,9 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
     const currentRealTimeStock = calculateRealTimeStock(product.id, product.stock);
     
     if (quantity > currentRealTimeStock) {
-      alert(`Cannot add ${quantity}. Only ${currentRealTimeStock} available in stock.`);
+      toast.error('Stock Unavailable', {
+        description: `Cannot add ${quantity}. Only ${currentRealTimeStock} available in stock.`,
+      });
       return;
     }
 
@@ -277,6 +280,21 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
 
   // Increase item quantity by 1
   const increaseItemQty = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    // Calculate real-time available stock
+    const realTimeStock = calculateRealTimeStock(productId, product.stock);
+    const currentQtyInInvoice = items.filter(i => i.productId === productId).reduce((sum, i) => sum + i.quantity, 0);
+    
+    // Prevent increasing if no stock available
+    if (currentQtyInInvoice >= realTimeStock) {
+      toast.error('Stock Limit Reached', {
+        description: `Cannot increase quantity. Only ${realTimeStock} available in stock.`,
+      });
+      return;
+    }
+
     setItems(prevItems => {
       return prevItems.map(item => {
         if (item.productId === productId) {
