@@ -45,20 +45,18 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [selectedWarranty, setSelectedWarranty] = useState<string>(''); // Custom warranty selection
   
-  // Warranty options with icons
+  // Warranty options (matching CreateInvoice format)
   const warrantyOptions = [
-    { value: '', label: '📦 Product Default' },
-    { value: 'No Warranty', label: '❌ No Warranty' },
-    { value: '1 week', label: '🛡️ 1 Week' },
-    { value: '2 weeks', label: '🛡️ 2 Weeks' },
-    { value: '1 month', label: '🛡️ 1 Month' },
-    { value: '3 months', label: '🛡️ 3 Months' },
-    { value: '6 months', label: '🛡️ 6 Months' },
-    { value: '1 year', label: '✨ 1 Year' },
-    { value: '2 years', label: '✨ 2 Years' },
-    { value: '3 years', label: '⭐ 3 Years' },
-    { value: '5 years', label: '⭐ 5 Years' },
-    { value: 'Lifetime', label: '♾️ Lifetime Warranty' },
+    { label: 'No Warranty', value: '', days: 0 },
+    { label: '1 Month (30 Days)', value: '01M', days: 30 },
+    { label: '3 Months (90 Days)', value: '03M', days: 90 },
+    { label: '6 Months (180 Days)', value: '06M', days: 180 },
+    { label: '1 Year (350 Days)', value: '01Y', days: 350 },
+    { label: '2 Years (700 Days)', value: '02Y', days: 700 },
+    { label: '3 Years (1050 Days)', value: '03Y', days: 1050 },
+    { label: '5 Years (1750 Days)', value: '05Y', days: 1750 },
+    { label: '10 Years (3500 Days)', value: '10Y', days: 3500 },
+    { label: 'Lifetime Warranty', value: 'L/W', days: 36500 },
   ];
   
   // Payment method for adding products (default to 'cash' for walk-in, 'credit' for others)
