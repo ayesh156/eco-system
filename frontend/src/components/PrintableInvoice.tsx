@@ -724,21 +724,21 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
               <span className="value">{formatCurrency(invoice.total)}</span>
             </div>
             {/* Paid Amount - if partial payment */}
-            {invoice.paidAmount > 0 && invoice.paidAmount < invoice.total && (
+            {(invoice.paidAmount ?? 0) > 0 && (invoice.paidAmount ?? 0) < invoice.total && (
               <div className="totals-row" style={{ borderBottom: 'none', paddingTop: '6px' }}>
                 <span className="label">Paid Amount:</span>
-                <span className="value" style={{ color: '#000000', fontWeight: '600' }}>{formatCurrency(invoice.paidAmount)}</span>
+                <span className="value" style={{ color: '#000000', fontWeight: '600' }}>{formatCurrency(invoice.paidAmount ?? 0)}</span>
               </div>
             )}
           </div>
         </div>
 
         {/* Balance Due Box - Only show if there's a balance */}
-        {(invoice.dueAmount > 0 || (invoice.total - (invoice.paidAmount || 0)) > 0) && (
+        {((invoice.dueAmount ?? 0) > 0 || (invoice.total - ((invoice.paidAmount ?? 0))) > 0) && (
           <div style={{ marginBottom: '15px' }}>
             <div className="balance-due-box">
               <span className="label">⚠ BALANCE DUE:</span>
-              <span className="value">{formatCurrency(invoice.dueAmount || (invoice.total - (invoice.paidAmount || 0)))}</span>
+              <span className="value">{formatCurrency((invoice.dueAmount ?? 0) || (invoice.total - ((invoice.paidAmount ?? 0))))}</span>
             </div>
             <p className="balance-due-note">Please settle the outstanding balance at your earliest convenience</p>
           </div>
