@@ -291,10 +291,20 @@ export const CreateInvoice: React.FC = () => {
 
     const existingItem = items.find((i) => i.productId === product.id);
     if (existingItem) {
+      // Compare warranty due dates - use the later one (extend warranty if new is longer)
+      const existingDueDate = existingItem.warrantyDueDate ? new Date(existingItem.warrantyDueDate) : new Date(0);
+      const newDueDate = warrantyDueDate ? new Date(warrantyDueDate) : new Date(0);
+      const betterDueDate = newDueDate > existingDueDate ? warrantyDueDate : existingItem.warrantyDueDate;
+      
       setItems(
         items.map((i) =>
           i.productId === existingItem.productId
-            ? { ...i, quantity: i.quantity + 1, total: (i.quantity + 1) * i.unitPrice }
+            ? { 
+                ...i, 
+                quantity: i.quantity + 1, 
+                total: (i.quantity + 1) * i.unitPrice,
+                warrantyDueDate: betterDueDate // Apply the longer warranty
+              }
             : i
         )
       );

@@ -988,7 +988,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             customer: true,
             items: { include: { product: true } },
             payments: { orderBy: { paymentDate: 'desc' } },
-            _count: { select: { reminders: true } },
+            reminders: { select: { type: true } },
           },
           orderBy,
           skip: (page - 1) * limit,
@@ -997,11 +997,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         db.invoice.count({ where }),
       ]);
 
-      // Map invoices to include reminderCount at top level
-      const invoicesWithReminderCount = invoices.map((inv: any) => ({
-        ...inv,
-        reminderCount: inv._count?.reminders || 0,
-      }));
+      // Map invoices to include reminder counts by type
+      const invoicesWithReminderCount = invoices.map((inv: any) => {
+        const { reminders, ...invoiceData } = inv;
+        const friendlyCount = reminders?.filter((r: any) => r.type === 'PAYMENT').length || 0;
+        const urgentCount = reminders?.filter((r: any) => r.type === 'OVERDUE').length || 0;
+        return {
+          ...invoiceData,
+          reminderCount: reminders?.length || 0,
+          friendlyReminderCount: friendlyCount,
+          urgentReminderCount: urgentCount,
+        };
+      });
 
       return res.status(200).json({
         success: true,
@@ -1496,15 +1503,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
       
-      // Get updated reminder count for the invoice
-      const reminderCount = await db.invoiceReminder.count({
-        where: { invoiceId: existingInvoice.id },
-      });
+      // Get updated reminder counts (total, friendly, urgent)
+      const [reminderCount, friendlyReminderCount, urgentReminderCount] = await Promise.all([
+        db.invoiceReminder.count({ where: { invoiceId: existingInvoice.id } }),
+        db.invoiceReminder.count({ where: { invoiceId: existingInvoice.id, type: 'PAYMENT' } }),
+        db.invoiceReminder.count({ where: { invoiceId: existingInvoice.id, type: 'OVERDUE' } }),
+      ]);
       
       return res.status(201).json({ 
         success: true, 
         data: reminder,
         reminderCount,
+        friendlyReminderCount,
+        urgentReminderCount,
       });
     }
 

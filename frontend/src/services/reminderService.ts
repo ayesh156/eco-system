@@ -49,7 +49,9 @@ export interface CreateReminderResponse {
   success: boolean;
   data: InvoiceReminder;
   reminderCount?: number;
-  meta?: { reminderCount: number };
+  friendlyReminderCount?: number;
+  urgentReminderCount?: number;
+  meta?: { reminderCount: number; friendlyReminderCount?: number; urgentReminderCount?: number };
 }
 
 export const reminderService = {
@@ -144,10 +146,14 @@ export const reminderService = {
     
     // Handle both response formats (root level or meta object)
     const count = data.reminderCount ?? data.meta?.reminderCount ?? 1;
+    const friendlyCount = data.friendlyReminderCount ?? data.meta?.friendlyReminderCount ?? 0;
+    const urgentCount = data.urgentReminderCount ?? data.meta?.urgentReminderCount ?? 0;
     
     return {
       reminder: data.data,
       reminderCount: count,
+      friendlyReminderCount: friendlyCount,
+      urgentReminderCount: urgentCount,
     };
   },
 };

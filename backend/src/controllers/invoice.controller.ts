@@ -174,11 +174,12 @@ export const getAllInvoices = async (
       ];
     }
 
-    // Build sort options
-    const orderBy: Prisma.InvoiceOrderByWithRelationInput = {};
-    const sortField = sortBy as string;
-    orderBy[sortField as keyof Prisma.InvoiceOrderByWithRelationInput] = 
-      sortOrder as Prisma.SortOrder;
+    // Build sort options - validate sortBy to prevent invalid fields
+    const validSortFields = ['date', 'total', 'customerName', 'status', 'invoiceNumber', 'createdAt'];
+    const sortField = validSortFields.includes(sortBy as string) ? (sortBy as string) : 'date';
+    const orderBy: Prisma.InvoiceOrderByWithRelationInput = {
+      [sortField]: (sortOrder as 'asc' | 'desc') || 'desc',
+    };
 
     // Execute queries
     const [invoices, total] = await Promise.all([
@@ -196,8 +197,8 @@ export const getAllInvoices = async (
             }
           },
           payments: true,
-          _count: {
-            select: { reminders: true }
+          reminders: {
+            select: { type: true }
           },
         },
         orderBy,
@@ -207,12 +208,18 @@ export const getAllInvoices = async (
       prisma.invoice.count({ where }),
     ]);
 
-    // Map the response to include reminderCount
-    const mappedInvoices = invoices.map(invoice => ({
-      ...invoice,
-      reminderCount: invoice._count?.reminders || 0,
-      _count: undefined, // Remove the _count object from response
-    }));
+    // Map the response to include reminder counts by type
+    const mappedInvoices = invoices.map(invoice => {
+      const { reminders, ...invoiceData } = invoice;
+      const friendlyCount = reminders?.filter(r => r.type === 'PAYMENT').length || 0;
+      const urgentCount = reminders?.filter(r => r.type === 'OVERDUE').length || 0;
+      return {
+        ...invoiceData,
+        reminderCount: (reminders?.length || 0),
+        friendlyReminderCount: friendlyCount,
+        urgentReminderCount: urgentCount,
+      };
+    });
 
     res.json({
       success: true,
@@ -259,8 +266,8 @@ export const getInvoiceById = async (
         updatedBy: {
           select: { id: true, name: true, email: true }
         },
-        _count: {
-          select: { reminders: true }
+        reminders: {
+          select: { type: true }
         },
       },
     });
@@ -290,8 +297,8 @@ export const getInvoiceById = async (
           updatedBy: {
             select: { id: true, name: true, email: true }
           },
-          _count: {
-            select: { reminders: true }
+          reminders: {
+            select: { type: true }
           },
         },
       });
@@ -310,11 +317,15 @@ export const getInvoiceById = async (
       throw new AppError('You do not have permission to access this invoice', 403);
     }
 
-    // Map to include reminderCount
+    // Map to include reminder counts by type
+    const { reminders, ...invoiceData } = invoice;
+    const friendlyCount = reminders?.filter(r => r.type === 'PAYMENT').length || 0;
+    const urgentCount = reminders?.filter(r => r.type === 'OVERDUE').length || 0;
     const mappedInvoice = {
-      ...invoice,
-      reminderCount: invoice._count?.reminders || 0,
-      _count: undefined,
+      ...invoiceData,
+      reminderCount: reminders?.length || 0,
+      friendlyReminderCount: friendlyCount,
+      urgentReminderCount: urgentCount,
     };
 
     res.json({
@@ -1102,15 +1113,25 @@ export const createInvoiceReminder = async (
       },
     });
 
-    // Get updated reminder count
-    const reminderCount = await prisma.invoiceReminder.count({
-      where: { invoiceId: invoice.id },
-    });
+    // Get updated reminder counts (total, friendly, urgent)
+    const [reminderCount, friendlyReminderCount, urgentReminderCount] = await Promise.all([
+      prisma.invoiceReminder.count({
+        where: { invoiceId: invoice.id },
+      }),
+      prisma.invoiceReminder.count({
+        where: { invoiceId: invoice.id, type: 'PAYMENT' },
+      }),
+      prisma.invoiceReminder.count({
+        where: { invoiceId: invoice.id, type: 'OVERDUE' },
+      }),
+    ]);
 
     res.status(201).json({
       success: true,
       data: reminder,
       reminderCount,
+      friendlyReminderCount,
+      urgentReminderCount,
     });
   } catch (error) {
     next(error);

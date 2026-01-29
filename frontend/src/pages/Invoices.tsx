@@ -20,7 +20,7 @@ import {
   List, SortAsc, SortDesc, RefreshCw, LayoutGrid,
   Calendar, User, Building2, XCircle, CircleDollarSign, DollarSign,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  Shield, AlertTriangle, MessageCircle, Clock
+  Shield, AlertTriangle, MessageCircle, Clock, Loader2
 } from 'lucide-react';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { InvoiceEditModal } from '../components/modals/InvoiceEditModal';
@@ -114,6 +114,7 @@ export const Invoices: React.FC = () => {
   // Operation loading states
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   
   // Track if initial load has happened
   const initialLoadRef = useRef(false);
@@ -398,6 +399,9 @@ export const Invoices: React.FC = () => {
       return;
     }
 
+    // Set loading state
+    setSendingReminderId(invoice.apiId || invoice.id);
+
     // Calculate amounts
     const dueAmount = invoice.total - (invoice.paidAmount || 0);
     const dueDate = new Date(invoice.dueDate);
@@ -440,62 +444,68 @@ export const Invoices: React.FC = () => {
     }
     phone = phone.replace('+', '');
 
-    // Try to save reminder to database (if using API)
+    // Try to save reminder to database FIRST (wait for it before opening WhatsApp)
     let reminderCount = (invoice.reminderCount || 0) + 1;
-    if (isUsingAPI && invoice.apiId) {
-      try {
-        const result = await reminderService.create(invoice.apiId, {
-          type: isOverdueNow ? 'overdue' : 'payment',
-          channel: 'whatsapp',
-          message: message,
-          customerPhone: phone,
-          customerName: invoice.customerName,
-          shopId: effectiveShopId, // For SUPER_ADMIN viewing shops
-        });
-        reminderCount = result.reminderCount;
-        console.log('✅ Reminder saved to database, count:', reminderCount);
-      } catch (error) {
-        console.warn('⚠️ Could not save reminder to database:', error);
-        // Continue anyway - local tracking will still work
+    
+    try {
+      if (isUsingAPI && invoice.apiId) {
+        try {
+          const result = await reminderService.create(invoice.apiId, {
+            type: isOverdueNow ? 'overdue' : 'payment',
+            channel: 'whatsapp',
+            message: message,
+            customerPhone: phone,
+            customerName: invoice.customerName,
+            shopId: effectiveShopId, // For SUPER_ADMIN viewing shops
+          });
+          reminderCount = result.reminderCount;
+          console.log('✅ Reminder saved to database, count:', reminderCount);
+        } catch (error) {
+          console.warn('⚠️ Could not save reminder to database:', error);
+          // Continue anyway - local tracking will still work
+        }
       }
+
+      // Track the reminder locally
+      const newReminder = {
+        id: `reminder-${Date.now()}`,
+        invoiceId: invoice.id,
+        type: isOverdueNow ? 'overdue' as const : 'payment' as const,
+        channel: 'whatsapp' as const,
+        sentAt: new Date().toISOString(),
+        message: message,
+        customerPhone: phone,
+        customerName: invoice.customerName,
+      };
+
+      // Update invoice with reminder tracking - update both local and cached invoices
+      const updateWithReminder = (prev: Invoice[]) => prev.map(inv => {
+        if (inv.id === invoice.id || inv.apiId === invoice.apiId) {
+          const existingReminders = inv.reminders || [];
+          return {
+            ...inv,
+            reminders: [...existingReminders, newReminder],
+            reminderCount: reminderCount,
+            lastReminderDate: newReminder.sentAt,
+          };
+        }
+        return inv;
+      });
+      setInvoices(updateWithReminder);
+      setCachedInvoices(updateWithReminder);
+
+      // Open WhatsApp with the message using wa.me format
+      const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+
+      // Show success toast
+      toast.success(`${isOverdueNow ? 'Overdue' : 'Payment'} reminder sent to ${invoice.customerName}`, {
+        description: `Reminder #${reminderCount} sent via WhatsApp`,
+      });
+    } finally {
+      // Clear loading state
+      setSendingReminderId(null);
     }
-
-    // Track the reminder locally
-    const newReminder = {
-      id: `reminder-${Date.now()}`,
-      invoiceId: invoice.id,
-      type: isOverdueNow ? 'overdue' as const : 'payment' as const,
-      channel: 'whatsapp' as const,
-      sentAt: new Date().toISOString(),
-      message: message,
-      customerPhone: phone,
-      customerName: invoice.customerName,
-    };
-
-    // Update invoice with reminder tracking - update both local and cached invoices
-    const updateWithReminder = (prev: Invoice[]) => prev.map(inv => {
-      if (inv.id === invoice.id || inv.apiId === invoice.apiId) {
-        const existingReminders = inv.reminders || [];
-        return {
-          ...inv,
-          reminders: [...existingReminders, newReminder],
-          reminderCount: reminderCount,
-          lastReminderDate: newReminder.sentAt,
-        };
-      }
-      return inv;
-    });
-    setInvoices(updateWithReminder);
-    setCachedInvoices(updateWithReminder);
-
-    // Open WhatsApp with the message using wa.me format
-    const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-
-    // Show success toast
-    toast.success(`${isOverdueNow ? 'Overdue' : 'Payment'} reminder sent to ${invoice.customerName}`, {
-      description: `Reminder #${reminderCount} sent via WhatsApp`,
-    });
   };
 
   // Open reminder history modal
@@ -1599,11 +1609,25 @@ export const Invoices: React.FC = () => {
                                 {whatsAppSettings.enabled ? (
                                   <button 
                                     onClick={() => sendWhatsAppReminder(invoice)}
-                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25 relative"
+                                    disabled={sendingReminderId === (invoice.apiId || invoice.id)}
+                                    className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/25 relative ${
+                                      sendingReminderId === (invoice.apiId || invoice.id) 
+                                        ? 'opacity-70 cursor-wait' 
+                                        : 'hover:from-orange-600 hover:to-amber-600'
+                                    }`}
                                     title="Send Urgent Overdue Reminder via WhatsApp"
                                   >
-                                    <MessageCircle className="w-4 h-4" />
-                                    🚨 Send Urgent Reminder
+                                    {sendingReminderId === (invoice.apiId || invoice.id) ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Sending...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <MessageCircle className="w-4 h-4" />
+                                        🚨 Send Urgent Reminder
+                                      </>
+                                    )}
                                     {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
                                       <button 
                                         onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
@@ -1646,11 +1670,25 @@ export const Invoices: React.FC = () => {
                                     </div>
                                     <button 
                                       onClick={() => sendWhatsAppReminder(invoice)}
-                                      className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-emerald-500/25 relative"
+                                      disabled={sendingReminderId === (invoice.apiId || invoice.id)}
+                                      className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-emerald-500/25 relative ${
+                                        sendingReminderId === (invoice.apiId || invoice.id) 
+                                          ? 'opacity-70 cursor-wait' 
+                                          : 'hover:from-green-600 hover:to-emerald-600'
+                                      }`}
                                       title="Send Payment Reminder via WhatsApp"
                                     >
-                                      <MessageCircle className="w-4 h-4" />
-                                      💬 Send Reminder
+                                      {sendingReminderId === (invoice.apiId || invoice.id) ? (
+                                        <>
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                          Sending...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <MessageCircle className="w-4 h-4" />
+                                          💬 Send Reminder
+                                        </>
+                                      )}
                                       {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
                                         <span 
                                           onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}
@@ -1992,14 +2030,21 @@ export const Invoices: React.FC = () => {
                           {whatsAppSettings.enabled && needsReminder(invoice) && (
                             <button 
                               onClick={() => sendWhatsAppReminder(invoice)}
+                              disabled={sendingReminderId === (invoice.apiId || invoice.id)}
                               className={`p-2 rounded-xl transition-colors relative ${
-                                isOverdue(invoice)
-                                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                                  : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
+                                sendingReminderId === (invoice.apiId || invoice.id)
+                                  ? 'opacity-70 cursor-wait'
+                                  : isOverdue(invoice)
+                                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                                    : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'
                               }`}
                               title={isOverdue(invoice) ? 'Send Overdue Reminder via WhatsApp' : 'Send Payment Reminder via WhatsApp'}
                             >
-                              <MessageCircle className="w-4 h-4" />
+                              {sendingReminderId === (invoice.apiId || invoice.id) ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <MessageCircle className="w-4 h-4" />
+                              )}
                               {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
                                 <span 
                                   onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(invoice); }}

@@ -63,6 +63,8 @@ export interface APIInvoice {
   createdAt: string;
   updatedAt: string;
   reminderCount?: number;
+  friendlyReminderCount?: number;
+  urgentReminderCount?: number;
   emailSent?: boolean;
   emailSentAt?: string;
   customer?: {
@@ -530,6 +532,8 @@ export const convertAPIInvoiceToFrontend = (apiInvoice: APIInvoice): Invoice => 
       ? apiInvoice.payments[0].paymentDate 
       : undefined,
     reminderCount: apiInvoice.reminderCount || 0,
+    friendlyReminderCount: apiInvoice.friendlyReminderCount || 0,
+    urgentReminderCount: apiInvoice.urgentReminderCount || 0,
     emailSent: apiInvoice.emailSent || false,
     emailSentAt: apiInvoice.emailSentAt,
     customer: apiInvoice.customer,

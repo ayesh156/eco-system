@@ -104,6 +104,7 @@ export const Customers: React.FC = () => {
   // Invoices state for tracking payments - loaded from API
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null); // Track which customer's reminder is being sent
 
   // WhatsApp settings from context
   const { settings: whatsAppSettings, shopDetails } = useWhatsAppSettings();
@@ -476,151 +477,278 @@ export const Customers: React.FC = () => {
     );
   };
 
+  // Calculate reminder counts for a customer across all their invoices by type
+  const getCustomerFriendlyReminderCount = useCallback((customerId: string): number => {
+    const customerInvoices = invoices.filter(inv => inv.customerId === customerId);
+    return customerInvoices.reduce((sum, inv) => sum + (inv.friendlyReminderCount || 0), 0);
+  }, [invoices]);
+
+  const getCustomerUrgentReminderCount = useCallback((customerId: string): number => {
+    const customerInvoices = invoices.filter(inv => inv.customerId === customerId);
+    return customerInvoices.reduce((sum, inv) => sum + (inv.urgentReminderCount || 0), 0);
+  }, [invoices]);
+
   // WhatsApp reminder functions
-  const sendFriendlyReminder = (customer: Customer) => {
+  const sendFriendlyReminder = async (customer: Customer) => {
     if (!whatsAppSettings.enabled) {
       alert('WhatsApp reminders are disabled. Please enable them in settings.');
       return;
     }
 
-    // Get ONLY overdue invoices for this customer
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const customerInvoices = invoices.filter(inv => 
-      inv.customerId === customer.id && inv.status !== 'fullpaid'
-    );
-    const overdueInvoices = customerInvoices.filter(inv => {
-      const dueDate = new Date(inv.dueDate);
-      dueDate.setHours(0, 0, 0, 0);
-      return dueDate < today;
-    });
-    
-    // Calculate totals from OVERDUE invoices only
-    const totalOverdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.dueAmount ?? (inv.total - (inv.paidAmount || 0))), 0);
-    
-    // Build overdue invoice list for message
-    let invoiceDetails = '';
-    if (overdueInvoices.length > 0) {
-      invoiceDetails = overdueInvoices.map(inv => {
-        const dueAmt = inv.dueAmount ?? (inv.total - (inv.paidAmount || 0));
+    // Set loading state
+    setSendingReminderId(customer.id);
+
+    try {
+      // Get ONLY overdue invoices for this customer
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const customerInvoices = invoices.filter(inv => 
+        inv.customerId === customer.id && inv.status !== 'fullpaid'
+      );
+      const overdueInvoices = customerInvoices.filter(inv => {
         const dueDate = new Date(inv.dueDate);
-        const daysOver = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-        return `• ${inv.id}: Rs. ${dueAmt.toLocaleString('en-LK')} (${daysOver} days)`;
-      }).join('\n');
-    }
-    
-    // Create custom message with ONLY overdue invoice details
-    let message = `Hello ${customer.name}! 👋\n\n`;
-    message += `Greetings from *${effectiveShopName}*!\n\n`;
-    
-    if (overdueInvoices.length > 0) {
-      message += `This is a friendly reminder about your overdue payment${overdueInvoices.length > 1 ? 's' : ''}:\n\n`;
+        dueDate.setHours(0, 0, 0, 0);
+        return dueDate < today;
+      });
       
-      if (overdueInvoices.length > 1) {
-        message += `📋 *${overdueInvoices.length} Overdue Invoices:*\n${invoiceDetails}\n\n`;
-      } else {
-        message += `📋 *Invoice:* #${overdueInvoices[0].id}\n`;
-        const dueAmt = overdueInvoices[0].dueAmount ?? (overdueInvoices[0].total - (overdueInvoices[0].paidAmount || 0));
-        message += `💰 *Amount Due:* Rs. ${dueAmt.toLocaleString('en-LK')}\n\n`;
+      // Calculate totals from OVERDUE invoices only
+      const totalOverdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.dueAmount ?? (inv.total - (inv.paidAmount || 0))), 0);
+      
+      // Build overdue invoice list for message
+      let invoiceDetails = '';
+      if (overdueInvoices.length > 0) {
+        invoiceDetails = overdueInvoices.map(inv => {
+          const dueAmt = inv.dueAmount ?? (inv.total - (inv.paidAmount || 0));
+          const dueDate = new Date(inv.dueDate);
+          const daysOver = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+          return `• ${inv.id}: Rs. ${dueAmt.toLocaleString('en-LK')} (${daysOver} days)`;
+        }).join('\n');
       }
       
-      message += `⏳ *Total Overdue:* Rs. ${totalOverdueAmount.toLocaleString('en-LK')}\n\n`;
-    } else {
-      // No overdue invoices - shouldn't happen but handle gracefully
-      message += `This is a friendly reminder about your account.\n\n`;
-    }
-    
-    message += `We kindly request you to settle your outstanding balance at your earliest convenience.\n\n`;
-    message += `If you've already made the payment, please disregard this message.\n\n`;
-    message += `Thank you for your continued trust! 🙏\n\n`;
-    message += `*${effectiveShopName}*\n`;
-    message += `📞 ${effectiveShopPhone}\n`;
-    message += `📍 ${effectiveShopAddress}`;
-    if (effectiveShopWebsite) {
-      message += `\n🌐 ${effectiveShopWebsite}`;
-    }
+      // Create custom message with ONLY overdue invoice details
+      let message = `Hello ${customer.name}! 👋\n\n`;
+      message += `Greetings from *${effectiveShopName}*!\n\n`;
+      
+      if (overdueInvoices.length > 0) {
+        message += `This is a friendly reminder about your overdue payment${overdueInvoices.length > 1 ? 's' : ''}:\n\n`;
+        
+        if (overdueInvoices.length > 1) {
+          message += `📋 *${overdueInvoices.length} Overdue Invoices:*\n${invoiceDetails}\n\n`;
+        } else {
+          message += `📋 *Invoice:* #${overdueInvoices[0].id}\n`;
+          const dueAmt = overdueInvoices[0].dueAmount ?? (overdueInvoices[0].total - (overdueInvoices[0].paidAmount || 0));
+          message += `💰 *Amount Due:* Rs. ${dueAmt.toLocaleString('en-LK')}\n\n`;
+        }
+        
+        message += `⏳ *Total Overdue:* Rs. ${totalOverdueAmount.toLocaleString('en-LK')}\n\n`;
+      } else {
+        // No overdue invoices - shouldn't happen but handle gracefully
+        message += `This is a friendly reminder about your account.\n\n`;
+      }
+      
+      message += `We kindly request you to settle your outstanding balance at your earliest convenience.\n\n`;
+      message += `If you've already made the payment, please disregard this message.\n\n`;
+      message += `Thank you for your continued trust! 🙏\n\n`;
+      message += `*${effectiveShopName}*\n`;
+      message += `📞 ${effectiveShopPhone}\n`;
+      message += `📍 ${effectiveShopAddress}`;
+      if (effectiveShopWebsite) {
+        message += `\n🌐 ${effectiveShopWebsite}`;
+      }
 
-    const phone = customer.phone.replace(/[^0-9]/g, '');
-    const formattedPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+      const phone = customer.phone.replace(/[^0-9]/g, '');
+      const formattedPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
+
+      // Save reminder to database for each overdue invoice
+      let totalRemindersSent = 0;
+      for (const invoice of overdueInvoices) {
+        const invoiceApiId = invoice.apiId || invoice.id;
+        try {
+          const result = await reminderService.create(invoiceApiId, {
+            type: 'payment',
+            channel: 'whatsapp',
+            message: message,
+            customerPhone: formattedPhone,
+            customerName: customer.name,
+            shopId: effectiveShopId,
+          });
+          totalRemindersSent++;
+          
+          // Update invoice reminder counts in state (friendly type)
+          setInvoices(prev => prev.map(inv => 
+            (inv.id === invoice.id || inv.apiId === invoiceApiId) 
+              ? { 
+                  ...inv, 
+                  reminderCount: result.reminderCount, 
+                  friendlyReminderCount: result.friendlyReminderCount,
+                  urgentReminderCount: result.urgentReminderCount,
+                  lastReminderDate: new Date().toISOString() 
+                } 
+              : inv
+          ));
+          setCachedInvoices(prev => prev.map(inv => 
+            (inv.id === invoice.id || inv.apiId === invoiceApiId) 
+              ? { 
+                  ...inv, 
+                  reminderCount: result.reminderCount, 
+                  friendlyReminderCount: result.friendlyReminderCount,
+                  urgentReminderCount: result.urgentReminderCount,
+                  lastReminderDate: new Date().toISOString() 
+                } 
+              : inv
+          ));
+        } catch (error) {
+          console.warn(`⚠️ Could not save reminder for invoice ${invoice.id}:`, error);
+        }
+      }
+
+      // Open WhatsApp
+      const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+
+      if (totalRemindersSent > 0) {
+        toast.success(`Friendly reminder sent to ${customer.name}`, {
+          description: `${totalRemindersSent} invoice reminder${totalRemindersSent > 1 ? 's' : ''} saved`,
+        });
+      }
+    } finally {
+      setSendingReminderId(null);
+    }
   };
 
-  const sendUrgentReminder = (customer: Customer) => {
+  const sendUrgentReminder = async (customer: Customer) => {
     if (!whatsAppSettings.enabled) {
       alert('WhatsApp reminders are disabled. Please enable them in settings.');
       return;
     }
 
-    // Get overdue invoices for this customer
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const customerInvoices = invoices.filter(inv => 
-      inv.customerId === customer.id && inv.status !== 'fullpaid'
-    );
-    const overdueInvoices = customerInvoices.filter(inv => {
-      const dueDate = new Date(inv.dueDate);
-      dueDate.setHours(0, 0, 0, 0);
-      return dueDate < today;
-    });
-    
-    // Calculate overdue totals
-    const totalOverdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.dueAmount ?? (inv.total - (inv.paidAmount || 0))), 0);
-    
-    // Calculate max days overdue
-    let maxDaysOverdue = 0;
-    overdueInvoices.forEach(inv => {
-      const dueDate = new Date(inv.dueDate);
-      const days = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-      if (days > maxDaysOverdue) maxDaysOverdue = days;
-    });
-    
-    // Build overdue invoice list
-    let overdueDetails = '';
-    if (overdueInvoices.length > 0) {
-      overdueDetails = overdueInvoices.map(inv => {
-        const dueAmt = inv.dueAmount ?? (inv.total - (inv.paidAmount || 0));
-        const dueDate = new Date(inv.dueDate);
-        const daysOver = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-        return `• ${inv.id}: Rs. ${dueAmt.toLocaleString('en-LK')} (${daysOver} days overdue)`;
-      }).join('\n');
-    }
-    
-    // Create urgent message with all overdue invoice details
-    let message = `⚠️ *URGENT: Payment Overdue Notice*\n\n`;
-    message += `Dear ${customer.name},\n\n`;
-    message += `We regret to inform you that your payment${overdueInvoices.length > 1 ? 's are' : ' is'} now *OVERDUE*.\n\n`;
-    
-    if (overdueInvoices.length > 1) {
-      message += `🚨 *${overdueInvoices.length} OVERDUE Invoices:*\n${overdueDetails}\n\n`;
-      message += `📊 *Total Overdue:* Rs. ${totalOverdueAmount.toLocaleString('en-LK')}\n`;
-      message += `⏰ *Longest Overdue:* ${maxDaysOverdue} days\n\n`;
-    } else if (overdueInvoices.length === 1) {
-      const inv = overdueInvoices[0];
-      const dueAmt = inv.dueAmount ?? (inv.total - (inv.paidAmount || 0));
-      message += `📋 *Invoice:* #${inv.id}\n`;
-      message += `📅 *Original Due Date:* ${new Date(inv.dueDate).toLocaleDateString('en-GB')}\n`;
-      message += `⏰ *Days Overdue:* ${maxDaysOverdue} days\n`;
-      message += `💸 *Outstanding Amount:* Rs. ${dueAmt.toLocaleString('en-LK')}\n\n`;
-    } else {
-      // No overdue invoices, use credit balance
-      message += `💸 *Outstanding Amount:* Rs. ${(customer.creditBalance || 0).toLocaleString('en-LK')}\n\n`;
-    }
-    
-    message += `*Immediate action is required.* Please settle this payment as soon as possible to avoid any inconvenience.\n\n`;
-    message += `For payment assistance or queries, please contact us immediately.\n\n`;
-    message += `We value your business and appreciate your prompt attention to this matter.\n\n`;
-    message += `Best regards,\n*${effectiveShopName}*\n`;
-    message += `📞 ${effectiveShopPhone}\n`;
-    message += `📍 ${effectiveShopAddress}`;
-    if (effectiveShopWebsite) {
-      message += `\n🌐 ${effectiveShopWebsite}`;
-    }
+    // Set loading state
+    setSendingReminderId(customer.id);
 
-    const phone = customer.phone.replace(/[^0-9]/g, '');
-    const formattedPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
-    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    try {
+      // Get overdue invoices for this customer
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const customerInvoices = invoices.filter(inv => 
+        inv.customerId === customer.id && inv.status !== 'fullpaid'
+      );
+      const overdueInvoices = customerInvoices.filter(inv => {
+        const dueDate = new Date(inv.dueDate);
+        dueDate.setHours(0, 0, 0, 0);
+        return dueDate < today;
+      });
+      
+      // Calculate overdue totals
+      const totalOverdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.dueAmount ?? (inv.total - (inv.paidAmount || 0))), 0);
+      
+      // Calculate max days overdue
+      let maxDaysOverdue = 0;
+      overdueInvoices.forEach(inv => {
+        const dueDate = new Date(inv.dueDate);
+        const days = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (days > maxDaysOverdue) maxDaysOverdue = days;
+      });
+      
+      // Build overdue invoice list
+      let overdueDetails = '';
+      if (overdueInvoices.length > 0) {
+        overdueDetails = overdueInvoices.map(inv => {
+          const dueAmt = inv.dueAmount ?? (inv.total - (inv.paidAmount || 0));
+          const dueDate = new Date(inv.dueDate);
+          const daysOver = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+          return `• ${inv.id}: Rs. ${dueAmt.toLocaleString('en-LK')} (${daysOver} days overdue)`;
+        }).join('\n');
+      }
+      
+      // Create urgent message with all overdue invoice details
+      let message = `⚠️ *URGENT: Payment Overdue Notice*\n\n`;
+      message += `Dear ${customer.name},\n\n`;
+      message += `We regret to inform you that your payment${overdueInvoices.length > 1 ? 's are' : ' is'} now *OVERDUE*.\n\n`;
+      
+      if (overdueInvoices.length > 1) {
+        message += `🚨 *${overdueInvoices.length} OVERDUE Invoices:*\n${overdueDetails}\n\n`;
+        message += `📊 *Total Overdue:* Rs. ${totalOverdueAmount.toLocaleString('en-LK')}\n`;
+        message += `⏰ *Longest Overdue:* ${maxDaysOverdue} days\n\n`;
+      } else if (overdueInvoices.length === 1) {
+        const inv = overdueInvoices[0];
+        const dueAmt = inv.dueAmount ?? (inv.total - (inv.paidAmount || 0));
+        message += `📋 *Invoice:* #${inv.id}\n`;
+        message += `📅 *Original Due Date:* ${new Date(inv.dueDate).toLocaleDateString('en-GB')}\n`;
+        message += `⏰ *Days Overdue:* ${maxDaysOverdue} days\n`;
+        message += `💸 *Outstanding Amount:* Rs. ${dueAmt.toLocaleString('en-LK')}\n\n`;
+      } else {
+        // No overdue invoices, use credit balance
+        message += `💸 *Outstanding Amount:* Rs. ${(customer.creditBalance || 0).toLocaleString('en-LK')}\n\n`;
+      }
+      
+      message += `*Immediate action is required.* Please settle this payment as soon as possible to avoid any inconvenience.\n\n`;
+      message += `For payment assistance or queries, please contact us immediately.\n\n`;
+      message += `We value your business and appreciate your prompt attention to this matter.\n\n`;
+      message += `Best regards,\n*${effectiveShopName}*\n`;
+      message += `📞 ${effectiveShopPhone}\n`;
+      message += `📍 ${effectiveShopAddress}`;
+      if (effectiveShopWebsite) {
+        message += `\n🌐 ${effectiveShopWebsite}`;
+      }
+
+      const phone = customer.phone.replace(/[^0-9]/g, '');
+      const formattedPhone = phone.startsWith('0') ? '94' + phone.substring(1) : phone;
+
+      // Save reminder to database for each overdue invoice
+      let totalRemindersSent = 0;
+      for (const invoice of overdueInvoices) {
+        const invoiceApiId = invoice.apiId || invoice.id;
+        try {
+          const result = await reminderService.create(invoiceApiId, {
+            type: 'overdue',
+            channel: 'whatsapp',
+            message: message,
+            customerPhone: formattedPhone,
+            customerName: customer.name,
+            shopId: effectiveShopId,
+          });
+          totalRemindersSent++;
+          
+          // Update invoice reminder counts in state (urgent type)
+          setInvoices(prev => prev.map(inv => 
+            (inv.id === invoice.id || inv.apiId === invoiceApiId) 
+              ? { 
+                  ...inv, 
+                  reminderCount: result.reminderCount, 
+                  friendlyReminderCount: result.friendlyReminderCount,
+                  urgentReminderCount: result.urgentReminderCount,
+                  lastReminderDate: new Date().toISOString() 
+                } 
+              : inv
+          ));
+          setCachedInvoices(prev => prev.map(inv => 
+            (inv.id === invoice.id || inv.apiId === invoiceApiId) 
+              ? { 
+                  ...inv, 
+                  reminderCount: result.reminderCount, 
+                  friendlyReminderCount: result.friendlyReminderCount,
+                  urgentReminderCount: result.urgentReminderCount,
+                  lastReminderDate: new Date().toISOString() 
+                } 
+              : inv
+          ));
+        } catch (error) {
+          console.warn(`⚠️ Could not save reminder for invoice ${invoice.id}:`, error);
+        }
+      }
+
+      // Open WhatsApp
+      const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+
+      if (totalRemindersSent > 0) {
+        toast.success(`Urgent reminder sent to ${customer.name}`, {
+          description: `${totalRemindersSent} invoice reminder${totalRemindersSent > 1 ? 's' : ''} saved`,
+        });
+      }
+    } finally {
+      setSendingReminderId(null);
+    }
   };
 
   const getDaysUntilDue = (dueDate?: string) => {
@@ -1648,21 +1776,41 @@ export const Customers: React.FC = () => {
                             <>
                               <button
                                 onClick={() => sendUrgentReminder(customer)}
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                  theme === 'dark' ? 'hover:bg-red-500/10 text-red-400' : 'hover:bg-red-50 text-red-500'
+                                disabled={sendingReminderId === customer.id}
+                                className={`p-1.5 rounded-lg transition-colors relative ${
+                                  sendingReminderId === customer.id
+                                    ? 'opacity-50 cursor-wait'
+                                    : theme === 'dark' ? 'hover:bg-red-500/10 text-red-400' : 'hover:bg-red-50 text-red-500'
                                 }`}
                                 title="Send Urgent Reminder (WhatsApp)"
                               >
-                                <Zap className="w-4 h-4" />
+                                {sendingReminderId === customer.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Zap className="w-4 h-4" />
+                                )}
+                                {getCustomerUrgentReminderCount(customer.id) > 0 && sendingReminderId !== customer.id && (
+                                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                                    {getCustomerUrgentReminderCount(customer.id) > 9 ? '9+' : getCustomerUrgentReminderCount(customer.id)}
+                                  </span>
+                                )}
                               </button>
                               <button
                                 onClick={() => sendFriendlyReminder(customer)}
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                  theme === 'dark' ? 'hover:bg-green-500/10 text-green-400' : 'hover:bg-green-50 text-green-500'
+                                disabled={sendingReminderId === customer.id}
+                                className={`p-1.5 rounded-lg transition-colors relative ${
+                                  sendingReminderId === customer.id
+                                    ? 'opacity-50 cursor-wait'
+                                    : theme === 'dark' ? 'hover:bg-green-500/10 text-green-400' : 'hover:bg-green-50 text-green-500'
                                 }`}
                                 title="Send Friendly Reminder (WhatsApp)"
                               >
                                 <MessageCircle className="w-4 h-4" />
+                                {getCustomerFriendlyReminderCount(customer.id) > 0 && (
+                                  <span className="absolute -top-1 -right-1 bg-green-600 text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                                    {getCustomerFriendlyReminderCount(customer.id) > 9 ? '9+' : getCustomerFriendlyReminderCount(customer.id)}
+                                  </span>
+                                )}
                               </button>
                               <button
                                 onClick={() => handleOpenReminderHistory(customer)}
@@ -1759,15 +1907,39 @@ export const Customers: React.FC = () => {
                             <>
                               <button
                                 onClick={() => sendUrgentReminder(customer)}
-                                className={`p-1.5 rounded-lg ${theme === 'dark' ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-500'}`}
+                                disabled={sendingReminderId === customer.id}
+                                className={`p-1.5 rounded-lg relative ${
+                                  sendingReminderId === customer.id
+                                    ? 'opacity-50 cursor-wait'
+                                    : theme === 'dark' ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-500'
+                                }`}
                               >
-                                <Zap className="w-4 h-4" />
+                                {sendingReminderId === customer.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Zap className="w-4 h-4" />
+                                )}
+                                {getCustomerUrgentReminderCount(customer.id) > 0 && sendingReminderId !== customer.id && (
+                                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                                    {getCustomerUrgentReminderCount(customer.id) > 9 ? '9+' : getCustomerUrgentReminderCount(customer.id)}
+                                  </span>
+                                )}
                               </button>
                               <button
                                 onClick={() => sendFriendlyReminder(customer)}
-                                className={`p-1.5 rounded-lg ${theme === 'dark' ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-500'}`}
+                                disabled={sendingReminderId === customer.id}
+                                className={`p-1.5 rounded-lg relative ${
+                                  sendingReminderId === customer.id
+                                    ? 'opacity-50 cursor-wait'
+                                    : theme === 'dark' ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-500'
+                                }`}
                               >
                                 <MessageCircle className="w-4 h-4" />
+                                {getCustomerFriendlyReminderCount(customer.id) > 0 && (
+                                  <span className="absolute -top-1 -right-1 bg-green-600 text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                                    {getCustomerFriendlyReminderCount(customer.id) > 9 ? '9+' : getCustomerFriendlyReminderCount(customer.id)}
+                                  </span>
+                                )}
                               </button>
                               <button
                                 onClick={() => handleOpenReminderHistory(customer)}
@@ -2054,22 +2226,47 @@ export const Customers: React.FC = () => {
                         <div className="flex gap-2">
                           <button 
                             onClick={() => sendFriendlyReminder(customer)}
-                            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
-                              theme === 'dark' ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-green-50 text-green-600 hover:bg-green-100'
+                            disabled={sendingReminderId === customer.id}
+                            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium relative ${
+                              sendingReminderId === customer.id
+                                ? 'opacity-50 cursor-wait bg-green-500/10 text-green-400'
+                                : theme === 'dark' ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-green-50 text-green-600 hover:bg-green-100'
                             }`}
                           >
-                            <MessageCircle className="w-3.5 h-3.5" /> Remind
+                            {sendingReminderId === customer.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            )}
+                            {sendingReminderId === customer.id ? 'Sending...' : 'Remind'}
+                            {getCustomerFriendlyReminderCount(customer.id) > 0 && sendingReminderId !== customer.id && (
+                              <span className="absolute -top-1 -right-1 bg-green-600 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                                {getCustomerFriendlyReminderCount(customer.id) > 9 ? '9+' : getCustomerFriendlyReminderCount(customer.id)}
+                              </span>
+                            )}
                           </button>
                           <button 
                             onClick={() => sendUrgentReminder(customer)}
-                            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium ${
-                              isOverdue
-                                ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white'
-                                : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
+                            disabled={sendingReminderId === customer.id}
+                            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium relative ${
+                              sendingReminderId === customer.id
+                                ? 'opacity-50 cursor-wait bg-amber-500/20'
+                                : isOverdue
+                                  ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white'
+                                  : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
                             }`}
                           >
-                            <Zap className="w-3.5 h-3.5" /> 
-                            Urgent!
+                            {sendingReminderId === customer.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Zap className="w-3.5 h-3.5" />
+                            )}
+                            {sendingReminderId === customer.id ? '' : 'Urgent!'}
+                            {getCustomerUrgentReminderCount(customer.id) > 0 && sendingReminderId !== customer.id && (
+                              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                                {getCustomerUrgentReminderCount(customer.id) > 9 ? '9+' : getCustomerUrgentReminderCount(customer.id)}
+                              </span>
+                            )}
                           </button>
                           {/* Reminder History Button */}
                           <button 

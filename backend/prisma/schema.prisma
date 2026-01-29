@@ -486,7 +486,8 @@ model InvoiceItem {
   total           Float
   
   // Warranty
-  warrantyDueDate DateTime?
+  warranty        String?        // Product warranty code/text (copied from product at time of purchase)
+  warrantyDueDate DateTime?      // Calculated warranty expiration date
   
   createdAt       DateTime  @default(now())
 

@@ -58,6 +58,22 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
     { label: '10 Years (3500 Days)', value: '10Y', days: 3500 },
     { label: 'Lifetime Warranty', value: 'L/W', days: 36500 },
   ];
+
+  // Map product warranty text to warranty code
+  const mapWarrantyToCode = (warranty: string | undefined): string => {
+    if (!warranty) return '';
+    const lower = warranty.toLowerCase();
+    if (lower.includes('lifetime')) return 'L/W';
+    if (lower.includes('10 year')) return '10Y';
+    if (lower.includes('5 year')) return '05Y';
+    if (lower.includes('3 year')) return '03Y';
+    if (lower.includes('2 year')) return '02Y';
+    if (lower.includes('1 year') || lower.includes('one year')) return '01Y';
+    if (lower.includes('6 month')) return '06M';
+    if (lower.includes('3 month')) return '03M';
+    if (lower.includes('1 month') || lower.includes('one month')) return '01M';
+    return '';
+  };
   
   // Payment method for adding products (default to 'cash' for walk-in, 'credit' for others)
   const [addPaymentMethod, setAddPaymentMethod] = useState<'cash' | 'card' | 'bank' | 'credit'>('credit');
@@ -84,7 +100,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
       setItems(invoiceItems);
       // TRUE deep copy using JSON to avoid reference issues
       setOriginalItems(JSON.parse(JSON.stringify(invoice.items)));
-      console.log('🔄 Loaded invoice items:', invoice.items.length, 'Original saved:', JSON.parse(JSON.stringify(invoice.items)).length);
+      console.log('🔄 Loaded invoice items:', invoice.items.length, 'with warrantyDueDates:', invoice.items.map(i => ({ name: i.productName, warrantyDueDate: i.warrantyDueDate })));
       setIssueDate(invoice.date);
       setDueDate(invoice.dueDate);
       setStatus(invoice.status);
@@ -136,8 +152,32 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
     if (!product) return;
 
     const unitPrice = product.price;
-    // Use selected warranty if set, otherwise use product's default warranty
-    const itemWarranty = selectedWarranty || product.warranty;
+    // Use selected warranty (already in code format from combobox selection)
+    // If selectedWarranty is empty, map product's default warranty to code
+    const itemWarrantyCode = selectedWarranty || mapWarrantyToCode(product.warranty);
+    
+    // Helper function to get warranty days from code OR text format
+    const getWarrantyDays = (warranty: string | undefined): number => {
+      if (!warranty) return 0;
+      // First try to find by code value
+      const byCode = warrantyOptions.find(opt => opt.value === warranty);
+      if (byCode) return byCode.days;
+      // If not found, convert text to code first, then get days
+      const warrantyCode = mapWarrantyToCode(warranty);
+      const byConvertedCode = warrantyOptions.find(opt => opt.value === warrantyCode);
+      return byConvertedCode?.days || 0;
+    };
+    
+    // Calculate warrantyDueDate from warranty code
+    const calculateWarrantyDueDate = (warrantyCode: string): string | undefined => {
+      const days = getWarrantyDays(warrantyCode);
+      if (days <= 0) return undefined;
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + days);
+      return dueDate.toISOString().split('T')[0];
+    };
+    
+    const newWarrantyDueDate = calculateWarrantyDueDate(itemWarrantyCode);
     
     const newItem: InvoiceItem = {
       productId: product.id,
@@ -145,15 +185,27 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
       quantity,
       unitPrice,
       total: quantity * unitPrice,
-      warranty: itemWarranty,
+      warrantyDueDate: newWarrantyDueDate,
     };
 
     const existingItem = items.find((i) => i.productId === selectedProductId);
     if (existingItem) {
+      // Compare warranty due dates - use the later one
+      const existingDueDate = existingItem.warrantyDueDate ? new Date(existingItem.warrantyDueDate) : new Date(0);
+      const newDueDate = newWarrantyDueDate ? new Date(newWarrantyDueDate) : new Date(0);
+      
+      // If new warranty due date is later, use it; otherwise keep existing
+      const betterDueDate = newDueDate > existingDueDate ? newWarrantyDueDate : existingItem.warrantyDueDate;
+      
       setItems(
         items.map((i) =>
           i.productId === selectedProductId
-            ? { ...i, quantity: i.quantity + quantity, total: (i.quantity + quantity) * i.unitPrice }
+            ? { 
+                ...i, 
+                quantity: i.quantity + quantity, 
+                total: (i.quantity + quantity) * i.unitPrice,
+                warrantyDueDate: betterDueDate // Apply the longer warranty
+              }
             : i
         )
       );
@@ -854,6 +906,8 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                       onClick={() => {
                         setSelectedProductId(p.id);
                         setProductSearch(p.name);
+                        // Auto-select product's default warranty (map to code format)
+                        setSelectedWarranty(mapWarrantyToCode(p.warranty));
                       }}
                       className={`w-full px-4 py-2 text-left border-b last:border-b-0 transition-colors ${
                         theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'
@@ -953,13 +1007,6 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
               <Label className="text-gray-900 dark:text-white flex items-center gap-2 mb-2">
                 <Shield className="w-4 h-4 text-blue-500" />
                 Warranty
-                {currentProduct?.warranty && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
-                  }`}>
-                    Default: {currentProduct.warranty}
-                  </span>
-                )}
               </Label>
               <SearchableSelect
                 options={warrantyOptions.map(opt => ({
@@ -973,10 +1020,10 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                 emptyMessage="No warranty option found"
                 theme={theme}
               />
-              {selectedWarranty && (
+              {selectedWarranty && selectedWarranty !== mapWarrantyToCode(currentProduct?.warranty) && (
                 <p className={`text-xs mt-1.5 flex items-center gap-1.5 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
                   <CheckCircle className="w-3.5 h-3.5" />
-                  Custom warranty will be applied: <strong>{selectedWarranty}</strong>
+                  Custom warranty will be applied: <strong>{warrantyOptions.find(opt => opt.value === selectedWarranty)?.label || selectedWarranty}</strong>
                 </p>
               )}
             </div>
@@ -1038,9 +1085,54 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
             ) : (
               <div className="space-y-2">
                 {items.map((item) => {
-                  // Find product to get warranty info
+                  // Find the product to get its warranty info as fallback
                   const product = products.find(p => p.id === item.productId);
-                  const warranty = product?.warranty;
+                  
+                  // For display: FIRST check item.warrantyDueDate, then fallback to product warranty
+                  let warrantyDisplay: string | null = null;
+                  
+                  if (item.warrantyDueDate) {
+                    // Calculate warranty period from warrantyDueDate
+                    // Use invoice date as the start date for accurate calculation
+                    const invoiceDate = invoice?.date ? new Date(invoice.date) : new Date();
+                    const dueDate = new Date(item.warrantyDueDate);
+                    const totalWarrantyDays = Math.ceil((dueDate.getTime() - invoiceDate.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    if (totalWarrantyDays > 0) {
+                      // Find matching warranty option by days
+                      const matchingOption = warrantyOptions.find(opt => 
+                        opt.days > 0 && Math.abs(opt.days - totalWarrantyDays) <= 30
+                      );
+                      
+                      if (matchingOption) {
+                        warrantyDisplay = matchingOption.label;
+                      } else if (totalWarrantyDays >= 350) {
+                        const years = Math.round(totalWarrantyDays / 350);
+                        warrantyDisplay = `${years} Year${years > 1 ? 's' : ''}`;
+                      } else if (totalWarrantyDays >= 28) {
+                        const months = Math.round(totalWarrantyDays / 30);
+                        warrantyDisplay = `${months} Month${months > 1 ? 's' : ''}`;
+                      } else {
+                        warrantyDisplay = `${totalWarrantyDays} Day${totalWarrantyDays > 1 ? 's' : ''}`;
+                      }
+                    }
+                  } else if (product?.warranty) {
+                    // Fallback: Use product's default warranty
+                    const productWarranty = product.warranty;
+                    const warrantyCode = mapWarrantyToCode(productWarranty);
+                    const warrantyOption = warrantyOptions.find(opt => opt.value === warrantyCode);
+                    
+                    if (warrantyOption && warrantyOption.label !== 'No Warranty') {
+                      warrantyDisplay = warrantyOption.label;
+                    } else if (!productWarranty.toLowerCase().includes('no warranty')) {
+                      warrantyDisplay = productWarranty;
+                    }
+                  }
+                  
+                  // REMOVED: Old incorrect logic that prioritized product warranty over item.warrantyDueDate
+                  // Old code checked product warranty first which was wrong
+                  
+                  const hasWarranty = !!warrantyDisplay;
                   
                   return (
                     <div
@@ -1054,16 +1146,16 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                           <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                             {item.productName}
                           </p>
-                          {warranty && (
+                          {hasWarranty && (
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                               theme === 'dark' 
                                 ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' 
                                 : 'bg-blue-50 text-blue-700 border border-blue-200'
                             }`}>
-                              🛡️ {warranty}
+                              🛡️ {warrantyDisplay}
                             </span>
                           )}
-                          {!warranty && (
+                          {!hasWarranty && (
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                               theme === 'dark' 
                                 ? 'bg-slate-500/20 text-slate-400 border border-slate-500/30' 

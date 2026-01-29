@@ -1833,6 +1833,8 @@ export interface Invoice {
   // Reminder tracking
   reminders?: InvoiceReminder[];
   reminderCount?: number; // Total reminders sent
+  friendlyReminderCount?: number; // Friendly (PAYMENT type) reminders sent
+  urgentReminderCount?: number; // Urgent (OVERDUE type) reminders sent
   lastReminderDate?: string; // Last reminder date
   // Email tracking
   emailSent?: boolean; // Whether invoice has been emailed to customer
