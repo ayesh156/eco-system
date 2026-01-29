@@ -130,26 +130,55 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
 
   const currentProduct = products.find((p) => p.id === selectedProductId);
 
-  // Filter products by search
+  // Get productIds that are already in the invoice items (these should still be shown even if stock is 0)
+  const productIdsInInvoice = useMemo(() => {
+    return new Set(items.map(item => item.productId).filter(Boolean));
+  }, [items]);
+
+  // Helper to calculate real-time stock for a product
+  // Formula: product.stock (DB) + originalQtyInInvoice - currentQtyInInvoice
+  // This shows what the stock WILL BE after saving the invoice
+  const calculateRealTimeStock = (productId: string, dbStock: number): number => {
+    const originalQty = originalItems.filter(i => i.productId === productId).reduce((sum, i) => sum + i.quantity, 0);
+    const currentQty = items.filter(i => i.productId === productId).reduce((sum, i) => sum + i.quantity, 0);
+    return dbStock + originalQty - currentQty;
+  };
+
+  // Filter products by search AND stock availability
+  // Show products with stock > 0 OR products already in the invoice
   const filteredProducts = useMemo(() => {
-    if (!productSearch.trim()) return products;
+    // First filter by stock: show if realTimeStock > 0 OR if product is already in invoice
+    const availableProducts = products.filter(p => {
+      const realTimeStock = calculateRealTimeStock(p.id, p.stock);
+      return realTimeStock > 0 || productIdsInInvoice.has(p.id);
+    });
+    
+    if (!productSearch.trim()) return availableProducts;
     const selectedProduct = products.find(p => p.id === selectedProductId);
-    if (selectedProduct && productSearch === selectedProduct.name) return products;
+    if (selectedProduct && productSearch === selectedProduct.name) return availableProducts;
     
     const searchLower = productSearch.toLowerCase();
-    return products.filter(
+    return availableProducts.filter(
       (p) =>
         p.name.toLowerCase().includes(searchLower) ||
         p.serialNumber.toLowerCase().includes(searchLower) ||
         (p.barcode && p.barcode.toLowerCase().includes(searchLower)) ||
         p.category.toLowerCase().includes(searchLower)
     );
-  }, [products, productSearch, selectedProductId]);
+  }, [products, productSearch, selectedProductId, productIdsInInvoice, items, originalItems]);
 
   const addItem = () => {
     if (!selectedProductId || quantity <= 0) return;
     const product = products.find((p) => p.id === selectedProductId);
     if (!product) return;
+
+    // Stock validation using real-time stock calculation
+    const currentRealTimeStock = calculateRealTimeStock(product.id, product.stock);
+    
+    if (quantity > currentRealTimeStock) {
+      alert(`Cannot add ${quantity}. Only ${currentRealTimeStock} available in stock.`);
+      return;
+    }
 
     const unitPrice = product.price;
     // Use selected warranty (already in code format from combobox selection)
@@ -899,43 +928,70 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                     No products found
                   </div>
                 ) : (
-                  filteredProducts.slice(0, 10).map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedProductId(p.id);
-                        setProductSearch(p.name);
-                        // Auto-select product's default warranty (map to code format)
-                        setSelectedWarranty(mapWarrantyToCode(p.warranty));
-                      }}
-                      className={`w-full px-4 py-2 text-left border-b last:border-b-0 transition-colors ${
-                        theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'
-                      } ${
-                        selectedProductId === p.id
-                          ? 'bg-emerald-500/10'
-                          : theme === 'dark' ? 'hover:bg-slate-700/50' : 'hover:bg-slate-100'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className={`font-medium truncate ${selectedProductId === p.id ? 'text-emerald-400' : (theme === 'dark' ? 'text-white' : 'text-slate-900')}`}>
-                            {p.name}
-                          </span>
-                          {p.warranty && (
-                            <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded ${
-                              theme === 'dark' ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-600'
+                  filteredProducts.slice(0, 10).map((p) => {
+                    // Calculate REAL-TIME stock using the helper function
+                    // This shows what stock WILL BE after saving current changes
+                    const realTimeStock = calculateRealTimeStock(p.id, p.stock);
+                    const isLowStock = realTimeStock > 0 && realTimeStock <= 5;
+                    const isOutOfStock = realTimeStock <= 0;
+                    
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedProductId(p.id);
+                          setProductSearch(p.name);
+                          // Auto-select product's default warranty (map to code format)
+                          setSelectedWarranty(mapWarrantyToCode(p.warranty));
+                        }}
+                        disabled={isOutOfStock}
+                        className={`w-full px-4 py-2 text-left border-b last:border-b-0 transition-colors ${
+                          theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'
+                        } ${
+                          isOutOfStock 
+                            ? 'opacity-50 cursor-not-allowed'
+                            : selectedProductId === p.id
+                              ? 'bg-emerald-500/10'
+                              : theme === 'dark' ? 'hover:bg-slate-700/50' : 'hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className={`font-medium truncate ${
+                              isOutOfStock 
+                                ? (theme === 'dark' ? 'text-slate-500' : 'text-slate-400')
+                                : selectedProductId === p.id 
+                                  ? 'text-emerald-400' 
+                                  : (theme === 'dark' ? 'text-white' : 'text-slate-900')
                             }`}>
-                              {p.warranty}
+                              {p.name}
                             </span>
-                          )}
+                            {/* Real-Time Stock Badge */}
+                            <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${
+                              isOutOfStock
+                                ? (theme === 'dark' ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600')
+                                : isLowStock
+                                  ? (theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-50 text-amber-600')
+                                  : (theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600')
+                            }`}>
+                              {isOutOfStock ? 'Out of Stock' : `${realTimeStock} available`}
+                            </span>
+                            {p.warranty && (
+                              <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded ${
+                                theme === 'dark' ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-600'
+                              }`}>
+                                {p.warranty}
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-sm flex-shrink-0 ml-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Rs. {p.price.toLocaleString()}
+                          </span>
                         </div>
-                        <span className={`text-sm flex-shrink-0 ml-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Rs. {p.price.toLocaleString()}
-                        </span>
-                      </div>
-                    </button>
-                  ))
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -943,7 +999,16 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
             {currentProduct && (
               <div className="p-2 mb-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
                 <p className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
-                  Selected: <span className="font-semibold text-emerald-400">{currentProduct.name}</span> • Stock: {currentProduct.stock}
+                  Selected: <span className="font-semibold text-emerald-400">{currentProduct.name}</span> • 
+                  <span className={`ml-1 font-medium ${
+                    calculateRealTimeStock(currentProduct.id, currentProduct.stock) <= 0 
+                      ? 'text-red-400' 
+                      : calculateRealTimeStock(currentProduct.id, currentProduct.stock) <= 5 
+                        ? 'text-amber-400' 
+                        : 'text-emerald-400'
+                  }`}>
+                    {calculateRealTimeStock(currentProduct.id, currentProduct.stock)} available
+                  </span>
                   {currentProduct.warranty && (
                     <span className="ml-2 text-blue-400">• 🛡️ {currentProduct.warranty}</span>
                   )}

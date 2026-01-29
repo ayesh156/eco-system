@@ -742,8 +742,11 @@ export const Invoices: React.FC = () => {
           setSelectedInvoice(null);
           
           // Refetch fresh data to ensure consistency (async - no need to await)
-          console.log('📡 Refetching invoice data after edit...');
+          console.log('📡 Refetching invoice and product data after edit...');
           fetchInvoices(true).catch(err => console.warn('Refetch warning:', err));
+          
+          // CRITICAL: Refresh products to get updated stock values
+          loadProducts(true).catch(err => console.warn('Product refresh warning:', err));
           
           return;
         } catch (error) {
@@ -809,6 +812,9 @@ export const Invoices: React.FC = () => {
       setCachedInvoices(prevInvoices => prevInvoices.filter(inv => inv.id !== selectedInvoice.id));
       setShowDeleteModal(false);
       setSelectedInvoice(null);
+      
+      // CRITICAL: Refresh products to get updated stock values (stock is restored when invoice deleted)
+      loadProducts(true).catch(err => console.warn('Product refresh warning:', err));
     } finally {
       setIsDeleting(false);
     }

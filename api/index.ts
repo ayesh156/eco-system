@@ -1188,6 +1188,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
         
         console.log('[CREATE INVOICE] Invoice created successfully:', invoice.id, invoice.invoiceNumber);
+        
+        // ==================== DEDUCT STOCK ====================
+        // After successful invoice creation, deduct stock for each item
+        for (const item of invoiceItems) {
+          if (item.productId) {
+            await db.product.update({
+              where: { id: item.productId },
+              data: { stock: { decrement: item.quantity } },
+            });
+            console.log(`📦 Stock deducted for product ${item.productId}: -${item.quantity}`);
+          }
+        }
+        
         return res.status(201).json({ success: true, data: invoice });
       } catch (invoiceError: any) {
         console.error('[CREATE INVOICE ERROR]', invoiceError.message);
@@ -1268,11 +1281,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       if (dueAmount !== undefined && !updateData.dueAmount) updateData.dueAmount = dueAmount;
       
-      // Update items if provided
+      // Update items if provided (with stock management)
       if (items && items.length > 0) {
-        await db.invoiceItem.deleteMany({ where: { invoiceId: existingInvoice.id } });
+        // ==================== STOCK MANAGEMENT ====================
+        // Step 1: Get old items before deleting
+        const oldItems = await db.invoiceItem.findMany({ where: { invoiceId: existingInvoice.id } });
         
-        // Validate productIds for each item
+        // Step 2: Create maps of old and new quantities by productId
+        const oldItemsMap = new Map<string, number>();
+        for (const oldItem of oldItems) {
+          if (oldItem.productId) {
+            const currentQty = oldItemsMap.get(oldItem.productId) || 0;
+            oldItemsMap.set(oldItem.productId, currentQty + oldItem.quantity);
+          }
+        }
+        
+        // Validate productIds and build new items map
         const validatedItems = await Promise.all(items.map(async (item: any) => {
           let validProductId = null;
           if (item.productId) {
@@ -1291,6 +1315,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           };
         }));
         
+        const newItemsMap = new Map<string, number>();
+        for (const newItem of validatedItems) {
+          if (newItem.productId) {
+            const currentQty = newItemsMap.get(newItem.productId) || 0;
+            newItemsMap.set(newItem.productId, currentQty + newItem.quantity);
+          }
+        }
+        
+        // Step 3: Calculate and apply stock adjustments
+        const allProductIds = new Set([...oldItemsMap.keys(), ...newItemsMap.keys()]);
+        for (const productId of allProductIds) {
+          const oldQty = oldItemsMap.get(productId) || 0;
+          const newQty = newItemsMap.get(productId) || 0;
+          const difference = newQty - oldQty;
+          
+          if (difference !== 0) {
+            await db.product.update({
+              where: { id: productId },
+              data: {
+                stock: difference > 0 
+                  ? { decrement: difference }  // Taking more from stock
+                  : { increment: Math.abs(difference) }, // Returning to stock
+              },
+            });
+            console.log(`📦 Stock adjusted for product ${productId}: ${difference > 0 ? '-' : '+'}${Math.abs(difference)} (old: ${oldQty}, new: ${newQty})`);
+          }
+        }
+        
+        // Step 4: Delete old items and create new ones
+        await db.invoiceItem.deleteMany({ where: { invoiceId: existingInvoice.id } });
         await db.invoiceItem.createMany({ data: validatedItems });
       }
       
@@ -1333,6 +1387,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // CRITICAL: Verify ownership before deleting (use effectiveShopId for SuperAdmin viewing)
       if (existingInvoice.shopId !== effectiveShopId) {
         return res.status(403).json({ success: false, error: 'Access denied - invoice does not belong to your shop' });
+      }
+      
+      // ==================== RESTORE STOCK BEFORE DELETE ====================
+      // Get all items from this invoice and restore their stock
+      const invoiceItems = await db.invoiceItem.findMany({ where: { invoiceId: existingInvoice.id } });
+      for (const item of invoiceItems) {
+        if (item.productId) {
+          await db.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } }, // Restore stock
+          });
+          console.log(`📦 Stock restored for product ${item.productId}: +${item.quantity} (invoice deleted)`);
+        }
       }
       
       // Delete related items and payments first

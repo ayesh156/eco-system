@@ -647,10 +647,58 @@ export const updateInvoice = async (
     const dueAmount = total - newPaidAmount;
     const status = manualStatus || calculateInvoiceStatus(total, newPaidAmount);
 
-    // Update in transaction
+    // Update in transaction with stock management
     const invoice = await prisma.$transaction(async (tx) => {
-      // Delete existing items if new items provided
+      // ==================== STOCK MANAGEMENT ====================
+      // When items are being updated, we need to:
+      // 1. Restore stock from old items (add back to inventory)
+      // 2. Deduct stock for new items (subtract from inventory)
+      
       if (validatedItems.length > 0) {
+        // Step 1: Create a map of old items by productId for comparison
+        const oldItemsMap = new Map<string, number>();
+        for (const oldItem of existingInvoice.items) {
+          if (oldItem.productId) {
+            const currentQty = oldItemsMap.get(oldItem.productId) || 0;
+            oldItemsMap.set(oldItem.productId, currentQty + oldItem.quantity);
+          }
+        }
+        
+        // Step 2: Create a map of new items by productId
+        const newItemsMap = new Map<string, number>();
+        for (const newItem of validatedItems) {
+          if (newItem.productId) {
+            const currentQty = newItemsMap.get(newItem.productId) || 0;
+            newItemsMap.set(newItem.productId, currentQty + newItem.quantity);
+          }
+        }
+        
+        // Step 3: Calculate stock adjustments for each product
+        // Get all unique product IDs from both old and new items
+        const allProductIds = new Set([...oldItemsMap.keys(), ...newItemsMap.keys()]);
+        
+        for (const productId of allProductIds) {
+          const oldQty = oldItemsMap.get(productId) || 0;
+          const newQty = newItemsMap.get(productId) || 0;
+          const difference = newQty - oldQty;
+          
+          if (difference !== 0) {
+            // If difference > 0: We need MORE stock (decrement)
+            // If difference < 0: We need LESS stock (increment - returning to inventory)
+            await tx.product.update({
+              where: { id: productId },
+              data: {
+                stock: difference > 0 
+                  ? { decrement: difference }  // Taking more from stock
+                  : { increment: Math.abs(difference) }, // Returning to stock
+              },
+            });
+            
+            console.log(`📦 Stock adjusted for product ${productId}: ${difference > 0 ? '-' : '+'}${Math.abs(difference)} (old: ${oldQty}, new: ${newQty})`);
+          }
+        }
+        
+        // Delete existing items after stock adjustment
         await tx.invoiceItem.deleteMany({
           where: { invoiceId: invoiceId },
         });

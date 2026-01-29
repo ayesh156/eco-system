@@ -223,13 +223,22 @@ export const CreateInvoice: React.FC = () => {
     );
   }, [customers, customerSearch]);
 
-  // Filter products by search
+  // Get productIds that are already in the invoice items (these should still be shown even if stock is 0)
+  const productIdsInInvoice = useMemo(() => {
+    return new Set(items.map(item => item.productId).filter(Boolean));
+  }, [items]);
+
+  // Filter products by search AND stock availability
+  // Show products with stock > 0 OR products already in the invoice
   const filteredProducts = useMemo(() => {
-    let filtered = products;
+    // First filter by stock: show if stock > 0 OR if product is already in invoice
+    let filtered = products.filter(
+      p => p.stock > 0 || productIdsInInvoice.has(p.id)
+    );
     
     if (productSearch.trim()) {
       const searchLower = productSearch.toLowerCase();
-      filtered = products.filter(
+      filtered = filtered.filter(
         (p) =>
           p.name.toLowerCase().includes(searchLower) ||
           p.serialNumber.toLowerCase().includes(searchLower) ||
@@ -244,7 +253,7 @@ export const CreateInvoice: React.FC = () => {
       if (a.stock <= 0 && b.stock > 0) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [products, productSearch]);
+  }, [products, productSearch, productIdsInInvoice]);
 
   // Helper function to map product warranty text to warranty code
   const mapWarrantyToCode = (warranty: string | undefined): string => {
@@ -273,6 +282,15 @@ export const CreateInvoice: React.FC = () => {
   };
 
   const addItem = (product: Product) => {
+    // Stock validation: Calculate how much is already in the invoice
+    const existingQtyInInvoice = items.filter(i => i.productId === product.id).reduce((sum, i) => sum + i.quantity, 0);
+    const availableStock = product.stock;
+    
+    if (existingQtyInInvoice >= availableStock) {
+      alert(`Cannot add more. Only ${availableStock} available in stock and you already have ${existingQtyInInvoice} in the invoice.`);
+      return;
+    }
+
     const unitPrice = product.price;
     
     // Auto-select warranty based on product's warranty field
@@ -494,6 +512,9 @@ export const CreateInvoice: React.FC = () => {
       
       // Add the new invoice to the cache so it appears immediately on the invoices page
       setCachedInvoices(prev => [convertedInvoice, ...prev]);
+      
+      // CRITICAL: Refresh products to get updated stock values from database
+      loadProducts(true).catch(err => console.warn('Product refresh warning:', err));
       
       setCreatedInvoice(convertedInvoice as Invoice & { buyingDate: string });
       setShowPrintPreview(true);
@@ -1084,38 +1105,59 @@ export const CreateInvoice: React.FC = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                {filteredProducts.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => addItem(product)}
-                    disabled={product.stock <= 0}
-                    className={`w-full p-3 rounded-xl text-left transition-all flex items-center gap-3 disabled:opacity-50 ${
-                      theme === 'dark' 
-                        ? 'bg-slate-700/50 hover:bg-slate-700' 
-                        : 'bg-slate-50 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      theme === 'dark' ? 'bg-teal-500/20' : 'bg-teal-100'
-                    }`}>
-                      <Package className="w-5 h-5 text-teal-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                        {product.name}
-                      </p>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {product.serialNumber} • Stock: {product.stock}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-emerald-500">
-                        Rs. {product.price.toLocaleString()}
-                      </p>
-                    </div>
-                    <Plus className="w-5 h-5 text-emerald-500" />
-                  </button>
-                ))}
+                {filteredProducts.map((product) => {
+                  // Calculate available stock considering what's already in invoice
+                  const qtyInInvoice = items.filter(i => i.productId === product.id).reduce((sum, i) => sum + i.quantity, 0);
+                  const remainingStock = product.stock - qtyInInvoice;
+                  const isLowStock = remainingStock > 0 && remainingStock <= 5;
+                  const isOutOfStock = remainingStock <= 0;
+                  
+                  return (
+                    <button
+                      key={product.id}
+                      onClick={() => addItem(product)}
+                      disabled={isOutOfStock}
+                      className={`w-full p-3 rounded-xl text-left transition-all flex items-center gap-3 ${
+                        isOutOfStock 
+                          ? 'opacity-50 cursor-not-allowed'
+                          : theme === 'dark' 
+                            ? 'bg-slate-700/50 hover:bg-slate-700' 
+                            : 'bg-slate-50 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        theme === 'dark' ? 'bg-teal-500/20' : 'bg-teal-100'
+                      }`}>
+                        <Package className="w-5 h-5 text-teal-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          {product.name}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {product.serialNumber}
+                          </p>
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                            isOutOfStock
+                              ? (theme === 'dark' ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600')
+                              : isLowStock
+                                ? (theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-50 text-amber-600')
+                                : (theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600')
+                          }`}>
+                            {isOutOfStock ? 'Out of Stock' : `${remainingStock} left`}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-emerald-500">
+                          Rs. {product.price.toLocaleString()}
+                        </p>
+                      </div>
+                      <Plus className={`w-5 h-5 ${isOutOfStock ? 'text-slate-400' : 'text-emerald-500'}`} />
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
