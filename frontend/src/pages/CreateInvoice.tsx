@@ -393,16 +393,11 @@ export const CreateInvoice: React.FC = () => {
 
     // Stock validation: Check available stock before allowing quantity increase
     const product = products.find(p => p.id === productId);
-    if (product) {
-      const existingQtyInInvoice = items.filter(i => i.productId === productId).reduce((sum, i) => sum + i.quantity, 0);
-      const availableStock = product.stock;
-      
-      if (newQuantity > availableStock) {
-        toast.error('Stock Limit Exceeded', {
-          description: `Cannot set quantity to ${newQuantity}. Only ${availableStock} available in stock.`,
-        });
-        return;
-      }
+    if (product && newQuantity > product.stock) {
+      toast.error('Stock Limit Exceeded', {
+        description: `Cannot set quantity to ${newQuantity}. Only ${product.stock} available in stock.`,
+      });
+      return;
     }
 
     setItems(items.map(item => 
