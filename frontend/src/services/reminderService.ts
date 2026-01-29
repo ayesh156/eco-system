@@ -120,7 +120,7 @@ export const reminderService = {
   /**
    * Create a new reminder for an invoice
    */
-  async create(invoiceId: string, reminder: CreateReminderRequest): Promise<{ reminder: InvoiceReminder; reminderCount: number }> {
+  async create(invoiceId: string, reminder: CreateReminderRequest): Promise<{ reminder: InvoiceReminder; reminderCount: number; friendlyReminderCount: number; urgentReminderCount: number }> {
     // Build URL with optional shopId query param (for SUPER_ADMIN viewing shops)
     let url = `${API_BASE_URL}/api/v1/invoices/${invoiceId}/reminders`;
     if (reminder.shopId) {
