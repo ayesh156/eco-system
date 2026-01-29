@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm install && npm run build && cd ../backend && npm install && npx prisma generate",
+  "buildCommand": "cd frontend && npm install && npm run build && cd .. && npm install && cp -r backend/prisma . && npx prisma generate",
   "outputDirectory": "frontend/dist",
   "framework": "vite",
   "functions": {

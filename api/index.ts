@@ -548,6 +548,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // API Test Route - verifies API is working and database connection
+    if (path === '/api/v1/test' && method === 'GET') {
+      try {
+        // Test database connection
+        const dbTest = await prisma.$queryRaw`SELECT 1 as test`;
+        return res.status(200).json({ 
+          success: true,
+          message: 'API is working correctly',
+          timestamp: new Date().toISOString(),
+          database: 'connected',
+          environment: process.env.NODE_ENV || 'development',
+          dbTest
+        });
+      } catch (dbError: any) {
+        return res.status(200).json({ 
+          success: true,
+          message: 'API is working but database connection failed',
+          timestamp: new Date().toISOString(),
+          database: 'error',
+          dbError: dbError.message
+        });
+      }
+    }
+
     // Use global prisma instance (no await needed)
     const db = prisma;
 
@@ -938,96 +962,120 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== CREATE INVOICE ====================
     if (path === '/api/v1/invoices' && method === 'POST') {
-      // Require authentication for multi-tenant isolation
-      if (!effectiveShopId) {
-        return res.status(401).json({ success: false, message: 'Authentication required' });
-      }
-      
-      const { customerId, items, subtotal, tax, discount, total, paidAmount, status, date, dueDate, paymentMethod, salesChannel, notes } = body;
-      
-      // Get customer name from customer
-      const customer = await db.customer.findUnique({ where: { id: customerId } });
-      const customerName = customer?.name || 'Unknown Customer';
-      
-      // Verify customer belongs to same shop (using effectiveShopId for SuperAdmin)
-      if (customer && customer.shopId !== effectiveShopId) {
-        return res.status(403).json({ success: false, error: 'Customer does not belong to your shop' });
-      }
-      
-      // Use effective shopId (supports SuperAdmin viewing other shops)
-      const invoiceShopId = effectiveShopId;
-      
-      // Generate unique invoice number for this shop
-      // Uses shop-specific sequence + millisecond precision + random component
-      const invoiceNumber = await generateUniqueInvoiceNumber(invoiceShopId, db);
+      try {
+        // Require authentication for multi-tenant isolation
+        if (!effectiveShopId) {
+          return res.status(401).json({ success: false, message: 'Authentication required' });
+        }
+        
+        const { customerId, items, subtotal, tax, discount, total, paidAmount, status, date, dueDate, paymentMethod, salesChannel, notes } = body;
+        
+        console.log('[CREATE INVOICE] Starting invoice creation for shop:', effectiveShopId);
+        console.log('[CREATE INVOICE] Request body:', JSON.stringify({ customerId, itemsCount: items?.length, subtotal, tax, discount, total, paidAmount, status }));
+        
+        // Get customer name from customer (customerId is optional for walk-in)
+        let customerName = 'Walk-in Customer';
+        if (customerId) {
+          const customer = await db.customer.findUnique({ where: { id: customerId } });
+          customerName = customer?.name || 'Unknown Customer';
+          
+          // Verify customer belongs to same shop (using effectiveShopId for SuperAdmin)
+          if (customer && customer.shopId !== effectiveShopId) {
+            return res.status(403).json({ success: false, error: 'Customer does not belong to your shop' });
+          }
+        }
+        
+        // Use effective shopId (supports SuperAdmin viewing other shops)
+        const invoiceShopId = effectiveShopId;
+        
+        // Generate unique invoice number for this shop
+        // Uses shop-specific sequence + millisecond precision + random component
+        const invoiceNumber = await generateUniqueInvoiceNumber(invoiceShopId, db);
+        console.log('[CREATE INVOICE] Generated invoice number:', invoiceNumber);
 
-      // Calculate subtotal from items if not provided
-      const calculatedSubtotal = subtotal || (items || []).reduce((sum: number, item: any) => {
-        const qty = item.quantity || 1;
-        const price = item.unitPrice || item.price || 0;
-        return sum + (qty * price);
-      }, 0);
-      
-      const calculatedTax = tax || 0;
-      const calculatedDiscount = discount || 0;
-      const calculatedTotal = total || (calculatedSubtotal + calculatedTax - calculatedDiscount);
-      const calculatedPaid = paidAmount || 0;
-      const calculatedDue = calculatedTotal - calculatedPaid;
-      
-      let invoiceStatus: InvoiceStatus = (status as InvoiceStatus) || InvoiceStatus.UNPAID;
-      if (!status) {
-        if (calculatedPaid >= calculatedTotal) invoiceStatus = InvoiceStatus.FULLPAID;
-        else if (calculatedPaid > 0) invoiceStatus = InvoiceStatus.HALFPAY;
-      }
+        // Calculate subtotal from items if not provided
+        const calculatedSubtotal = subtotal || (items || []).reduce((sum: number, item: any) => {
+          const qty = item.quantity || 1;
+          const price = item.unitPrice || item.price || 0;
+          return sum + (qty * price);
+        }, 0);
+        
+        const calculatedTax = tax || 0;
+        const calculatedDiscount = discount || 0;
+        const calculatedTotal = total || (calculatedSubtotal + calculatedTax - calculatedDiscount);
+        const calculatedPaid = paidAmount || 0;
+        const calculatedDue = calculatedTotal - calculatedPaid;
+        
+        let invoiceStatus: InvoiceStatus = (status as InvoiceStatus) || InvoiceStatus.UNPAID;
+        if (!status) {
+          if (calculatedPaid >= calculatedTotal) invoiceStatus = InvoiceStatus.FULLPAID;
+          else if (calculatedPaid > 0) invoiceStatus = InvoiceStatus.HALFPAY;
+        }
 
-      const invoice = await db.invoice.create({
-        data: {
-          invoiceNumber,
-          customerId,
-          customerName,
-          shopId: invoiceShopId,
-          subtotal: calculatedSubtotal,
-          tax: calculatedTax,
-          discount: calculatedDiscount,
-          total: calculatedTotal,
-          paidAmount: calculatedPaid,
-          dueAmount: calculatedDue,
-          status: invoiceStatus,
-          date: date ? new Date(date) : new Date(),
-          dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          paymentMethod: paymentMethod || 'CASH',
-          salesChannel: salesChannel || 'ON_SITE',
-          notes,
-          items: {
-            create: await Promise.all((items || []).map(async (item: any) => {
-              // Validate productId - set to null if product doesn't exist
-              let validProductId = null;
-              if (item.productId) {
-                const product = await db.product.findUnique({ where: { id: item.productId } });
-                if (product) validProductId = item.productId;
-              }
-              const itemPrice = item.unitPrice || item.price || 0;
-              return {
-                productId: validProductId,
-                productName: item.productName || item.name || 'Unknown Product',
-                quantity: item.quantity || 1,
-                unitPrice: itemPrice,
-                originalPrice: item.originalPrice || itemPrice,
-                discount: item.discount || 0,
-                total: item.total || (item.quantity * itemPrice),
-                warrantyDueDate: item.warrantyDueDate ? new Date(item.warrantyDueDate) : null,
-              };
-            })),
+        // Prepare invoice items
+        const invoiceItems = await Promise.all((items || []).map(async (item: any) => {
+          // Validate productId - set to null if product doesn't exist
+          let validProductId = null;
+          if (item.productId) {
+            const product = await db.product.findUnique({ where: { id: item.productId } });
+            if (product) validProductId = item.productId;
+          }
+          const itemPrice = item.unitPrice || item.price || 0;
+          return {
+            productId: validProductId,
+            productName: item.productName || item.name || 'Unknown Product',
+            quantity: item.quantity || 1,
+            unitPrice: itemPrice,
+            originalPrice: item.originalPrice || itemPrice,
+            discount: item.discount || 0,
+            total: item.total || ((item.quantity || 1) * itemPrice),
+            warrantyDueDate: item.warrantyDueDate ? new Date(item.warrantyDueDate) : null,
+          };
+        }));
+
+        console.log('[CREATE INVOICE] Creating invoice with', invoiceItems.length, 'items');
+
+        const invoice = await db.invoice.create({
+          data: {
+            invoiceNumber,
+            customerId: customerId || null,
+            customerName,
+            shopId: invoiceShopId,
+            subtotal: calculatedSubtotal,
+            tax: calculatedTax,
+            discount: calculatedDiscount,
+            total: calculatedTotal,
+            paidAmount: calculatedPaid,
+            dueAmount: calculatedDue,
+            status: invoiceStatus,
+            date: date ? new Date(date) : new Date(),
+            dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            paymentMethod: paymentMethod || 'CASH',
+            salesChannel: salesChannel || 'ON_SITE',
+            notes,
+            items: {
+              create: invoiceItems,
+            },
           },
-        },
-        include: {
-          customer: true,
-          items: { include: { product: true } },
-          payments: true,
-        },
-      });
-      
-      return res.status(201).json({ success: true, data: invoice });
+          include: {
+            customer: true,
+            items: { include: { product: true } },
+            payments: true,
+          },
+        });
+        
+        console.log('[CREATE INVOICE] Invoice created successfully:', invoice.id, invoice.invoiceNumber);
+        return res.status(201).json({ success: true, data: invoice });
+      } catch (invoiceError: any) {
+        console.error('[CREATE INVOICE ERROR]', invoiceError.message);
+        console.error('[CREATE INVOICE ERROR STACK]', invoiceError.stack);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to create invoice', 
+          details: invoiceError.message,
+          code: invoiceError.code || 'UNKNOWN'
+        });
+      }
     }
 
     // ==================== UPDATE INVOICE ====================
