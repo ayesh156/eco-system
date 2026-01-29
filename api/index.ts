@@ -232,12 +232,12 @@ function generateInvoiceEmailHTML(data: {
         </div>
         ` : ''}
         ${data.dueAmount > 0 ? `
-        <div style="margin-top: 15px; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 10px; padding: 15px; border-left: 4px solid #f59e0b;">
+        <div style="margin-top: 15px; background: #ffffff; border: 2px solid #000000; padding: 15px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: #ffffff; font-weight: 700; font-size: 15px;">⚠️ BALANCE DUE:</span>
-            <span style="color: #fbbf24; font-weight: 800; font-size: 20px;">${formatCurrency(data.dueAmount)}</span>
+            <span style="color: #000000; font-weight: 700; font-size: 15px;">⚠️ BALANCE DUE:</span>
+            <span style="color: #000000; font-weight: 800; font-size: 20px;">${formatCurrency(data.dueAmount)}</span>
           </div>
-          <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0; text-align: center;">Please settle the outstanding balance at your earliest convenience</p>
+          <p style="color: #666666; font-size: 11px; margin: 8px 0 0; text-align: center;">Please settle the outstanding balance at your earliest convenience</p>
         </div>
         ` : ''}
       </div>

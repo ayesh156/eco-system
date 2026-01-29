@@ -454,6 +454,40 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
             color: #000;
           }
 
+          /* BALANCE DUE BOX - INK EFFICIENT STYLING */
+          .balance-due-box {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 12px 15px;
+            margin-top: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .balance-due-box .label {
+            font-size: 10pt;
+            font-weight: 800;
+            color: #000;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+
+          .balance-due-box .value {
+            font-size: 13pt;
+            font-weight: 900;
+            color: #000;
+            font-family: 'Consolas', 'Monaco', monospace;
+          }
+
+          .balance-due-note {
+            text-align: center;
+            font-size: 7pt;
+            color: #666;
+            margin-top: 4px;
+            font-style: italic;
+          }
+
           /* NOTES SECTION - NO BACKGROUND */
           .notes-section {
             background: white;
@@ -689,8 +723,26 @@ export const PrintableInvoice = forwardRef<HTMLDivElement, PrintableInvoiceProps
               <span className="label">Grand total:</span>
               <span className="value">{formatCurrency(invoice.total)}</span>
             </div>
+            {/* Paid Amount - if partial payment */}
+            {invoice.paidAmount > 0 && invoice.paidAmount < invoice.total && (
+              <div className="totals-row" style={{ borderBottom: 'none', paddingTop: '6px' }}>
+                <span className="label">Paid Amount:</span>
+                <span className="value" style={{ color: '#000000', fontWeight: '600' }}>{formatCurrency(invoice.paidAmount)}</span>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Balance Due Box - Only show if there's a balance */}
+        {(invoice.dueAmount > 0 || (invoice.total - (invoice.paidAmount || 0)) > 0) && (
+          <div style={{ marginBottom: '15px' }}>
+            <div className="balance-due-box">
+              <span className="label">⚠ BALANCE DUE:</span>
+              <span className="value">{formatCurrency(invoice.dueAmount || (invoice.total - (invoice.paidAmount || 0)))}</span>
+            </div>
+            <p className="balance-due-note">Please settle the outstanding balance at your earliest convenience</p>
+          </div>
+        )}
 
         {/* Notes / Terms */}
         <div className="notes-section">

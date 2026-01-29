@@ -451,6 +451,41 @@ const generateInvoiceHTML = (data: InvoicePDFData): string => {
       color: #000;
     }
 
+    /* BALANCE DUE BOX - INK EFFICIENT STYLING */
+    .balance-due-box {
+      background: #fff;
+      border: 2px solid #000;
+      padding: 12px 15px;
+      margin-top: 12px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .balance-due-box .label {
+      font-size: 10pt;
+      font-weight: 800;
+      color: #000;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .balance-due-box .value {
+      font-size: 13pt;
+      font-weight: 900;
+      color: #000;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    .balance-due-note {
+      text-align: center;
+      font-size: 7pt;
+      color: #666;
+      margin-bottom: 12px;
+      font-style: italic;
+    }
+
     /* NOTES SECTION */
     .notes-section {
       background: white;
@@ -616,8 +651,23 @@ const generateInvoiceHTML = (data: InvoicePDFData): string => {
         <span class="label">Grand total:</span>
         <span class="value">${formatCurrency(data.total)}</span>
       </div>
+      ${data.paidAmount > 0 && data.paidAmount < data.total ? `
+        <div class="totals-row" style="border-bottom: none; padding-top: 6px;">
+          <span class="label">Paid Amount:</span>
+          <span class="value" style="color: #000000; font-weight: 600;">${formatCurrency(data.paidAmount)}</span>
+        </div>
+      ` : ''}
     </div>
   </div>
+
+  <!-- Balance Due Box - Only show if there's a balance -->
+  ${data.dueAmount > 0 ? `
+    <div class="balance-due-box">
+      <span class="label">⚠ BALANCE DUE:</span>
+      <span class="value">${formatCurrency(data.dueAmount)}</span>
+    </div>
+    <p class="balance-due-note">Please settle the outstanding balance at your earliest convenience</p>
+  ` : ''}
 
   <!-- Notes / Terms -->
   <div class="notes-section">
