@@ -540,28 +540,144 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // API Test Route - verifies API is working and database connection
+    // API Test Route - Beautiful HTML UI
     if (path === '/api/v1/test' && method === 'GET') {
+      let dbStatus = 'connected';
+      let dbMessage = 'Database Connected';
+      
       try {
-        // Test database connection
-        const dbTest = await prisma.$queryRaw`SELECT 1 as test`;
-        return res.status(200).json({ 
-          success: true,
-          message: 'API is working correctly',
-          timestamp: new Date().toISOString(),
-          database: 'connected',
-          environment: process.env.NODE_ENV || 'development',
-          dbTest
-        });
+        await prisma.$queryRaw`SELECT 1 as test`;
       } catch (dbError: any) {
-        return res.status(200).json({ 
-          success: true,
-          message: 'API is working but database connection failed',
-          timestamp: new Date().toISOString(),
-          database: 'error',
-          dbError: dbError.message
-        });
+        dbStatus = 'error';
+        dbMessage = `Database Error: ${dbError.message}`;
       }
+      
+      const timestamp = new Date().toLocaleString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true 
+      });
+      const env = process.env.NODE_ENV || 'development';
+      
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECOTEC API - Status</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+    .container { text-align: center; padding: 20px; animation: fadeIn 0.8s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .rocket-icon {
+      width: 120px; height: 120px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 30px;
+      font-size: 60px;
+      animation: float 3s ease-in-out infinite;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+    @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
+    h1 {
+      font-size: 4rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+    .subtitle { font-size: 1.25rem; color: rgba(255, 255, 255, 0.8); margin-bottom: 40px; }
+    .status-container { display: flex; gap: 15px; justify-content: center; align-items: center; margin-bottom: 30px; flex-wrap: wrap; }
+    .status-badge {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(16, 185, 129, 0.3);
+      border-radius: 50px;
+      padding: 12px 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+    .status-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: #10b981;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .status-dot.error { background: #ef4444; }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.1); } }
+    .version-badge {
+      background: rgba(139, 92, 246, 0.3);
+      border: 2px solid rgba(139, 92, 246, 0.5);
+      border-radius: 50px;
+      padding: 8px 20px;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .timestamp { font-size: 1rem; color: rgba(255, 255, 255, 0.6); margin-top: 30px; }
+    .footer {
+      margin-top: 40px;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .db-status { margin-top: 20px; padding: 10px 20px; background: rgba(30, 41, 59, 0.4); border-radius: 12px; font-size: 0.9rem; color: rgba(255, 255, 255, 0.7); }
+    @media (max-width: 768px) {
+      h1 { font-size: 2.5rem; }
+      .subtitle { font-size: 1rem; }
+      .rocket-icon { width: 80px; height: 80px; font-size: 40px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="rocket-icon">🚀</div>
+    <h1>ECOTEC API</h1>
+    <p class="subtitle">Enterprise Shop Management System</p>
+    <div class="status-container">
+      <div class="status-badge">
+        <span class="status-dot${dbStatus === 'error' ? ' error' : ''}"></span>
+        <span>${dbStatus === 'connected' ? 'API is Working!' : 'API Running (DB Error)'}</span>
+      </div>
+      <div class="version-badge">v1.0.0 • ${env}</div>
+    </div>
+    ${dbStatus === 'error' ? `<div class="db-status">⚠️ ${dbMessage}</div>` : ''}
+    <p class="timestamp">${timestamp}</p>
+    <div class="footer">
+      <span>✨</span>
+      <span>Powered by Express.js + Prisma + Supabase</span>
+    </div>
+  </div>
+</body>
+</html>`;
+      
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(200).send(html);
     }
 
     // Use global prisma instance (no await needed)
