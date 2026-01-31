@@ -10,12 +10,18 @@ import { SearchableSelect } from '../ui/searchable-select';
 import { toast } from 'sonner';
 import { invoiceItemHistoryService, type CreateHistoryRequest, type ItemHistoryAction } from '../../services/invoiceItemHistoryService';
 
+// Stock change info for updating product cache after save
+export interface StockChange {
+  productId: string;
+  quantityDelta: number; // positive = stock increased, negative = stock decreased
+}
+
 interface InvoiceEditModalProps {
   isOpen: boolean;
   invoice: Invoice | null;
   products: Product[];
   onClose: () => void;
-  onSave: (invoice: Invoice) => Promise<void>;
+  onSave: (invoice: Invoice, stockChanges: StockChange[]) => Promise<void>;
   isSaving?: boolean;
   shopId?: string; // For SUPER_ADMIN viewing
 }
@@ -31,6 +37,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
 }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
+  
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [originalItems, setOriginalItems] = useState<InvoiceItem[]>([]); // Track original items for history
   const [issueDate, setIssueDate] = useState('');
@@ -520,10 +527,50 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
       paidAmount: Math.round(newPaidAmount * 100) / 100,
     };
 
-    // Record item changes before saving
-    await recordItemChanges(invoice.id, invoice.apiId);
+    // Calculate stock changes (delta between original and current items)
+    // Formula: For each product, stockDelta = originalQty - newQty
+    // Positive delta = stock should increase (product removed/qty reduced)
+    // Negative delta = stock should decrease (product added/qty increased)
+    const stockChanges: StockChange[] = [];
+    
+    // Create maps for comparison
+    const originalQtyMap = new Map<string, number>();
+    originalItems.forEach(item => {
+      const existing = originalQtyMap.get(item.productId) || 0;
+      originalQtyMap.set(item.productId, existing + item.quantity);
+    });
+    
+    const currentQtyMap = new Map<string, number>();
+    items.forEach(item => {
+      const existing = currentQtyMap.get(item.productId) || 0;
+      currentQtyMap.set(item.productId, existing + item.quantity);
+    });
+    
+    // Find all unique product IDs
+    const allProductIds = new Set([...originalQtyMap.keys(), ...currentQtyMap.keys()]);
+    
+    allProductIds.forEach(productId => {
+      const originalQty = originalQtyMap.get(productId) || 0;
+      const currentQty = currentQtyMap.get(productId) || 0;
+      const delta = originalQty - currentQty; // positive = stock increases, negative = stock decreases
+      
+      if (delta !== 0) {
+        stockChanges.push({ productId, quantityDelta: delta });
+        console.log(`📦 Stock change for ${productId}: ${originalQty} → ${currentQty} (delta: ${delta > 0 ? '+' : ''}${delta})`);
+      }
+    });
 
-    await onSave(updatedInvoice);
+    // Record item changes in parallel (don't block save) for faster UI response
+    // Use setTimeout to ensure it runs after onSave starts
+    const invoiceId = invoice.id;
+    const apiId = invoice.apiId;
+    setTimeout(() => {
+      recordItemChanges(invoiceId, apiId).catch(err => 
+        console.warn('⚠️ History recording failed:', err)
+      );
+    }, 0);
+
+    await onSave(updatedInvoice, stockChanges);
   };
 
   const handleClose = () => {

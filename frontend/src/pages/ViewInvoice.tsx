@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import type { Invoice, InvoicePayment, Customer } from '../data/mockData';
 import PrintableInvoice from '../components/PrintableInvoice';
 import { InvoicePaymentModal } from '../components/modals/InvoicePaymentModal';
-import { InvoiceEditModal } from '../components/modals/InvoiceEditModal';
+import { InvoiceEditModal, type StockChange } from '../components/modals/InvoiceEditModal';
 import {
   invoiceService,
   convertAPIInvoiceToFrontend,
@@ -57,6 +57,7 @@ export const ViewInvoice: React.FC = () => {
     loadCustomers, 
     products: cachedProducts, 
     loadProducts,
+    setProducts: setCachedProducts,
     setInvoices: setCachedInvoices
   } = useDataCache();
   
@@ -456,8 +457,26 @@ export const ViewInvoice: React.FC = () => {
   const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-LK')}`;
 
   // Handle invoice save from edit modal
-  const handleSaveEdit = async (updatedInvoice: Invoice): Promise<void> => {
+  const handleSaveEdit = async (updatedInvoice: Invoice, stockChanges: StockChange[]): Promise<void> => {
     setIsSaving(true);
+    
+    // Helper function to apply stock changes to products cache
+    const applyStockChanges = (changes: StockChange[]) => {
+      if (changes.length === 0) return;
+      
+      setCachedProducts(prevProducts => {
+        return prevProducts.map(product => {
+          const change = changes.find(c => c.productId === product.id);
+          if (change) {
+            const newStock = Math.max(0, product.stock + change.quantityDelta);
+            console.log(`📦 Updated ${product.name} stock: ${product.stock} → ${newStock} (delta: ${change.quantityDelta})`);
+            return { ...product, stock: newStock };
+          }
+          return product;
+        });
+      });
+    };
+    
     try {
       // If using API, update via API
       if (isUsingAPI && apiInvoiceId) {
@@ -487,6 +506,9 @@ export const ViewInvoice: React.FC = () => {
             prev.map(inv => inv.id === convertedInvoice.id || inv.apiId === apiInvoiceId ? convertedInvoice : inv)
           );
           
+          // Apply stock changes to products cache
+          applyStockChanges(stockChanges);
+          
           toast.success('Invoice updated successfully', {
             description: `Invoice #${updatedInvoice.id} has been updated.`,
           });
@@ -503,6 +525,10 @@ export const ViewInvoice: React.FC = () => {
       
       // Local update
       setInvoices([updatedInvoice]);
+      
+      // Apply stock changes locally too
+      applyStockChanges(stockChanges);
+      
       toast.success('Invoice updated locally', {
         description: `Invoice #${updatedInvoice.id} has been updated.`,
       });

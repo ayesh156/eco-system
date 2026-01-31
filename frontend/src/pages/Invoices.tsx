@@ -23,7 +23,7 @@ import {
   Shield, AlertTriangle, MessageCircle, Clock, Loader2
 } from 'lucide-react';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
-import { InvoiceEditModal } from '../components/modals/InvoiceEditModal';
+import { InvoiceEditModal, type StockChange } from '../components/modals/InvoiceEditModal';
 import { InvoicePaymentModal } from '../components/modals/InvoicePaymentModal';
 import { ReminderHistoryModal } from '../components/modals/ReminderHistoryModal';
 import { SearchableSelect } from '../components/ui/searchable-select';
@@ -41,6 +41,7 @@ export const Invoices: React.FC = () => {
     loadInvoices, 
     products: cachedProducts,
     loadProducts,
+    setProducts: setCachedProducts,
     customers: cachedCustomers,
     loadCustomers,
     setInvoices: setCachedInvoices
@@ -698,9 +699,31 @@ export const Invoices: React.FC = () => {
     setShowPaymentModal(true);
   };
 
-  const handleSaveEdit = async (updatedInvoice: Invoice): Promise<void> => {
+  const handleSaveEdit = async (updatedInvoice: Invoice, stockChanges: StockChange[]): Promise<void> => {
     setIsSaving(true);
     console.log('🔄 Saving invoice:', updatedInvoice.id, 'apiId:', updatedInvoice.apiId, 'isUsingAPI:', isUsingAPI);
+    console.log('📦 Stock changes to apply:', stockChanges);
+    
+    // Helper function to apply stock changes to products cache
+    const applyStockChanges = (changes: StockChange[]) => {
+      if (changes.length === 0) return;
+      
+      const updateProducts = (prevProducts: Product[]) => {
+        return prevProducts.map(product => {
+          const change = changes.find(c => c.productId === product.id);
+          if (change) {
+            const newStock = Math.max(0, product.stock + change.quantityDelta);
+            console.log(`📦 Updated ${product.name} stock: ${product.stock} → ${newStock} (delta: ${change.quantityDelta})`);
+            return { ...product, stock: newStock };
+          }
+          return product;
+        });
+      };
+      
+      // Update both local state and context cache
+      setProducts(updateProducts);
+      setCachedProducts(updateProducts);
+    };
     
     try {
       // If using API, update via API
@@ -732,6 +755,9 @@ export const Invoices: React.FC = () => {
           setInvoices(updateInvoiceList);
           setCachedInvoices(updateInvoiceList);
           
+          // Apply stock changes to products cache IMMEDIATELY (no API refresh needed)
+          applyStockChanges(stockChanges);
+          
           toast.success('Invoice updated successfully', {
             description: `Invoice #${updatedInvoice.id} has been updated.`,
           });
@@ -741,12 +767,9 @@ export const Invoices: React.FC = () => {
           setShowEditModal(false);
           setSelectedInvoice(null);
           
-          // Refetch fresh data to ensure consistency (async - no need to await)
-          console.log('📡 Refetching invoice and product data after edit...');
+          // Refetch invoices to ensure consistency (async - no need to await)
+          console.log('📡 Refetching invoice data after edit...');
           fetchInvoices(true).catch(err => console.warn('Refetch warning:', err));
-          
-          // CRITICAL: Refresh products to get updated stock values
-          loadProducts(true).catch(err => console.warn('Product refresh warning:', err));
           
           return;
         } catch (error) {
@@ -763,6 +786,9 @@ export const Invoices: React.FC = () => {
         prevInvoices.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv);
       setInvoices(updateInvoiceList);
       setCachedInvoices(updateInvoiceList);
+      
+      // Apply stock changes locally too
+      applyStockChanges(stockChanges);
       
       toast.success('Invoice updated locally', {
         description: `Invoice #${updatedInvoice.id} has been updated.`,
