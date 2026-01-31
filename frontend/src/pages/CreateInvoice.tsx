@@ -55,7 +55,7 @@ export const CreateInvoice: React.FC = () => {
   const { settings: taxSettings } = useTaxSettings();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
-  const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts, setInvoices: setCachedInvoices, currentShopId } = useDataCache();
+  const { customers: cachedCustomers, products: cachedProducts, loadCustomers, loadProducts, setInvoices: setCachedInvoices, setProducts: setCachedProducts, currentShopId } = useDataCache();
   const { branding } = useShopBranding();
   
   // API data states - Start with empty arrays, will load from API
@@ -525,8 +525,22 @@ export const CreateInvoice: React.FC = () => {
       // Add the new invoice to the cache so it appears immediately on the invoices page
       setCachedInvoices(prev => [convertedInvoice, ...prev]);
       
-      // CRITICAL: Refresh products to get updated stock values from database
-      loadProducts(true).catch(err => console.warn('Product refresh warning:', err));
+      // CRITICAL: Update product stock in cache locally (decrease stock for sold items)
+      const updateProductStock = (prevProducts: Product[]) => {
+        return prevProducts.map(product => {
+          const soldItem = items.find(item => item.productId === product.id);
+          if (soldItem) {
+            const newStock = Math.max(0, product.stock - soldItem.quantity);
+            console.log(`📦 Updated ${product.name} stock: ${product.stock} → ${newStock} (sold: -${soldItem.quantity})`);
+            return { ...product, stock: newStock };
+          }
+          return product;
+        });
+      };
+      
+      // Update both local state and context cache
+      setProducts(updateProductStock);
+      setCachedProducts(updateProductStock);
       
       setCreatedInvoice(convertedInvoice as Invoice & { buyingDate: string });
       setShowPrintPreview(true);

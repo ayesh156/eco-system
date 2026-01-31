@@ -41,7 +41,7 @@ const convertAPIProductToFrontend = (apiProduct: APIProduct): Product => ({
 
 export const Products: React.FC = () => {
   const { theme } = useTheme();
-  const { setProducts: setCachedProducts } = useDataCache();
+  const { products: cachedProducts, setProducts: setCachedProducts } = useDataCache();
   const { isViewingShop, viewingShop } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -166,6 +166,28 @@ export const Products: React.FC = () => {
     
     loadProducts();
   }, [location.state, effectiveShopId, setCachedProducts]);
+
+  // Sync local products state with cached products when cache changes
+  // This ensures stock updates from invoice create/edit reflect here in real-time
+  useEffect(() => {
+    if (cachedProducts.length > 0 && !isLoading) {
+      // Merge cached stock values into local products
+      setProducts(prevProducts => {
+        // If we don't have local products yet, use cached
+        if (prevProducts.length === 0) return cachedProducts;
+        
+        // Update only the stock values from cache (to preserve any local edits in progress)
+        return prevProducts.map(localProduct => {
+          const cachedProduct = cachedProducts.find(cp => cp.id === localProduct.id);
+          if (cachedProduct && cachedProduct.stock !== localProduct.stock) {
+            console.log(`🔄 Synced ${localProduct.name} stock from cache: ${localProduct.stock} → ${cachedProduct.stock}`);
+            return { ...localProduct, stock: cachedProduct.stock };
+          }
+          return localProduct;
+        });
+      });
+    }
+  }, [cachedProducts, isLoading]);
 
   // Close calendar when clicking outside
   useEffect(() => {
