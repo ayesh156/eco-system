@@ -44,7 +44,7 @@ interface ShopUser {
   id: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'MANAGER' | 'STAFF';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'STAFF';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -679,7 +679,7 @@ export const ShopAdminPanel: React.FC = () => {
     const [formData, setFormData] = useState({
       name: '',
       email: '',
-      role: 'STAFF' as 'ADMIN' | 'MANAGER' | 'STAFF',
+      role: 'STAFF' as ShopUser['role'],
       isActive: true,
     });
     const [isSaving, setIsSaving] = useState(false);

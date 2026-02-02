@@ -10,11 +10,11 @@ import { SearchableSelect } from '../components/ui/searchable-select';
 import { toast } from 'sonner';
 import { 
   Bell, Palette, MessageCircle, Info, Copy, Check, 
-  Globe, Moon, Sun, Sparkles,
-  Mail, Phone, Building2, Save,
+  Moon, Sun, Sparkles,
+  Mail, Building2, Save,
   RefreshCw, Eye, EyeOff, CheckCircle2, AlertCircle, Clock,
   Smartphone, Laptop, SendHorizontal, Settings2, FileText, RotateCcw,
-  Users, Image, Layers, Search, Edit, Key, UserPlus, UserCog,
+  Users, Layers, Search, Edit, Key, UserPlus, UserCog,
   CheckCircle, XCircle, Trash2, ChevronRight, ChevronLeft, X,
   LayoutGrid, List, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
@@ -37,7 +37,7 @@ interface ShopUser {
   id: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'MANAGER' | 'STAFF';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'STAFF';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -105,27 +105,14 @@ export const Settings: React.FC = () => {
   // Sections tab state
   const [localHiddenSections, setLocalHiddenSections] = useState<string[]>(hiddenSections);
   const [localAdminHiddenSections, setLocalAdminHiddenSections] = useState<string[]>(adminHiddenSections);
-  const [sectionsSaving, setSectionsSaving] = useState(false);
   const [sectionsHasChanges, setSectionsHasChanges] = useState(false);
-  
-  // Profile form states - initialize with effective shop data
-  const [businessName, setBusinessName] = useState(effectiveShop?.name || 'Shop Name');
-  const [email, setEmail] = useState(effectiveShop?.email || '');
-  const [phone, setPhone] = useState(effectiveShop?.phone || '');
-  const [address, setAddress] = useState(effectiveShop?.address || '');
-  const [website, setWebsite] = useState(effectiveShop?.website || '');
 
   // Update form when effective shop changes (e.g., SUPER_ADMIN switches shops)
   React.useEffect(() => {
     if (effectiveShop) {
       console.log('📋 Settings: Loading shop details for:', effectiveShop.name, effectiveShop.id);
-      setBusinessName(effectiveShop.name || 'Shop Name');
-      setEmail(effectiveShop.email || '');
-      setPhone(effectiveShop.phone || '');
-      setAddress(effectiveShop.address || '');
-      setWebsite(effectiveShop.website || '');
     }
-  }, [effectiveShop?.id, effectiveShop?.name, effectiveShop?.email, effectiveShop?.phone, effectiveShop?.address, effectiveShop?.website]);
+  }, [effectiveShop?.id]);
 
   // Get effective shop details for preview - prioritize API data, fallback to branding, then effective shop
   const effectiveShopName = shopDetails?.name || branding?.name || effectiveShop?.name || 'Your Shop Name';
@@ -138,8 +125,9 @@ export const Settings: React.FC = () => {
   
   // Redirect regular users (not ADMIN) away from restricted tabs (sections, users)
   useEffect(() => {
-    const isRegularUser = user?.role === 'USER';
-    if (isRegularUser && (activeTab === 'sections' || activeTab === 'users')) {
+    // Only ADMIN, SUPER_ADMIN, MANAGER can access sections/users tabs
+    const canAccessShopAdminTabs = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'MANAGER';
+    if (!canAccessShopAdminTabs && (activeTab === 'sections' || activeTab === 'users')) {
       setActiveTab('appearance');
     }
   }, [user?.role, activeTab]);
@@ -251,34 +239,6 @@ export const Settings: React.FC = () => {
       
       setLocalAdminHiddenSections(newAdminHiddenSections);
     }
-  };
-
-  // Save sections - called when Save Changes button is clicked
-  const handleSaveSections = async () => {
-    setSectionsSaving(true);
-    try {
-      if (isSuperAdmin) {
-        await updateHiddenSections(localHiddenSections);
-        toast.success('Section visibility updated successfully!');
-      } else if (isShopAdmin) {
-        await updateAdminHiddenSections(localAdminHiddenSections);
-        toast.success('Section visibility updated successfully!');
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save sections');
-    } finally {
-      setSectionsSaving(false);
-    }
-  };
-
-  // Reset sections to original state (no save)
-  const handleResetSections = () => {
-    if (isSuperAdmin) {
-      setLocalHiddenSections(hiddenSections);
-    } else if (isShopAdmin) {
-      setLocalAdminHiddenSections(adminHiddenSections);
-    }
-    toast.success('Changes discarded');
   };
 
   // Filtered users
@@ -534,7 +494,7 @@ export const Settings: React.FC = () => {
     const [formData, setFormData] = useState({
       name: '',
       email: '',
-      role: 'STAFF' as 'ADMIN' | 'MANAGER' | 'STAFF',
+      role: 'STAFF' as ShopUser['role'],
       isActive: true,
     });
     const [isSaving, setIsSaving] = useState(false);

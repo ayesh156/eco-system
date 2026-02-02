@@ -11,7 +11,6 @@ import {
   Globe, 
   FileText,
   Building2,
-  DollarSign,
   Percent,
   ArrowRight,
   Loader2,
@@ -368,7 +367,7 @@ export const ShopSetup: React.FC = () => {
                   <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     Currency
                   </label>
-                  <SearchableSelect
+                                  <SearchableSelect
                     value={formData.currency}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}
                     options={[
@@ -381,7 +380,6 @@ export const ShopSetup: React.FC = () => {
                       { value: 'CAD', label: 'CAD (C$)' },
                     ]}
                     placeholder="Select currency"
-                    icon={<DollarSign className="w-4 h-4" />}
                     className="text-sm"
                     theme={theme}
                   />

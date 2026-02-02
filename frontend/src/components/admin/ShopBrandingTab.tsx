@@ -15,7 +15,6 @@ import {
   Image,
   Upload,
   Trash2,
-  Save,
   Loader2,
   CheckCircle2,
   AlertCircle,
@@ -35,7 +34,6 @@ export const ShopBrandingTab: React.FC = () => {
   const {
     branding,
     updateBranding,
-    saveBranding,
     hasUnsavedChanges,
   } = useShopBranding();
 
@@ -60,7 +58,6 @@ export const ShopBrandingTab: React.FC = () => {
   } | null>(null);
 
   // UI state
-  const [isSaving, setIsSaving] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   // Refs
@@ -233,25 +230,6 @@ export const ShopBrandingTab: React.FC = () => {
     updateBranding({ logo: undefined });
     setCompressionInfo(null);
     toast('Logo removed. Save to apply changes.');
-  };
-
-  // Handle save
-  const handleSave = async () => {
-    if (!canEdit) {
-      toast('You do not have permission to edit shop settings');
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      await saveBranding();
-      toast.success('Shop branding saved successfully!');
-    } catch {
-      toast.error('Failed to save settings');
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   return (
