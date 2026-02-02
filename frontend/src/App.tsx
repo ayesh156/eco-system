@@ -10,7 +10,9 @@ import { WhatsAppSettingsProvider } from './contexts/WhatsAppSettingsContext';
 import { TaxSettingsProvider } from './contexts/TaxSettingsContext';
 import { DataCacheProvider } from './contexts/DataCacheContext';
 import { ShopBrandingProvider } from './contexts/ShopBrandingContext';
+import { ShopSectionsProvider } from './contexts/ShopSectionsContext';
 import { AdminLayout } from './components/AdminLayout';
+import { SectionGuard } from './components/SectionGuard';
 import { Toaster } from 'sonner';
 
 // Eager load Dashboard (landing page) and Auth pages
@@ -87,6 +89,7 @@ function App() {
               <TaxSettingsProvider>
                 <DataCacheProvider>
                 <ShopBrandingProvider>
+                <ShopSectionsProvider>
                 <ThemedToaster />
                 <BrowserRouter
                   future={{
@@ -115,50 +118,52 @@ function App() {
                             <Routes>
                               <Route path="/" element={<Dashboard />} />
                               <Route path="/dashboard" element={<Dashboard />} />
-                              <Route path="/invoices" element={<Invoices />} />
-                              <Route path="/invoices/create" element={<CreateInvoice />} />
-                              <Route path="/invoices/:id" element={<ViewInvoice />} />
-                              <Route path="/products" element={<Products />} />
-                              <Route path="/products/add" element={<ProductForm />} />
-                              <Route path="/products/edit/:id" element={<ProductForm />} />
-                              <Route path="/products/labels" element={<ProductLabels />} />
-                              <Route path="/categories" element={<Categories />} />
-                              <Route path="/brands" element={<Brands />} />
-                              <Route path="/customers" element={<Customers />} />
-                              <Route path="/suppliers" element={<Suppliers />} />
-                              <Route path="/grn" element={<GoodsReceived />} />
-                              <Route path="/grn/create" element={<CreateGRN />} />
-                              <Route path="/warranties" element={<Warranties />} />
-                              <Route path="/estimates" element={<Estimates />} />
-                              <Route path="/estimates/create" element={<EstimateForm />} />
-                              <Route path="/estimates/edit/:id" element={<EstimateForm />} />
-                              <Route path="/quotations" element={<Quotations />} />
-                              <Route path="/quotations/create" element={<QuotationForm />} />
-                              <Route path="/quotations/edit/:id" element={<QuotationForm />} />
-                              <Route path="/services" element={<Services />} />
-                              <Route path="/services/add" element={<ServiceForm />} />
-                              <Route path="/services/edit/:id" element={<ServiceForm />} />
-                              <Route path="/service-categories" element={<ServiceCategories />} />
-                              <Route path="/job-notes" element={<JobNotes />} />
-                              <Route path="/job-notes/create" element={<JobNoteForm />} />
-                              <Route path="/job-notes/edit/:id" element={<JobNoteForm />} />
-                              <Route path="/reports" element={<Reports />} />
-                              <Route path="/cash-management" element={<CashManagement />} />
-                              <Route path="/cash-management/transactions" element={<CashManagement />} />
-                              <Route path="/cash-management/insights" element={<CashManagement />} />
-                              <Route path="/cash-management/accounts" element={<CashManagement />} />
+                              <Route path="/invoices" element={<SectionGuard path="/invoices"><Invoices /></SectionGuard>} />
+                              <Route path="/invoices/create" element={<SectionGuard path="/invoices"><CreateInvoice /></SectionGuard>} />
+                              <Route path="/invoices/:id" element={<SectionGuard path="/invoices"><ViewInvoice /></SectionGuard>} />
+                              <Route path="/products" element={<SectionGuard path="/products"><Products /></SectionGuard>} />
+                              <Route path="/products/add" element={<SectionGuard path="/products"><ProductForm /></SectionGuard>} />
+                              <Route path="/products/edit/:id" element={<SectionGuard path="/products"><ProductForm /></SectionGuard>} />
+                              <Route path="/products/labels" element={<SectionGuard path="/products"><ProductLabels /></SectionGuard>} />
+                              <Route path="/categories" element={<SectionGuard path="/products"><Categories /></SectionGuard>} />
+                              <Route path="/brands" element={<SectionGuard path="/products"><Brands /></SectionGuard>} />
+                              <Route path="/customers" element={<SectionGuard path="/customers"><Customers /></SectionGuard>} />
+                              <Route path="/suppliers" element={<SectionGuard path="/suppliers"><Suppliers /></SectionGuard>} />
+                              <Route path="/grn" element={<SectionGuard path="/grn"><GoodsReceived /></SectionGuard>} />
+                              <Route path="/grn/create" element={<SectionGuard path="/grn"><CreateGRN /></SectionGuard>} />
+                              <Route path="/warranties" element={<SectionGuard path="/warranties"><Warranties /></SectionGuard>} />
+                              <Route path="/estimates" element={<SectionGuard path="/estimates"><Estimates /></SectionGuard>} />
+                              <Route path="/estimates/create" element={<SectionGuard path="/estimates"><EstimateForm /></SectionGuard>} />
+                              <Route path="/estimates/edit/:id" element={<SectionGuard path="/estimates"><EstimateForm /></SectionGuard>} />
+                              <Route path="/quotations" element={<SectionGuard path="/quotations"><Quotations /></SectionGuard>} />
+                              <Route path="/quotations/create" element={<SectionGuard path="/quotations"><QuotationForm /></SectionGuard>} />
+                              <Route path="/quotations/edit/:id" element={<SectionGuard path="/quotations"><QuotationForm /></SectionGuard>} />
+                              <Route path="/services" element={<SectionGuard path="/services"><Services /></SectionGuard>} />
+                              <Route path="/services/add" element={<SectionGuard path="/services"><ServiceForm /></SectionGuard>} />
+                              <Route path="/services/edit/:id" element={<SectionGuard path="/services"><ServiceForm /></SectionGuard>} />
+                              <Route path="/service-categories" element={<SectionGuard path="/services"><ServiceCategories /></SectionGuard>} />
+                              <Route path="/job-notes" element={<SectionGuard path="/job-notes"><JobNotes /></SectionGuard>} />
+                              <Route path="/job-notes/create" element={<SectionGuard path="/job-notes"><JobNoteForm /></SectionGuard>} />
+                              <Route path="/job-notes/edit/:id" element={<SectionGuard path="/job-notes"><JobNoteForm /></SectionGuard>} />
+                              <Route path="/reports" element={<SectionGuard path="/reports"><Reports /></SectionGuard>} />
+                              <Route path="/cash-management" element={<SectionGuard path="/cash-management"><CashManagement /></SectionGuard>} />
+                              <Route path="/cash-management/transactions" element={<SectionGuard path="/cash-management"><CashManagement /></SectionGuard>} />
+                              <Route path="/cash-management/insights" element={<SectionGuard path="/cash-management"><CashManagement /></SectionGuard>} />
+                              <Route path="/cash-management/accounts" element={<SectionGuard path="/cash-management"><CashManagement /></SectionGuard>} />
                               <Route path="/settings" element={<Settings />} />
                               <Route path="/help" element={<Help />} />
                               <Route path="/ai-chat" element={<AIChat />} />
-                              <Route path="/notes" element={<Notes />} />
-                              <Route path="/calendar" element={<Calendar />} />
-                              <Route path="/data-export" element={<DataExport />} />
+                              <Route path="/notes" element={<SectionGuard path="/notes"><Notes /></SectionGuard>} />
+                              <Route path="/calendar" element={<SectionGuard path="/calendar"><Calendar /></SectionGuard>} />
+                              <Route path="/data-export" element={<SectionGuard path="/data-export"><DataExport /></SectionGuard>} />
                               <Route path="/admin" element={<AdminDashboard />} />
                               <Route path="/admin/shops" element={<AdminDashboard />} />
                               <Route path="/admin/users" element={<AdminDashboard />} />
+                              <Route path="/admin/activity" element={<AdminDashboard />} />
                               <Route path="/shop-admin" element={<ShopAdminPanel />} />
                               <Route path="/shop-admin/users" element={<ShopAdminPanel />} />
                               <Route path="/shop-admin/branding" element={<ShopAdminPanel />} />
+                              <Route path="/shop-admin/sections" element={<ShopAdminPanel />} />
                               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                               <Route path="*" element={<NotFound />} />
                             </Routes>
@@ -168,6 +173,7 @@ function App() {
                     } />
                   </Routes>
                 </BrowserRouter>
+                </ShopSectionsProvider>
                 </ShopBrandingProvider>
                 </DataCacheProvider>
               </TaxSettingsProvider>

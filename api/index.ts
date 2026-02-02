@@ -3254,6 +3254,97 @@ Best regards,
     }
 
     // ========================================
+    // SHOP SECTION VISIBILITY ROUTES
+    // ========================================
+
+    // GET shop sections (hiddenSections + adminHiddenSections)
+    const shopSectionsMatch = path.match(/^\/api\/v1\/shops\/([^/]+)\/sections$/);
+    if (shopSectionsMatch && method === 'GET') {
+      const shopIdParam = shopSectionsMatch[1];
+      
+      const shop = await prisma.shop.findUnique({
+        where: { id: shopIdParam },
+        select: {
+          id: true,
+          hiddenSections: true,
+          adminHiddenSections: true,
+        },
+      });
+
+      if (!shop) {
+        return res.status(404).json({ success: false, error: 'Shop not found' });
+      }
+
+      return res.status(200).json({
+        success: true,
+        hiddenSections: shop.hiddenSections || [],
+        adminHiddenSections: shop.adminHiddenSections || [],
+      });
+    }
+
+    // PUT/PATCH shop sections
+    // SuperAdmin updates hiddenSections (affects ADMIN + USER)
+    // Shop ADMIN updates adminHiddenSections (affects USER only)
+    if (shopSectionsMatch && (method === 'PUT' || method === 'PATCH')) {
+      const shopIdParam = shopSectionsMatch[1];
+      const userRole = getUserRoleFromToken(req);
+      
+      if (!userRole) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+
+      // Check if shop exists
+      const existingShop = await prisma.shop.findUnique({
+        where: { id: shopIdParam },
+      });
+
+      if (!existingShop) {
+        return res.status(404).json({ success: false, error: 'Shop not found' });
+      }
+
+      const { hiddenSections, adminHiddenSections } = body;
+      const updateData: { hiddenSections?: string[]; adminHiddenSections?: string[] } = {};
+
+      // SuperAdmin can update hiddenSections
+      if (userRole === 'SUPER_ADMIN' && hiddenSections !== undefined) {
+        if (!Array.isArray(hiddenSections)) {
+          return res.status(400).json({ success: false, error: 'hiddenSections must be an array of strings' });
+        }
+        updateData.hiddenSections = hiddenSections;
+      }
+
+      // Shop ADMIN or SUPER_ADMIN can update adminHiddenSections
+      if ((userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && adminHiddenSections !== undefined) {
+        if (!Array.isArray(adminHiddenSections)) {
+          return res.status(400).json({ success: false, error: 'adminHiddenSections must be an array of strings' });
+        }
+        updateData.adminHiddenSections = adminHiddenSections;
+      }
+
+      // If no valid update data, return error
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ success: false, error: 'No valid section data to update' });
+      }
+
+      const updatedShop = await prisma.shop.update({
+        where: { id: shopIdParam },
+        data: updateData,
+        select: {
+          id: true,
+          hiddenSections: true,
+          adminHiddenSections: true,
+        },
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Section visibility updated successfully',
+        hiddenSections: updatedShop.hiddenSections,
+        adminHiddenSections: updatedShop.adminHiddenSections,
+      });
+    }
+
+    // ========================================
     // SHOP ADMIN ROUTES
     // ========================================
 
@@ -3284,18 +3375,21 @@ Best regards,
 
     // Shop Admin Users List
     if (path === '/api/v1/shop-admin/users' && method === 'GET') {
-      const shopId = getShopIdFromToken(req);
-      if (!shopId) {
+      // Support both shop admin's own shopId and SuperAdmin with shopId query param
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
       const users = await prisma.user.findMany({
-        where: { shopId },
+        where: { shopId: effectiveShopId },
         select: {
           id: true,
           email: true,
           name: true,
           role: true,
+          isActive: true,
+          lastLogin: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -3307,8 +3401,16 @@ Best regards,
 
     // Shop Admin Create User
     if (path === '/api/v1/shop-admin/users' && method === 'POST') {
-      const shopId = getShopIdFromToken(req);
-      if (!shopId) {
+      // Support both shop admin's own shopId and SuperAdmin with shopId in body/query
+      let effectiveShopId = getShopIdFromToken(req);
+      
+      // SuperAdmin can create users for any shop by providing shopId in body
+      const userRole = getUserRoleFromToken(req);
+      if (userRole === 'SUPER_ADMIN' && body.shopId) {
+        effectiveShopId = body.shopId;
+      }
+      
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
@@ -3327,13 +3429,15 @@ Best regards,
           password: hashedPassword,
           name,
           role: role || 'STAFF',
-          shopId,
+          shopId: effectiveShopId,
+          isActive: true,
         },
         select: {
           id: true,
           email: true,
           name: true,
           role: true,
+          isActive: true,
           createdAt: true,
         },
       });
@@ -3344,17 +3448,18 @@ Best regards,
     // Shop Admin Update/Delete User
     const shopAdminUserMatch = path.match(/^\/api\/v1\/shop-admin\/users\/([^/]+)$/);
     if (shopAdminUserMatch && (method === 'PUT' || method === 'PATCH')) {
-      const shopId = getShopIdFromToken(req);
-      if (!shopId) {
+      // Support both shop admin's own shopId and SuperAdmin with shopId query param
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
       const userId = shopAdminUserMatch[1];
-      const { name, email, role, password } = body;
+      const { name, email, role, password, isActive } = body;
 
       // Verify user belongs to this shop
       const existingUser = await prisma.user.findFirst({
-        where: { id: userId, shopId },
+        where: { id: userId, shopId: effectiveShopId },
       });
       if (!existingUser) {
         return res.status(404).json({ success: false, message: 'User not found' });
@@ -3365,6 +3470,7 @@ Best regards,
       if (email) updateData.email = email;
       if (role) updateData.role = role;
       if (password) updateData.password = await bcrypt.hash(password, 12);
+      if (isActive !== undefined) updateData.isActive = isActive;
 
       const updatedUser = await prisma.user.update({
         where: { id: userId },
@@ -3374,6 +3480,7 @@ Best regards,
           email: true,
           name: true,
           role: true,
+          isActive: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -3383,8 +3490,9 @@ Best regards,
     }
 
     if (shopAdminUserMatch && method === 'DELETE') {
-      const shopId = getShopIdFromToken(req);
-      if (!shopId) {
+      // Support both shop admin's own shopId and SuperAdmin with shopId query param
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
@@ -3392,7 +3500,7 @@ Best regards,
 
       // Verify user belongs to this shop
       const existingUser = await prisma.user.findFirst({
-        where: { id: userId, shopId },
+        where: { id: userId, shopId: effectiveShopId },
       });
       if (!existingUser) {
         return res.status(404).json({ success: false, message: 'User not found' });

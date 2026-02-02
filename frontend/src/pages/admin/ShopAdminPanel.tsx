@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useShopSections, ALL_SECTIONS } from '../../contexts/ShopSectionsContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SearchableSelect } from '../../components/ui/searchable-select';
 import { ShopBrandingTab } from '../../components/admin/ShopBrandingTab';
+import { toast } from 'sonner';
 import {
   Users,
   Search,
@@ -26,6 +28,9 @@ import {
   Trash2,
   ShieldCheck,
   UserCog,
+  Eye,
+  EyeOff,
+  Layers,
 } from 'lucide-react';
 
 // API URL from environment
@@ -65,20 +70,279 @@ type StatusFilter = 'all' | 'active' | 'inactive';
 type RoleFilter = 'all' | 'MANAGER' | 'STAFF';
 
 // ===================================
+// Section Visibility Tab Component
+// ===================================
+
+interface SectionVisibilityTabProps {
+  hiddenSections: string[];
+  onUpdateSections: (sections: string[]) => Promise<void>;
+  isLoading: boolean;
+  theme: 'dark' | 'light';
+}
+
+const SectionVisibilityTab: React.FC<SectionVisibilityTabProps> = ({
+  hiddenSections,
+  onUpdateSections,
+  isLoading,
+  theme,
+}) => {
+  const [localHiddenSections, setLocalHiddenSections] = useState<string[]>(hiddenSections);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Sync local state when props change
+  useEffect(() => {
+    setLocalHiddenSections(hiddenSections);
+  }, [hiddenSections]);
+
+  // Check if there are unsaved changes
+  useEffect(() => {
+    const sortedLocal = [...localHiddenSections].sort();
+    const sortedProp = [...hiddenSections].sort();
+    setHasChanges(JSON.stringify(sortedLocal) !== JSON.stringify(sortedProp));
+  }, [localHiddenSections, hiddenSections]);
+
+  const toggleSection = (path: string) => {
+    setLocalHiddenSections(prev =>
+      prev.includes(path)
+        ? prev.filter(p => p !== path)
+        : [...prev, path]
+    );
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onUpdateSections(localHiddenSections);
+      toast.success('Section visibility updated successfully!');
+    } catch (error) {
+      console.error('Failed to save sections:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save sections');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    setLocalHiddenSections(hiddenSections);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className={`animate-spin rounded-full h-8 w-8 border-2 ${
+          theme === 'dark' ? 'border-emerald-500 border-t-transparent' : 'border-emerald-600 border-t-transparent'
+        }`} />
+      </div>
+    );
+  }
+
+  const visibleCount = ALL_SECTIONS.length - localHiddenSections.length;
+  const hiddenCount = localHiddenSections.length;
+
+  return (
+    <div className="space-y-6">
+      {/* Header with Save Button */}
+      <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
+              <Layers className={`w-5 h-5 ${theme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`} />
+            </div>
+            <div>
+              <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                Section Visibility Settings
+              </h3>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                Control which sections are visible to shop users
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {hasChanges && (
+              <span className={`text-sm ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                Unsaved changes
+              </span>
+            )}
+            {hasChanges && (
+              <button
+                onClick={handleReset}
+                disabled={isSaving}
+                className={`px-4 py-2 rounded-xl font-medium transition-all ${theme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'}`}
+              >
+                Reset
+              </button>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !hasChanges}
+              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Save Changes
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className={`rounded-2xl border p-4 ${
+          theme === 'dark'
+            ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50'
+            : 'bg-white border-slate-200 shadow-sm'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+              <Layers className={`w-5 h-5 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+            </div>
+            <div>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Sections</p>
+              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{ALL_SECTIONS.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className={`rounded-2xl border p-4 ${
+          theme === 'dark'
+            ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50'
+            : 'bg-white border-slate-200 shadow-sm'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+              <Eye className={`w-5 h-5 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+            </div>
+            <div>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Visible</p>
+              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>{visibleCount}</p>
+            </div>
+          </div>
+        </div>
+        <div className={`rounded-2xl border p-4 ${
+          theme === 'dark'
+            ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50'
+            : 'bg-white border-slate-200 shadow-sm'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
+              <EyeOff className={`w-5 h-5 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
+            </div>
+            <div>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Hidden</p>
+              <p className={`text-xl font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>{hiddenCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Info Alert */}
+      <div className={`rounded-xl border p-4 ${
+        theme === 'dark'
+          ? 'bg-amber-500/10 border-amber-500/30'
+          : 'bg-amber-50 border-amber-200'
+      }`}>
+        <p className={`text-sm ${theme === 'dark' ? 'text-amber-200' : 'text-amber-800'}`}>
+          <strong>Note:</strong> Hidden sections will be removed from the navigation menu and direct URL access will show "Page Not Found". 
+          Only SUPER_ADMIN can change section visibility.
+        </p>
+      </div>
+
+      {/* Sections Grid */}
+      <div className={`rounded-2xl border ${
+        theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
+      }`}>
+        <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+          <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            Available Sections
+          </h3>
+          <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+            Toggle sections to show or hide them for this shop
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-6">
+          {ALL_SECTIONS.map((section) => {
+            const isHidden = localHiddenSections.includes(section.path);
+            return (
+              <div
+                key={section.path}
+                onClick={() => toggleSection(section.path)}
+                className={`relative overflow-hidden rounded-xl border p-4 cursor-pointer transition-all ${
+                  isHidden
+                    ? theme === 'dark'
+                      ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/20'
+                      : 'bg-red-50 border-red-200 hover:bg-red-100'
+                    : theme === 'dark'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20'
+                      : 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      {section.label}
+                    </h4>
+                    <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {section.description}
+                    </p>
+                    <code className={`text-[10px] mt-2 inline-block px-2 py-0.5 rounded ${
+                      theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {section.path}
+                    </code>
+                  </div>
+                  <div className={`flex-shrink-0 p-2 rounded-lg ${
+                    isHidden
+                      ? theme === 'dark' ? 'bg-red-500/20' : 'bg-red-200'
+                      : theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-200'
+                  }`}>
+                    {isHidden ? (
+                      <EyeOff className={`w-5 h-5 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
+                    ) : (
+                      <Eye className={`w-5 h-5 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+// ===================================
 // Main Component
 // ===================================
 
 export const ShopAdminPanel: React.FC = () => {
   const { theme } = useTheme();
   const { user, getAccessToken, isViewingShop, viewingShop } = useAuth();
+  const { hiddenSections, updateHiddenSections, isLoading: sectionsLoading } = useShopSections();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Determine active section from URL
-  const activeSection = location.pathname.includes('/branding') ? 'branding' : 'users';
+  const activeSection = location.pathname.includes('/branding') 
+    ? 'branding' 
+    : location.pathname.includes('/sections')
+    ? 'sections'
+    : 'users';
 
   // Determine if user has access: ADMIN or SUPER_ADMIN viewing a shop
   const hasAccess = user?.role === 'ADMIN' || (user?.role === 'SUPER_ADMIN' && isViewingShop);
+  
+  // Sections tab accessible by ADMIN (shop admin) and SUPER_ADMIN viewing a shop
+  const canAccessSections = user?.role === 'ADMIN' || (user?.role === 'SUPER_ADMIN' && isViewingShop);
 
   // State
   const [stats, setStats] = useState<ShopStats | null>(null);
@@ -108,7 +372,11 @@ export const ShopAdminPanel: React.FC = () => {
     if (user && !hasAccess) {
       navigate('/dashboard');
     }
-  }, [user, hasAccess, navigate]);
+    // Sections tab only accessible by SUPER_ADMIN
+    if (activeSection === 'sections' && !canAccessSections) {
+      navigate('/shop-admin/users');
+    }
+  }, [user, hasAccess, navigate, activeSection, canAccessSections]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -192,13 +460,16 @@ export const ShopAdminPanel: React.FC = () => {
   // Role badge
   const getRoleBadge = (role: string) => {
     const roleConfig = {
-      MANAGER: { bg: 'from-blue-500/10 to-indigo-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
-      STAFF: { bg: 'from-slate-500/10 to-gray-500/10', text: 'text-slate-400', border: 'border-slate-500/20' },
+      SUPER_ADMIN: { bg: 'from-purple-500/10 to-pink-500/10', text: 'text-purple-400', border: 'border-purple-500/20', icon: ShieldCheck },
+      ADMIN: { bg: 'from-emerald-500/10 to-teal-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: ShieldCheck },
+      MANAGER: { bg: 'from-blue-500/10 to-indigo-500/10', text: 'text-blue-400', border: 'border-blue-500/20', icon: UserCog },
+      STAFF: { bg: 'from-slate-500/10 to-gray-500/10', text: 'text-slate-400', border: 'border-slate-500/20', icon: UserCog },
     };
     const config = roleConfig[role as keyof typeof roleConfig] || roleConfig.STAFF;
+    const Icon = config.icon;
     return (
       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r ${config.bg} ${config.text} border ${config.border}`}>
-        <UserCog className="w-3 h-3" />
+        <Icon className="w-3 h-3" />
         {role}
       </span>
     );
@@ -901,12 +1172,14 @@ export const ShopAdminPanel: React.FC = () => {
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
             <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              {activeSection === 'branding' ? 'Shop Branding' : 'User Management'}
+              {activeSection === 'branding' ? 'Shop Branding' : activeSection === 'sections' ? 'Section Visibility' : 'User Management'}
             </h1>
           </div>
           <p className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             {activeSection === 'branding' 
               ? 'Customize your shop\'s logo and branding for invoices and documents' 
+              : activeSection === 'sections'
+              ? 'Control which sections are visible for this shop'
               : stats?.shop?.name ? `Manage users for ${stats.shop.name}` : 'Manage your shop users'}
           </p>
         </div>
@@ -936,6 +1209,13 @@ export const ShopAdminPanel: React.FC = () => {
       {/* Section Content */}
       {activeSection === 'branding' ? (
         <ShopBrandingTab />
+      ) : activeSection === 'sections' ? (
+        <SectionVisibilityTab
+          hiddenSections={hiddenSections}
+          onUpdateSections={updateHiddenSections}
+          isLoading={sectionsLoading}
+          theme={theme}
+        />
       ) : (
         <>
       {/* Stats Cards */}
@@ -1139,12 +1419,20 @@ export const ShopAdminPanel: React.FC = () => {
               <div
                 key={u.id}
                 className={`relative overflow-hidden rounded-2xl border p-5 ${
-                  theme === 'dark'
-                    ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50'
-                    : 'bg-white border-slate-200 shadow-sm'
+                  u.role === 'SUPER_ADMIN'
+                    ? theme === 'dark'
+                      ? 'bg-gradient-to-br from-purple-900/20 via-slate-800/50 to-slate-900/50 border-purple-500/30 ring-2 ring-purple-500/20'
+                      : 'bg-gradient-to-br from-purple-50 via-white to-white border-purple-200 ring-2 ring-purple-500/10'
+                    : theme === 'dark'
+                      ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50'
+                      : 'bg-white border-slate-200 shadow-sm'
                 }`}
               >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/10 to-purple-500/5 rounded-full blur-2xl" />
+                <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl ${
+                  u.role === 'SUPER_ADMIN'
+                    ? 'bg-gradient-to-br from-purple-500/20 to-pink-500/10'
+                    : 'bg-gradient-to-br from-blue-500/10 to-purple-500/5'
+                }`} />
                 <div className="relative">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -1250,7 +1538,13 @@ export const ShopAdminPanel: React.FC = () => {
                 <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}`}>
                   {paginatedUsers.map((u) => (
                     <tr key={u.id} className={`transition-colors ${
-                      theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'
+                      u.role === 'SUPER_ADMIN'
+                        ? theme === 'dark'
+                          ? 'bg-purple-900/10 hover:bg-purple-900/20 border-l-2 border-purple-500/50'
+                          : 'bg-purple-50/50 hover:bg-purple-50 border-l-2 border-purple-400'
+                        : theme === 'dark'
+                          ? 'hover:bg-slate-800/30'
+                          : 'hover:bg-slate-50'
                     }`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">

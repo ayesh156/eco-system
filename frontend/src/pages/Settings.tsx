@@ -1,15 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
 import { useShopBranding } from '../contexts/ShopBrandingContext';
 import { useTaxSettings } from '../contexts/TaxSettingsContext';
+import { useShopSections, ALL_SECTIONS } from '../contexts/ShopSectionsContext';
+import { ShopBrandingTab } from '../components/admin/ShopBrandingTab';
+import { SearchableSelect } from '../components/ui/searchable-select';
+import { toast } from 'sonner';
 import { 
   Bell, Palette, MessageCircle, Info, Copy, Check, 
   Globe, Moon, Sun, Sparkles,
   Mail, Phone, Building2, Save,
   RefreshCw, Eye, EyeOff, CheckCircle2, AlertCircle, Clock,
-  Smartphone, Laptop, SendHorizontal, Settings2, FileText, RotateCcw
+  Smartphone, Laptop, SendHorizontal, Settings2, FileText, RotateCcw,
+  Users, Image, Layers, Search, Edit, Key, UserPlus, UserCog,
+  CheckCircle, XCircle, Trash2, ChevronRight, ChevronLeft, X,
+  LayoutGrid, List, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 
 interface ReminderPreview {
@@ -22,26 +29,84 @@ interface ReminderPreview {
   daysOverdue: string;
 }
 
+// API URL from environment
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+
+// Shop User interface
+interface ShopUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'ADMIN' | 'MANAGER' | 'STAFF';
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastLogin: string | null;
+}
+
+type ViewMode = 'card' | 'table';
+type StatusFilter = 'all' | 'active' | 'inactive';
+type RoleFilter = 'all' | 'MANAGER' | 'STAFF';
+
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
-  const { user, isViewingShop, viewingShop } = useAuth();
+  const { user, isViewingShop, viewingShop, getAccessToken } = useAuth();
   const { settings: whatsAppSettings, shopDetails, updateSettings, saveSettings, resetToDefaults, isSaving: whatsAppSaving } = useWhatsAppSettings();
-  const { branding } = useShopBranding();
+  const { branding, saveBranding, hasUnsavedChanges: brandingHasUnsavedChanges } = useShopBranding();
   const { settings: taxSettings, updateSettings: updateTaxSettings, saveSettings: saveTaxSettings } = useTaxSettings();
+  const { 
+    hiddenSections, 
+    adminHiddenSections, 
+    updateHiddenSections, 
+    updateAdminHiddenSections,
+    getAdminVisibleSections,
+    isLoading: sectionsLoading 
+  } = useShopSections();
   
   // Check if user is Super Admin - hide business-specific settings unless viewing a shop
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const isShopAdmin = user?.role === 'ADMIN';
   const canViewBusinessSettings = !isSuperAdmin || (isSuperAdmin && isViewingShop);
+  // Shop Admin settings (Sections, Users tabs) visible for:
+  // - SUPER_ADMIN viewing a shop
+  // - Shop ADMIN (can manage sections for their users)
+  // NOT visible for regular shop users (USER role)
+  const canViewShopAdminSettings = isShopAdmin || (isSuperAdmin && isViewingShop);
   
   // Get the effective shop (either viewed shop for SUPER_ADMIN or user's own shop)
   const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
   
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'invoice'>('appearance');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'invoice' | 'sections' | 'branding' | 'users'>('appearance');
   const [showPreview, setShowPreview] = useState(false);
   const [previewType, setPreviewType] = useState<'payment' | 'overdue'>('payment');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // ===== Shop Admin States (for SUPER_ADMIN viewing a shop) =====
+  const [shopUsers, setShopUsers] = useState<ShopUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [usersLoadedForShop, setUsersLoadedForShop] = useState<string | null>(null); // Track which shop's users are loaded
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(8);
+  
+  // User modals
+  const [selectedUser, setSelectedUser] = useState<ShopUser | null>(null);
+  const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [isDeleteUserModalOpen, setIsDeleteUserModalOpen] = useState(false);
+
+  // Sections tab state
+  const [localHiddenSections, setLocalHiddenSections] = useState<string[]>(hiddenSections);
+  const [localAdminHiddenSections, setLocalAdminHiddenSections] = useState<string[]>(adminHiddenSections);
+  const [sectionsSaving, setSectionsSaving] = useState(false);
+  const [sectionsHasChanges, setSectionsHasChanges] = useState(false);
   
   // Profile form states - initialize with effective shop data
   const [businessName, setBusinessName] = useState(effectiveShop?.name || 'Shop Name');
@@ -68,6 +133,872 @@ export const Settings: React.FC = () => {
   const effectiveShopAddress = shopDetails?.address || branding?.address || effectiveShop?.address || 'Shop Address';
   const effectiveShopEmail = shopDetails?.email || branding?.email || effectiveShop?.email || 'shop@example.com';
   const effectiveShopWebsite = branding?.website || effectiveShop?.website || '';
+
+  // ===== Shop Admin Effects (for SUPER_ADMIN viewing a shop OR Shop ADMIN) =====
+  
+  // Redirect regular users (not ADMIN) away from restricted tabs (sections, users)
+  useEffect(() => {
+    const isRegularUser = user?.role === 'USER';
+    if (isRegularUser && (activeTab === 'sections' || activeTab === 'users')) {
+      setActiveTab('appearance');
+    }
+  }, [user?.role, activeTab]);
+  
+  // Sync local sections state when props change
+  useEffect(() => {
+    setLocalHiddenSections(hiddenSections);
+  }, [hiddenSections]);
+
+  // Sync admin hidden sections when props change
+  useEffect(() => {
+    setLocalAdminHiddenSections(adminHiddenSections);
+  }, [adminHiddenSections]);
+
+  // Check if there are unsaved section changes
+  useEffect(() => {
+    const sortedLocal = [...localHiddenSections].sort();
+    const sortedProp = [...hiddenSections].sort();
+    const sortedAdminLocal = [...localAdminHiddenSections].sort();
+    const sortedAdminProp = [...adminHiddenSections].sort();
+    setSectionsHasChanges(
+      JSON.stringify(sortedLocal) !== JSON.stringify(sortedProp) ||
+      JSON.stringify(sortedAdminLocal) !== JSON.stringify(sortedAdminProp)
+    );
+  }, [localHiddenSections, hiddenSections, localAdminHiddenSections, adminHiddenSections]);
+
+  // Fetch shop users when on users tab
+  const fetchShopUsers = async () => {
+    if (!canViewShopAdminSettings || activeTab !== 'users') return;
+    
+    setUsersLoading(true);
+    setUsersError(null);
+    const token = getAccessToken();
+    const shopIdParam = viewingShop ? `?shopId=${viewingShop.id}` : '';
+
+    try {
+      const res = await fetch(`${API_URL}/shop-admin/users${shopIdParam}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch users');
+      const data = await res.json();
+      setShopUsers(data.data || []);
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : 'Failed to load users');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  // Update a single user in the state (for individual card updates)
+  const updateUserInState = (updatedUser: ShopUser) => {
+    setShopUsers(prevUsers => 
+      prevUsers.map(user => 
+        user.id === updatedUser.id ? updatedUser : user
+      )
+    );
+  };
+
+  // Add a new user to the state
+  const addUserToState = (newUser: ShopUser) => {
+    setShopUsers(prevUsers => [newUser, ...prevUsers]);
+  };
+
+  // Remove a user from the state
+  const removeUserFromState = (userId: string) => {
+    setShopUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+  };
+
+  // Only fetch users once per shop (not on every tab switch)
+  useEffect(() => {
+    const currentShopId = viewingShop?.id || 'current';
+    // Only fetch if we're on users tab AND haven't loaded for this shop yet
+    if (canViewShopAdminSettings && activeTab === 'users' && usersLoadedForShop !== currentShopId) {
+      fetchShopUsers();
+      setUsersLoadedForShop(currentShopId);
+    }
+  }, [canViewShopAdminSettings, activeTab, viewingShop?.id, usersLoadedForShop]);
+
+  // Reset loaded state when shop changes
+  useEffect(() => {
+    const currentShopId = viewingShop?.id || 'current';
+    if (usersLoadedForShop && usersLoadedForShop !== currentShopId) {
+      setUsersLoadedForShop(null);
+      setShopUsers([]);
+    }
+  }, [viewingShop?.id]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [userSearchQuery, statusFilter, roleFilter]);
+
+  // Toggle section visibility - LOCAL only (no auto-save)
+  // SuperAdmin toggles hiddenSections (affects ADMIN + USER)
+  // Shop ADMIN toggles adminHiddenSections (affects USER only)
+  const toggleSection = (path: string) => {
+    if (isSuperAdmin) {
+      // SuperAdmin: Toggle in hiddenSections
+      const newHiddenSections = localHiddenSections.includes(path)
+        ? localHiddenSections.filter(p => p !== path)
+        : [...localHiddenSections, path];
+      
+      setLocalHiddenSections(newHiddenSections);
+    } else if (isShopAdmin) {
+      // Shop ADMIN: Toggle in adminHiddenSections (only affects regular users)
+      const newAdminHiddenSections = localAdminHiddenSections.includes(path)
+        ? localAdminHiddenSections.filter(p => p !== path)
+        : [...localAdminHiddenSections, path];
+      
+      setLocalAdminHiddenSections(newAdminHiddenSections);
+    }
+  };
+
+  // Save sections - called when Save Changes button is clicked
+  const handleSaveSections = async () => {
+    setSectionsSaving(true);
+    try {
+      if (isSuperAdmin) {
+        await updateHiddenSections(localHiddenSections);
+        toast.success('Section visibility updated successfully!');
+      } else if (isShopAdmin) {
+        await updateAdminHiddenSections(localAdminHiddenSections);
+        toast.success('Section visibility updated successfully!');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save sections');
+    } finally {
+      setSectionsSaving(false);
+    }
+  };
+
+  // Reset sections to original state (no save)
+  const handleResetSections = () => {
+    if (isSuperAdmin) {
+      setLocalHiddenSections(hiddenSections);
+    } else if (isShopAdmin) {
+      setLocalAdminHiddenSections(adminHiddenSections);
+    }
+    toast.success('Changes discarded');
+  };
+
+  // Filtered users
+  const filteredUsers = useMemo(() => {
+    return shopUsers.filter(u => {
+      // Hide SUPER_ADMIN users when viewing shop settings
+      if (u.role === 'SUPER_ADMIN') return false;
+      
+      const matchesSearch =
+        u.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+        u.email.toLowerCase().includes(userSearchQuery.toLowerCase());
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && u.isActive) ||
+        (statusFilter === 'inactive' && !u.isActive);
+      const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+      return matchesSearch && matchesStatus && matchesRole;
+    });
+  }, [shopUsers, userSearchQuery, statusFilter, roleFilter]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+  // Format date helper
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Role badge
+  const getRoleBadge = (role: string) => {
+    const roleConfig: Record<string, { bg: string; text: string; border: string }> = {
+      ADMIN: { bg: 'from-emerald-500/10 to-teal-500/10', text: theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600', border: 'border-emerald-500/20' },
+      MANAGER: { bg: 'from-blue-500/10 to-indigo-500/10', text: theme === 'dark' ? 'text-blue-400' : 'text-blue-600', border: 'border-blue-500/20' },
+      STAFF: { bg: 'from-slate-500/10 to-gray-500/10', text: theme === 'dark' ? 'text-slate-400' : 'text-slate-600', border: 'border-slate-500/20' },
+    };
+    const config = roleConfig[role] || roleConfig.STAFF;
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r ${config.bg} ${config.text} border ${config.border}`}>
+        <UserCog className="w-3 h-3" />
+        {role}
+      </span>
+    );
+  };
+
+  // Status badge
+  const getStatusBadge = (isActive: boolean) => {
+    return isActive ? (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-500/10 to-green-500/10 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'} border border-emerald-500/20`}>
+        <CheckCircle className="w-3 h-3" />
+        Active
+      </span>
+    ) : (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-red-500/10 to-rose-500/10 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'} border border-red-500/20`}>
+        <XCircle className="w-3 h-3" />
+        Inactive
+      </span>
+    );
+  };
+
+  // ===================================
+  // USER MODALS - CRUD Operations
+  // ===================================
+
+  // CREATE USER MODAL
+  const CreateUserModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: (newUser: ShopUser) => void;
+  }> = ({ isOpen, onClose, onSuccess }) => {
+    const [formData, setFormData] = useState({
+      email: '',
+      password: '',
+      name: '',
+      role: 'STAFF' as 'ADMIN' | 'MANAGER' | 'STAFF',
+    });
+    const [isSaving, setIsSaving] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsSaving(true);
+      setFormError(null);
+
+      try {
+        const token = getAccessToken();
+        const bodyData = viewingShop 
+          ? { ...formData, shopId: viewingShop.id }
+          : formData;
+        
+        const response = await fetch(`${API_URL}/shop-admin/users`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(bodyData),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to create user');
+        }
+
+        toast.success('User created successfully!');
+        onSuccess(data.data);
+        onClose();
+        setFormData({ email: '', password: '', name: '', role: 'STAFF' });
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : 'Failed to create user');
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className={`relative w-full max-w-md rounded-2xl border ${
+          theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
+        } shadow-2xl`}>
+          <div className={`flex items-center justify-between p-6 border-b ${
+            theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+          }`}>
+            <h2 className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              Create New User
+            </h2>
+            <button onClick={onClose} className={`p-2 rounded-lg ${
+              theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+            }`}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            {formError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {formError}
+              </div>
+            )}
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Name
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                minLength={2}
+                className={`w-full px-4 py-2.5 rounded-xl border ${
+                  theme === 'dark'
+                    ? 'bg-slate-800/50 border-slate-700/50 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Email
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                className={`w-full px-4 py-2.5 rounded-xl border ${
+                  theme === 'dark'
+                    ? 'bg-slate-800/50 border-slate-700/50 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Password
+              </label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                required
+                minLength={8}
+                className={`w-full px-4 py-2.5 rounded-xl border ${
+                  theme === 'dark'
+                    ? 'bg-slate-800/50 border-slate-700/50 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
+                }`}
+              />
+              <p className={`mt-1 text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                Min 8 chars with uppercase, lowercase, and number
+              </p>
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Role
+              </label>
+              <SearchableSelect
+                options={[
+                  { value: 'STAFF', label: 'Staff', icon: <Users className="w-4 h-4 text-slate-500" /> },
+                  { value: 'MANAGER', label: 'Manager', icon: <UserCog className="w-4 h-4 text-blue-500" /> },
+                  ...(viewingShop ? [{ value: 'ADMIN', label: 'Admin', icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" /> }] : []),
+                ]}
+                value={formData.role}
+                onValueChange={(val) => setFormData({ ...formData, role: val as 'ADMIN' | 'MANAGER' | 'STAFF' })}
+                placeholder="Select role"
+                searchPlaceholder="Search role..."
+                theme={theme}
+              />
+            </div>
+
+            <div className={`flex justify-end gap-3 pt-4 border-t ${
+              theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+            }`}>
+              <button type="button" onClick={onClose} className={`px-4 py-2 rounded-xl ${
+                theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium hover:shadow-emerald-500/25 disabled:opacity-50"
+              >
+                {isSaving ? 'Creating...' : 'Create User'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // EDIT USER MODAL
+  const EditUserModal: React.FC<{
+    user: ShopUser | null;
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: (updatedUser: ShopUser) => void;
+  }> = ({ user: editUser, isOpen, onClose, onSuccess }) => {
+    const [formData, setFormData] = useState({
+      name: '',
+      email: '',
+      role: 'STAFF' as 'ADMIN' | 'MANAGER' | 'STAFF',
+      isActive: true,
+    });
+    const [isSaving, setIsSaving] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
+
+    useEffect(() => {
+      if (editUser) {
+        setFormData({
+          name: editUser.name,
+          email: editUser.email,
+          role: editUser.role,
+          isActive: editUser.isActive,
+        });
+      }
+    }, [editUser]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editUser) return;
+
+      setIsSaving(true);
+      setFormError(null);
+
+      try {
+        const token = getAccessToken();
+        const shopIdParam = viewingShop ? `?shopId=${viewingShop.id}` : '';
+        const response = await fetch(`${API_URL}/shop-admin/users/${editUser.id}${shopIdParam}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(formData),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to update user');
+        }
+
+        toast.success('User updated successfully!');
+        onSuccess(data.data);
+        onClose();
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : 'Failed to update user');
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    if (!isOpen || !editUser) return null;
+
+    const isEditingOwnProfile = editUser.id === user?.id;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className={`relative w-full max-w-md rounded-2xl border ${
+          theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
+        } shadow-2xl`}>
+          <div className={`flex items-center justify-between p-6 border-b ${
+            theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+          }`}>
+            <div>
+              <h2 className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {isEditingOwnProfile ? 'Edit Your Profile' : 'Edit User'}
+              </h2>
+              {isEditingOwnProfile && (
+                <p className={`text-sm mt-0.5 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                  Update your name below
+                </p>
+              )}
+            </div>
+            <button onClick={onClose} className={`p-2 rounded-lg ${
+              theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+            }`}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            {formError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {formError}
+              </div>
+            )}
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Name
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                className={`w-full px-4 py-2.5 rounded-xl border ${
+                  theme === 'dark'
+                    ? 'bg-slate-800/50 border-slate-700/50 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Email
+              </label>
+              {isEditingOwnProfile ? (
+                <div className={`px-4 py-2.5 rounded-xl border flex items-center gap-2 ${
+                  theme === 'dark'
+                    ? 'bg-slate-800/30 border-slate-700/30 text-slate-400'
+                    : 'bg-slate-50 border-slate-200 text-slate-500'
+                }`}>
+                  <Mail className="w-4 h-4" />
+                  <span>{formData.email}</span>
+                  <span className={`ml-auto text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Cannot be changed
+                  </span>
+                </div>
+              ) : (
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  className={`w-full px-4 py-2.5 rounded-xl border ${
+                    theme === 'dark'
+                      ? 'bg-slate-800/50 border-slate-700/50 text-white'
+                      : 'bg-white border-slate-200 text-slate-900'
+                  }`}
+                />
+              )}
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Role
+              </label>
+              {(editUser.role === 'ADMIN' && !viewingShop) || isEditingOwnProfile ? (
+                <div className={`px-4 py-2.5 rounded-xl border flex items-center ${
+                  theme === 'dark'
+                    ? 'bg-slate-800/30 border-slate-700/30 text-slate-400'
+                    : 'bg-slate-50 border-slate-200 text-slate-600'
+                }`}>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  {editUser.role} {isEditingOwnProfile ? '(Your role)' : '(Cannot change)'}
+                </div>
+              ) : (
+                <SearchableSelect
+                  options={[
+                    { value: 'STAFF', label: 'Staff', icon: <Users className="w-4 h-4 text-slate-500" /> },
+                    { value: 'MANAGER', label: 'Manager', icon: <UserCog className="w-4 h-4 text-blue-500" /> },
+                    ...(viewingShop ? [{ value: 'ADMIN', label: 'Admin', icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" /> }] : []),
+                  ]}
+                  value={formData.role}
+                  onValueChange={(val) => setFormData({ ...formData, role: val as 'ADMIN' | 'MANAGER' | 'STAFF' })}
+                  placeholder="Select role"
+                  searchPlaceholder="Search role..."
+                  theme={theme}
+                />
+              )}
+            </div>
+
+            {((editUser.role !== 'ADMIN' || viewingShop) && !isEditingOwnProfile) && (
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isActiveEdit"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
+                />
+                <label htmlFor="isActiveEdit" className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Active account
+                </label>
+              </div>
+            )}
+
+            <div className={`flex justify-end gap-3 pt-4 border-t ${
+              theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+            }`}>
+              <button type="button" onClick={onClose} className={`px-4 py-2 rounded-xl ${
+                theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium hover:shadow-emerald-500/25 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // RESET PASSWORD MODAL
+  const ResetPasswordModal: React.FC<{
+    user: ShopUser | null;
+    isOpen: boolean;
+    onClose: () => void;
+  }> = ({ user: resetUser, isOpen, onClose }) => {
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!resetUser) return;
+
+      if (newPassword !== confirmPassword) {
+        setFormError('Passwords do not match');
+        return;
+      }
+
+      setIsSaving(true);
+      setFormError(null);
+
+      try {
+        const token = getAccessToken();
+        const shopIdParam = viewingShop ? `?shopId=${viewingShop.id}` : '';
+        const response = await fetch(`${API_URL}/shop-admin/users/${resetUser.id}/reset-password${shopIdParam}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ newPassword }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to reset password');
+        }
+
+        toast.success('Password reset successfully!');
+        onClose();
+        setNewPassword('');
+        setConfirmPassword('');
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : 'Failed to reset password');
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    if (!isOpen || !resetUser) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className={`relative w-full max-w-md rounded-2xl border ${
+          theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
+        } shadow-2xl`}>
+          <div className={`flex items-center justify-between p-6 border-b ${
+            theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+          }`}>
+            <h2 className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              Reset Password
+            </h2>
+            <button onClick={onClose} className={`p-2 rounded-lg ${
+              theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+            }`}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div className={`p-4 rounded-xl ${
+              theme === 'dark' ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'
+            }`}>
+              <p className={`text-sm ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>
+                Resetting password for: <strong>{resetUser.name}</strong>
+              </p>
+            </div>
+
+            {formError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {formError}
+              </div>
+            )}
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                New Password
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={8}
+                className={`w-full px-4 py-2.5 rounded-xl border ${
+                  theme === 'dark'
+                    ? 'bg-slate-800/50 border-slate-700/50 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className={`w-full px-4 py-2.5 rounded-xl border ${
+                  theme === 'dark'
+                    ? 'bg-slate-800/50 border-slate-700/50 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
+                }`}
+              />
+            </div>
+
+            <div className={`flex justify-end gap-3 pt-4 border-t ${
+              theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+            }`}>
+              <button type="button" onClick={onClose} className={`px-4 py-2 rounded-xl ${
+                theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium hover:shadow-amber-500/25 disabled:opacity-50"
+              >
+                <Key className="w-4 h-4" />
+                {isSaving ? 'Resetting...' : 'Reset Password'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // DELETE USER MODAL
+  const DeleteUserModal: React.FC<{
+    user: ShopUser | null;
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: (userId: string) => void;
+  }> = ({ user: deleteUser, isOpen, onClose, onSuccess }) => {
+    const [confirmText, setConfirmText] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
+
+    const handleDelete = async () => {
+      if (!deleteUser || confirmText !== 'DELETE') return;
+
+      setIsDeleting(true);
+      setFormError(null);
+
+      try {
+        const token = getAccessToken();
+        const shopIdParam = viewingShop ? `?shopId=${viewingShop.id}` : '';
+        const response = await fetch(`${API_URL}/shop-admin/users/${deleteUser.id}${shopIdParam}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to delete user');
+        }
+
+        toast.success('User deleted successfully!');
+        onSuccess(deleteUser.id);
+        onClose();
+        setConfirmText('');
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : 'Failed to delete user');
+      } finally {
+        setIsDeleting(false);
+      }
+    };
+
+    if (!isOpen || !deleteUser) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className={`relative w-full max-w-md rounded-2xl border ${
+          theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
+        } shadow-2xl`}>
+          <div className={`flex items-center justify-between p-6 border-b ${
+            theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+          }`}>
+            <h2 className="text-xl font-semibold text-red-500">
+              Delete User
+            </h2>
+            <button onClick={onClose} className={`p-2 rounded-lg ${
+              theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+            }`}>
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className={`p-4 rounded-xl ${
+              theme === 'dark' ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
+            }`}>
+              <p className={`text-sm ${theme === 'dark' ? 'text-red-400' : 'text-red-700'}`}>
+                <strong>Warning:</strong> This will deactivate the user account for <strong>{deleteUser.name}</strong>.
+                The user will no longer be able to log in.
+              </p>
+            </div>
+
+            {formError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {formError}
+              </div>
+            )}
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Type <span className="font-mono font-bold text-red-500">DELETE</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                className={`w-full px-4 py-2.5 rounded-xl border ${
+                  theme === 'dark'
+                    ? 'bg-slate-800/50 border-slate-700/50 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
+                }`}
+              />
+            </div>
+
+            <div className={`flex justify-end gap-3 pt-4 border-t ${
+              theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+            }`}>
+              <button type="button" onClick={onClose} className={`px-4 py-2 rounded-xl ${
+                theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}>
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting || confirmText !== 'DELETE'}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-xl font-medium hover:shadow-red-500/25 disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {isDeleting ? 'Deleting...' : 'Delete User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const placeholders = [
     { key: '{{customerName}}', desc: 'Customer name', example: 'John Doe' },
@@ -117,11 +1048,30 @@ export const Settings: React.FC = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Simulate API call for other settings
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setIsSaving(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    try {
+      // Save sections changes if any (supports both SuperAdmin and Shop ADMIN)
+      if (sectionsHasChanges) {
+        if (isSuperAdmin) {
+          await updateHiddenSections(localHiddenSections);
+        } else if (isShopAdmin) {
+          await updateAdminHiddenSections(localAdminHiddenSections);
+        }
+      }
+      // Save branding changes if on profile tab and has changes
+      if (activeTab === 'profile' && brandingHasUnsavedChanges) {
+        await saveBranding();
+      }
+      // Simulate API call for other settings
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setSaveSuccess(true);
+      toast.success('Settings saved successfully!');
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      toast.error('Failed to save settings');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleWhatsAppSave = async () => {
@@ -134,18 +1084,29 @@ export const Settings: React.FC = () => {
     }
   };
 
-  // All available tabs
-  const allTabs = [
+  // All available tabs - organized in categories
+  const generalTabs = [
     { id: 'appearance' as const, label: 'Appearance', icon: Palette, color: 'emerald' },
     { id: 'profile' as const, label: 'Business Profile', icon: Building2, color: 'purple', businessOnly: true },
     { id: 'notifications' as const, label: 'Notifications', icon: Bell, color: 'amber', businessOnly: true },
     { id: 'invoice' as const, label: 'Invoice Settings', icon: FileText, color: 'blue', businessOnly: true },
   ];
 
-  // Filter tabs - hide business-specific tabs for Super Admin unless viewing a shop
-  const tabs = canViewBusinessSettings 
-    ? allTabs
-    : allTabs.filter(tab => !tab.businessOnly);
+  // Shop Admin tabs - only for SUPER_ADMIN viewing a shop
+  const shopAdminTabs = [
+    { id: 'sections' as const, label: 'Sections', icon: Layers, color: 'violet', superAdminOnly: true },
+    { id: 'users' as const, label: 'Users', icon: Users, color: 'cyan', superAdminOnly: true },
+  ];
+
+  // Combine tabs based on user role
+  const allTabs = canViewShopAdminSettings 
+    ? [...generalTabs.filter(tab => !tab.businessOnly || canViewBusinessSettings), ...shopAdminTabs]
+    : canViewBusinessSettings 
+      ? generalTabs
+      : generalTabs.filter(tab => !tab.businessOnly);
+
+  // Use allTabs directly (renamed for consistency)
+  const tabs = allTabs;
 
   return (
     <div className="min-h-screen pb-8">
@@ -162,18 +1123,49 @@ export const Settings: React.FC = () => {
         </div>
         
         <div className="relative p-6 md:p-8">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <Settings2 className="w-7 h-7 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
+                <Settings2 className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  Settings
+                </h1>
+                <p className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Customize your experience and preferences
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                Settings
-              </h1>
-              <p className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                Customize your experience and preferences
-              </p>
-            </div>
+            {/* Save Button - Always visible at top except for tabs with their own save */}
+            {activeTab !== 'invoice' && activeTab !== 'users' && (
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className={`relative px-6 py-2.5 rounded-xl font-semibold text-white transition-all overflow-hidden ${
+                  saveSuccess 
+                    ? 'bg-green-500' 
+                    : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 hover:shadow-lg hover:shadow-purple-500/30'
+                }`}
+              >
+                {isSaving ? (
+                  <span className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </span>
+                ) : saveSuccess ? (
+                  <span className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Saved!
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -204,41 +1196,126 @@ export const Settings: React.FC = () => {
           </div>
         )}
 
-        {/* Modern Tab Navigation */}
+        {/* Modern Tab Navigation - World Class Design */}
         <div className={`rounded-2xl p-1.5 mb-8 ${
           theme === 'dark' ? 'bg-slate-800/50 backdrop-blur-sm' : 'bg-white shadow-lg shadow-slate-200/50'
         }`}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {tabs.map((tab) => {
+          {/* Shop Admin Section Divider - Show when SUPER_ADMIN viewing shop */}
+          {canViewShopAdminSettings && (
+            <div className="px-4 py-2 mb-2">
+              <div className="flex items-center gap-3">
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  General Settings
+                </span>
+                <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-200'}`} />
+              </div>
+            </div>
+          )}
+          
+          <div className={`grid gap-2 ${
+            canViewShopAdminSettings 
+              ? 'grid-cols-2 sm:grid-cols-4' 
+              : 'grid-cols-2 md:grid-cols-4'
+          }`}>
+            {tabs.slice(0, canViewShopAdminSettings ? 4 : tabs.length).map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
+              const getGradient = () => {
+                switch (tab.color) {
+                  case 'emerald': return 'from-emerald-500 to-teal-500';
+                  case 'purple': return 'from-purple-500 to-pink-500';
+                  case 'amber': return 'from-amber-500 to-orange-500';
+                  case 'blue': return 'from-blue-500 to-indigo-500';
+                  case 'violet': return 'from-violet-500 to-purple-500';
+                  case 'pink': return 'from-pink-500 to-rose-500';
+                  case 'cyan': return 'from-cyan-500 to-blue-500';
+                  default: return 'from-emerald-500 to-teal-500';
+                }
+              };
+              const getShadowColor = () => {
+                switch (tab.color) {
+                  case 'emerald': return 'rgba(16, 185, 129, 0.5)';
+                  case 'purple': return 'rgba(139, 92, 246, 0.5)';
+                  case 'amber': return 'rgba(245, 158, 11, 0.5)';
+                  case 'blue': return 'rgba(59, 130, 246, 0.5)';
+                  case 'violet': return 'rgba(139, 92, 246, 0.5)';
+                  case 'pink': return 'rgba(236, 72, 153, 0.5)';
+                  case 'cyan': return 'rgba(6, 182, 212, 0.5)';
+                  default: return 'rgba(16, 185, 129, 0.5)';
+                }
+              };
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
+                  className={`relative flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-medium transition-all duration-300 ${
                     isActive
-                      ? `${tab.color === 'emerald' ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 
-                          tab.color === 'purple' ? 'bg-gradient-to-r from-purple-500 to-pink-500' :
-                          tab.color === 'amber' ? 'bg-gradient-to-r from-amber-500 to-orange-500' :
-                          'bg-gradient-to-r from-green-500 to-emerald-500'} text-white shadow-lg`
+                      ? `bg-gradient-to-r ${getGradient()} text-white shadow-lg`
                       : theme === 'dark' 
                         ? 'text-slate-400 hover:text-white hover:bg-slate-700/50' 
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
-                  style={isActive ? {
-                    boxShadow: tab.color === 'emerald' ? '0 10px 30px -10px rgba(16, 185, 129, 0.5)' :
-                               tab.color === 'purple' ? '0 10px 30px -10px rgba(139, 92, 246, 0.5)' :
-                               tab.color === 'amber' ? '0 10px 30px -10px rgba(245, 158, 11, 0.5)' :
-                               '0 10px 30px -10px rgba(34, 197, 94, 0.5)'
-                  } : {}}
+                  style={isActive ? { boxShadow: `0 10px 30px -10px ${getShadowColor()}` } : {}}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="hidden sm:inline">{tab.label}</span>
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="hidden sm:inline text-sm">{tab.label}</span>
                 </button>
               );
             })}
           </div>
+
+          {/* Shop Admin Section - Only for SUPER_ADMIN viewing shop */}
+          {canViewShopAdminSettings && (
+            <>
+              <div className="px-4 py-2 mt-3">
+                <div className="flex items-center gap-3">
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600'}`}>
+                    Shop Administration
+                  </span>
+                  <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-200'}`} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {tabs.slice(4).map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  const getGradient = () => {
+                    switch (tab.color) {
+                      case 'violet': return 'from-violet-500 to-purple-500';
+                      case 'pink': return 'from-pink-500 to-rose-500';
+                      case 'cyan': return 'from-cyan-500 to-blue-500';
+                      default: return 'from-emerald-500 to-teal-500';
+                    }
+                  };
+                  const getShadowColor = () => {
+                    switch (tab.color) {
+                      case 'violet': return 'rgba(139, 92, 246, 0.5)';
+                      case 'pink': return 'rgba(236, 72, 153, 0.5)';
+                      case 'cyan': return 'rgba(6, 182, 212, 0.5)';
+                      default: return 'rgba(16, 185, 129, 0.5)';
+                    }
+                  };
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`relative flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                        isActive
+                          ? `bg-gradient-to-r ${getGradient()} text-white shadow-lg`
+                          : theme === 'dark' 
+                            ? 'text-slate-400 hover:text-white hover:bg-slate-700/50' 
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                      }`}
+                      style={isActive ? { boxShadow: `0 10px 30px -10px ${getShadowColor()}` } : {}}
+                    >
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      <span className="hidden sm:inline text-sm">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Appearance Tab */}
@@ -563,109 +1640,10 @@ export const Settings: React.FC = () => {
         {/* Profile Tab */}
         {activeTab === 'profile' && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <div className={`rounded-3xl border overflow-hidden ${
-              theme === 'dark' 
-                ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
-                : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
-            }`}>
-              {/* Profile Header */}
-              <div className="relative h-32 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600">
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDEwIDAgTCAwIDAgMCAxMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30" />
-              </div>
-              
-              <div className="relative px-6 pb-6">
-                <div className="absolute -top-12 left-6">
-                  <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-xl shadow-purple-500/30 border-4 border-white dark:border-slate-900">
-                    {businessName?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'SH'}
-                  </div>
-                </div>
-                
-                <div className="pt-16 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <Building2 className="w-4 h-4 inline mr-2" />
-                        Business Name
-                      </label>
-                      <input
-                        type="text"
-                        value={businessName}
-                        onChange={(e) => setBusinessName(e.target.value)}
-                        className={`w-full px-4 py-3 rounded-xl border transition-all ${
-                          theme === 'dark' 
-                            ? 'bg-slate-800/50 border-slate-700 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20' 
-                            : 'bg-white border-slate-200 text-slate-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <Mail className="w-4 h-4 inline mr-2" />
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className={`w-full px-4 py-3 rounded-xl border transition-all ${
-                          theme === 'dark' 
-                            ? 'bg-slate-800/50 border-slate-700 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20' 
-                            : 'bg-white border-slate-200 text-slate-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <Phone className="w-4 h-4 inline mr-2" />
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className={`w-full px-4 py-3 rounded-xl border transition-all ${
-                          theme === 'dark' 
-                            ? 'bg-slate-800/50 border-slate-700 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20' 
-                            : 'bg-white border-slate-200 text-slate-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <Globe className="w-4 h-4 inline mr-2" />
-                        Website
-                      </label>
-                      <input
-                        type="text"
-                        value={website}
-                        onChange={(e) => setWebsite(e.target.value)}
-                        className={`w-full px-4 py-3 rounded-xl border transition-all ${
-                          theme === 'dark' 
-                            ? 'bg-slate-800/50 border-slate-700 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20' 
-                            : 'bg-white border-slate-200 text-slate-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Address
-                    </label>
-                    <textarea
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      rows={3}
-                      className={`w-full px-4 py-3 rounded-xl border transition-all ${
-                        theme === 'dark' 
-                          ? 'bg-slate-800/50 border-slate-700 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20' 
-                          : 'bg-white border-slate-200 text-slate-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20'
-                      }`}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Branding Section - Logo, Shop Details & Live Preview */}
+            {canViewBusinessSettings && (
+              <ShopBrandingTab />
+            )}
           </div>
         )}
 
@@ -1057,39 +2035,642 @@ export const Settings: React.FC = () => {
           </div>
         )}
 
-        {/* Global Save Button */}
-        {activeTab !== 'invoice' && (
-          <div className="flex justify-end mt-8">
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className={`relative px-8 py-3 rounded-xl font-semibold text-white transition-all overflow-hidden ${
-                saveSuccess 
-                  ? 'bg-green-500' 
-                  : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 hover:shadow-lg hover:shadow-purple-500/30'
-              }`}
-            >
-              {isSaving ? (
-                <span className="flex items-center gap-2">
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                  Saving...
-                </span>
-              ) : saveSuccess ? (
-                <span className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5" />
-                  Saved Successfully!
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Save className="w-5 h-5" />
-                  Save Changes
-                </span>
-              )}
-            </button>
+        {/* ========== SECTIONS TAB (SUPER_ADMIN & SHOP ADMIN) ========== */}
+        {activeTab === 'sections' && canViewShopAdminSettings && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Creative Header with Gradient */}
+            <div className={`relative overflow-hidden rounded-3xl border ${theme === 'dark' ? 'bg-gradient-to-br from-violet-900/30 via-slate-800/50 to-purple-900/30 border-violet-500/20' : 'bg-gradient-to-br from-violet-50 via-white to-purple-50 border-violet-200 shadow-xl'}`}>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-violet-500/20 to-purple-500/10 rounded-full blur-3xl -translate-y-32 translate-x-32" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-pink-500/10 to-violet-500/10 rounded-full blur-3xl translate-y-24 -translate-x-24" />
+              <div className="relative p-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/30">
+                      <Layers className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        Section Control Center
+                      </h2>
+                      <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {isSuperAdmin 
+                          ? 'Manage section visibility for all shop users (Admin + Users)' 
+                          : 'Manage section visibility for your shop users'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  {/* Stats Pills - Show different stats based on role */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    {isSuperAdmin ? (
+                      <>
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-100 border border-emerald-200'}`}>
+                          <Eye className={`w-4 h-4 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                          <span className={`font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                            {ALL_SECTIONS.length - localHiddenSections.length}
+                          </span>
+                          <span className={`text-sm ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600'}`}>Visible</span>
+                        </div>
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-red-500/20 border border-red-500/30' : 'bg-red-100 border border-red-200'}`}>
+                          <EyeOff className={`w-4 h-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
+                          <span className={`font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-700'}`}>
+                            {localHiddenSections.length}
+                          </span>
+                          <span className={`text-sm ${theme === 'dark' ? 'text-red-400/70' : 'text-red-600'}`}>Hidden</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Shop ADMIN sees only sections not hidden by SuperAdmin */}
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-100 border border-emerald-200'}`}>
+                          <Eye className={`w-4 h-4 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                          <span className={`font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                            {getAdminVisibleSections().filter(s => !s.isHidden).length}
+                          </span>
+                          <span className={`text-sm ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600'}`}>Visible to Users</span>
+                        </div>
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-amber-500/20 border border-amber-500/30' : 'bg-amber-100 border border-amber-200'}`}>
+                          <EyeOff className={`w-4 h-4 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
+                          <span className={`font-bold ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>
+                            {localAdminHiddenSections.length}
+                          </span>
+                          <span className={`text-sm ${theme === 'dark' ? 'text-amber-400/70' : 'text-amber-600'}`}>Hidden from Users</span>
+                        </div>
+                      </>
+                    )}
+                    
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sections Grid with Toggle Switches */}
+            {sectionsLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="flex flex-col items-center gap-3">
+                  <div className={`animate-spin rounded-full h-10 w-10 border-3 ${theme === 'dark' ? 'border-violet-500 border-t-transparent' : 'border-violet-600 border-t-transparent'}`} />
+                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Loading sections...</p>
+                </div>
+              </div>
+            ) : isSuperAdmin ? (
+              /* SuperAdmin View: All sections with SuperAdmin-level hiding */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {ALL_SECTIONS.map((section) => {
+                  const isHidden = localHiddenSections.includes(section.path);
+                  const isVisible = !isHidden;
+                  return (
+                    <div
+                      key={section.path}
+                      className={`group relative overflow-hidden rounded-2xl border p-5 transition-all duration-300 cursor-pointer ${
+                        isVisible 
+                          ? theme === 'dark' 
+                            ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-emerald-500/30 hover:border-emerald-400/50 hover:shadow-lg hover:shadow-emerald-500/10' 
+                            : 'bg-white border-emerald-200 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-100'
+                          : theme === 'dark' 
+                            ? 'bg-gradient-to-br from-slate-800/40 to-slate-900/40 border-slate-700/50 hover:border-slate-600/50 opacity-60 hover:opacity-80' 
+                            : 'bg-slate-50 border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-90'
+                      }`}
+                      onClick={() => toggleSection(section.path)}
+                    >
+                      {/* Glow effect for visible sections */}
+                      {isVisible && (
+                        <div className={`absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl transition-opacity ${
+                          theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-200'
+                        } group-hover:opacity-100 opacity-50`} />
+                      )}
+                      
+                      <div className="relative flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${
+                            isVisible
+                              ? theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20' : 'bg-emerald-100'
+                              : theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-200'
+                          }`}>
+                            {section.icon}
+                          </div>
+                          <div>
+                            <p className={`font-semibold transition-colors ${
+                              isVisible
+                                ? theme === 'dark' ? 'text-white' : 'text-slate-900'
+                                : theme === 'dark' ? 'text-slate-500 line-through' : 'text-slate-400 line-through'
+                            }`}>
+                              {section.label}
+                            </p>
+                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {section.path}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Toggle Switch */}
+                        <div className={`relative w-14 h-8 rounded-full transition-all duration-300 ${
+                          isVisible
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30'
+                            : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
+                        }`}>
+                          <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300 flex items-center justify-center ${
+                            isVisible ? 'left-7' : 'left-1'
+                          }`}>
+                            {isVisible ? (
+                              <Eye className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Status indicator */}
+                      <div className={`mt-4 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${isVisible ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                          <span className={`text-xs font-medium ${
+                            isVisible
+                              ? theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'
+                              : theme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+                          }`}>
+                            {isVisible ? 'Visible to Admin + Users' : 'Hidden from Admin + Users'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Shop ADMIN View: Only sections NOT hidden by SuperAdmin, with Admin-level hiding */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {getAdminVisibleSections().map((section) => {
+                  const isHidden = localAdminHiddenSections.includes(section.path);
+                  const isVisible = !isHidden;
+                  return (
+                    <div
+                      key={section.path}
+                      className={`group relative overflow-hidden rounded-2xl border p-5 transition-all duration-300 cursor-pointer ${
+                        isVisible 
+                          ? theme === 'dark' 
+                            ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-cyan-500/30 hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-500/10' 
+                            : 'bg-white border-cyan-200 hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-100'
+                          : theme === 'dark' 
+                            ? 'bg-gradient-to-br from-slate-800/40 to-slate-900/40 border-amber-500/30 hover:border-amber-400/50 opacity-60 hover:opacity-80' 
+                            : 'bg-amber-50 border-amber-200 hover:border-amber-300 opacity-70 hover:opacity-90'
+                      }`}
+                      onClick={() => toggleSection(section.path)}
+                    >
+                      {/* Glow effect for visible sections */}
+                      {isVisible && (
+                        <div className={`absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl transition-opacity ${
+                          theme === 'dark' ? 'bg-cyan-500/20' : 'bg-cyan-200'
+                        } group-hover:opacity-100 opacity-50`} />
+                      )}
+                      
+                      <div className="relative flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${
+                            isVisible
+                              ? theme === 'dark' ? 'bg-gradient-to-br from-cyan-500/20 to-blue-500/20' : 'bg-cyan-100'
+                              : theme === 'dark' ? 'bg-amber-500/20' : 'bg-amber-200'
+                          }`}>
+                            {section.icon}
+                          </div>
+                          <div>
+                            <p className={`font-semibold transition-colors ${
+                              isVisible
+                                ? theme === 'dark' ? 'text-white' : 'text-slate-900'
+                                : theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
+                            }`}>
+                              {section.label}
+                            </p>
+                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {section.path}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Toggle Switch */}
+                        <div className={`relative w-14 h-8 rounded-full transition-all duration-300 ${
+                          isVisible
+                            ? 'bg-gradient-to-r from-cyan-500 to-blue-500 shadow-lg shadow-cyan-500/30'
+                            : 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-amber-500/30'
+                        }`}>
+                          <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300 flex items-center justify-center ${
+                            isVisible ? 'left-7' : 'left-1'
+                          }`}>
+                            {isVisible ? (
+                              <Eye className="w-3.5 h-3.5 text-cyan-500" />
+                            ) : (
+                              <EyeOff className="w-3.5 h-3.5 text-amber-500" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Status indicator */}
+                      <div className={`mt-4 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${isVisible ? 'bg-cyan-500 animate-pulse' : 'bg-amber-500'}`} />
+                          <span className={`text-xs font-medium ${
+                            isVisible
+                              ? theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'
+                              : theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
+                          }`}>
+                            {isVisible ? 'Visible to shop users' : 'Hidden from shop users'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Info Note */}
+            <div className={`flex items-start gap-3 p-4 rounded-xl ${theme === 'dark' ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
+              <Info className={`w-5 h-5 flex-shrink-0 mt-0.5 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+              <div>
+                <p className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}`}>Section Visibility Control</p>
+                <p className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-blue-400/70' : 'text-blue-600'}`}>
+                  Toggle sections on/off, then click the "Save Changes" button at the top right to apply your changes.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========== USERS TAB (SUPER_ADMIN ONLY) ========== */}
+        {activeTab === 'users' && canViewShopAdminSettings && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Header Card - Creative 2-Line Layout */}
+            <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+              {/* Line 1: Title, Description & Add User Button */}
+              <div className={`flex items-center justify-between gap-4 px-6 py-4 border-b ${theme === 'dark' ? 'border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-slate-900/30' : 'border-slate-200 bg-gradient-to-r from-slate-50 to-white'}`}>
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 ${theme === 'dark' ? 'shadow-lg shadow-cyan-500/5' : 'shadow-cyan-500/10'}`}>
+                    <Users className="w-6 h-6 text-cyan-500" />
+                  </div>
+                  <div>
+                    <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      Shop Users
+                    </h3>
+                    <p className={`text-sm flex items-center gap-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span>Manage users for</span>
+                      <span className={`font-medium ${theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'}`}>
+                        {viewingShop?.name || effectiveShop?.name}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsCreateUserModalOpen(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-cyan-500/25 transition-all hover:scale-105"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  <span className="hidden sm:inline">Add User</span>
+                </button>
+              </div>
+
+              {/* Line 2: Search & Filters */}
+              <div className="flex flex-wrap items-center gap-3 px-6 py-4">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[240px]">
+                  <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl border transition-all ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20' : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'}`}
+                  />
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  {/* Status Filter */}
+                  <div className="w-40">
+                    <SearchableSelect
+                      value={statusFilter}
+                      onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+                      placeholder="All Status"
+                      searchPlaceholder="Search..."
+                      emptyMessage="No options"
+                      theme={theme === 'dark' ? 'dark' : 'light'}
+                      options={[
+                        { value: 'all', label: 'All Status', icon: <CheckCircle className="w-4 h-4 text-slate-500" /> },
+                        { value: 'active', label: 'Active', icon: <CheckCircle className="w-4 h-4 text-emerald-500" /> },
+                        { value: 'inactive', label: 'Inactive', icon: <XCircle className="w-4 h-4 text-red-500" /> },
+                      ]}
+                    />
+                  </div>
+                  {/* Role Filter */}
+                  <div className="w-44">
+                    <SearchableSelect
+                      value={roleFilter}
+                      onValueChange={(value) => setRoleFilter(value as RoleFilter)}
+                      placeholder="All Roles"
+                      searchPlaceholder="Search..."
+                      emptyMessage="No options"
+                      theme={theme === 'dark' ? 'dark' : 'light'}
+                      options={[
+                        { value: 'all', label: 'All Roles', icon: <Users className="w-4 h-4 text-slate-500" /> },
+                        { value: 'MANAGER', label: 'Manager', icon: <UserCog className="w-4 h-4 text-blue-500" /> },
+                        { value: 'STAFF', label: 'Staff', icon: <Users className="w-4 h-4 text-slate-500" /> },
+                      ]}
+                    />
+                  </div>
+                  {/* View Toggle */}
+                  <div className={`flex rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                    <button
+                      onClick={() => setViewMode('card')}
+                      className={`p-2 transition-all ${viewMode === 'card' ? (theme === 'dark' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-50 text-cyan-600') : (theme === 'dark' ? 'text-slate-400 hover:bg-slate-700/50' : 'text-slate-500 hover:bg-slate-50')}`}
+                      title="Card view"
+                    >
+                      <LayoutGrid className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('table')}
+                      className={`p-2 transition-all ${viewMode === 'table' ? (theme === 'dark' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-50 text-cyan-600') : (theme === 'dark' ? 'text-slate-400 hover:bg-slate-700/50' : 'text-slate-500 hover:bg-slate-50')}`}
+                      title="Table view"
+                    >
+                      <List className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {/* Refresh */}
+                  <button
+                    onClick={() => { setUsersLoadedForShop(null); fetchShopUsers(); }}
+                    disabled={usersLoading}
+                    className={`p-2 rounded-xl border transition-all ${theme === 'dark' ? 'border-slate-700/50 hover:bg-slate-700/50 text-slate-400 disabled:opacity-50' : 'border-slate-200 hover:bg-slate-50 text-slate-500 disabled:opacity-50'}`}
+                    title="Refresh users"
+                  >
+                    <RefreshCw className={`w-5 h-5 ${usersLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Users List */}
+            {usersLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className={`animate-spin rounded-full h-8 w-8 border-2 ${theme === 'dark' ? 'border-cyan-500 border-t-transparent' : 'border-cyan-600 border-t-transparent'}`} />
+              </div>
+            ) : usersError ? (
+              <div className={`rounded-2xl border p-8 text-center ${theme === 'dark' ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'}`}>
+                <AlertCircle className={`w-12 h-12 mx-auto mb-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`} />
+                <p className={`font-medium ${theme === 'dark' ? 'text-red-400' : 'text-red-700'}`}>{usersError}</p>
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className={`rounded-2xl border p-8 text-center ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                <Users className={`w-12 h-12 mx-auto mb-4 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`} />
+                <p className={`font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>No users found</p>
+                <button
+                  onClick={() => setIsCreateUserModalOpen(true)}
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl font-medium"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Add First User
+                </button>
+              </div>
+            ) : viewMode === 'card' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {paginatedUsers.map((usr) => {
+                  const isCurrentUser = usr.id === user?.id;
+                  const canEditUser = usr.role !== 'ADMIN' || viewingShop || isCurrentUser;
+                  const canDeleteUser = (usr.role !== 'ADMIN' || viewingShop) && !isCurrentUser;
+                  
+                  return (
+                  <div
+                    key={usr.id}
+                    className={`rounded-2xl border p-4 transition-all hover:shadow-lg ${
+                      isCurrentUser 
+                        ? theme === 'dark' 
+                          ? 'bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border-emerald-500/30 ring-2 ring-emerald-500/20' 
+                          : 'bg-gradient-to-br from-emerald-50 to-cyan-50 border-emerald-200 ring-2 ring-emerald-200'
+                        : theme === 'dark' 
+                          ? 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50' 
+                          : 'bg-white border-slate-200 hover:shadow-slate-200/50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold bg-gradient-to-br ${usr.role === 'ADMIN' ? 'from-emerald-500 to-teal-500' : usr.role === 'MANAGER' ? 'from-blue-500 to-indigo-500' : 'from-slate-500 to-gray-600'}`}>
+                        {usr.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={`font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{usr.name}</p>
+                          {isCurrentUser && (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-xs truncate ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{usr.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mb-3">
+                      {getRoleBadge(usr.role)}
+                      {getStatusBadge(usr.isActive)}
+                    </div>
+                    <div className={`text-xs mb-3 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                      <p>Joined: {formatDate(usr.createdAt)}</p>
+                      {usr.lastLogin && <p>Last login: {formatDate(usr.lastLogin)}</p>}
+                    </div>
+                    {/* Action Buttons - SuperAdmin can manage ADMIN users when viewing a shop, or current user can edit themselves */}
+                    {canEditUser && (
+                      <div className={`flex items-center gap-2 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                        <button
+                          onClick={() => { setSelectedUser(usr); setIsEditUserModalOpen(true); }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            theme === 'dark' ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                          }`}
+                          title={isCurrentUser ? 'Edit your profile' : 'Edit user'}
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                          {isCurrentUser ? 'Edit Profile' : 'Edit'}
+                        </button>
+                        <button
+                          onClick={() => { setSelectedUser(usr); setIsResetPasswordModalOpen(true); }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            theme === 'dark' ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                          }`}
+                          title={isCurrentUser ? 'Change your password' : 'Reset password'}
+                        >
+                          <Key className="w-3.5 h-3.5" />
+                          Password
+                        </button>
+                        {canDeleteUser && (
+                          <button
+                            onClick={() => { setSelectedUser(usr); setIsDeleteUserModalOpen(true); }}
+                            className={`p-1.5 rounded-lg transition-all ${
+                              theme === 'dark' ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-50 text-red-600 hover:bg-red-100'
+                            }`}
+                            title="Delete user"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );})}
+              </div>
+            ) : (
+              <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                <table className="w-full">
+                  <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
+                    <tr>
+                      <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>User</th>
+                      <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Role</th>
+                      <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Status</th>
+                      <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Joined</th>
+                      <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}`}>
+                    {paginatedUsers.map((usr) => {
+                      const isCurrentUser = usr.id === user?.id;
+                      const canEditUser = usr.role !== 'ADMIN' || viewingShop || isCurrentUser;
+                      const canDeleteUser = (usr.role !== 'ADMIN' || viewingShop) && !isCurrentUser;
+                      
+                      return (
+                      <tr key={usr.id} className={`transition-colors ${
+                        isCurrentUser 
+                          ? theme === 'dark' 
+                            ? 'bg-gradient-to-r from-emerald-500/10 to-cyan-500/5 border-l-2 border-l-emerald-500' 
+                            : 'bg-gradient-to-r from-emerald-50 to-cyan-50 border-l-2 border-l-emerald-500'
+                          : theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'
+                      }`}>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br ${usr.role === 'ADMIN' ? 'from-emerald-500 to-teal-500' : usr.role === 'MANAGER' ? 'from-blue-500 to-indigo-500' : 'from-slate-500 to-gray-600'}`}>
+                              {usr.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{usr.name}</p>
+                                {isCurrentUser && (
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{usr.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">{getRoleBadge(usr.role)}</td>
+                        <td className="px-4 py-3">{getStatusBadge(usr.isActive)}</td>
+                        <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{formatDate(usr.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          {canEditUser ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => { setSelectedUser(usr); setIsEditUserModalOpen(true); }}
+                                className={`p-1.5 rounded-lg transition-all ${
+                                  theme === 'dark' ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-100 text-blue-600'
+                                }`}
+                                title={isCurrentUser ? 'Edit your profile' : 'Edit user'}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => { setSelectedUser(usr); setIsResetPasswordModalOpen(true); }}
+                                className={`p-1.5 rounded-lg transition-all ${
+                                  theme === 'dark' ? 'hover:bg-amber-500/20 text-amber-400' : 'hover:bg-amber-100 text-amber-600'
+                                }`}
+                                title={isCurrentUser ? 'Change your password' : 'Reset password'}
+                              >
+                                <Key className="w-4 h-4" />
+                              </button>
+                              {canDeleteUser && (
+                              <button
+                                onClick={() => { setSelectedUser(usr); setIsDeleteUserModalOpen(true); }}
+                                className={`p-1.5 rounded-lg transition-all ${
+                                  theme === 'dark' ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-100 text-red-600'
+                                }`}
+                                title="Delete user"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className={`text-xs ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );})}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className={`flex items-center justify-between rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} users
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className={`p-2 rounded-lg transition-all disabled:opacity-50 ${theme === 'dark' ? 'hover:bg-slate-700/50 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
+                  >
+                    <ChevronsLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className={`p-2 rounded-lg transition-all disabled:opacity-50 ${theme === 'dark' ? 'hover:bg-slate-700/50 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className={`px-3 py-1 text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`p-2 rounded-lg transition-all disabled:opacity-50 ${theme === 'dark' ? 'hover:bg-slate-700/50 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className={`p-2 rounded-lg transition-all disabled:opacity-50 ${theme === 'dark' ? 'hover:bg-slate-700/50 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}
+                  >
+                    <ChevronsRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
       </div>
+
+      {/* User Management Modals for Shop Administration */}
+      <CreateUserModal 
+        isOpen={isCreateUserModalOpen} 
+        onClose={() => setIsCreateUserModalOpen(false)} 
+        onSuccess={addUserToState} 
+      />
+      <EditUserModal 
+        user={selectedUser} 
+        isOpen={isEditUserModalOpen} 
+        onClose={() => { setIsEditUserModalOpen(false); setSelectedUser(null); }} 
+        onSuccess={updateUserInState} 
+      />
+      <ResetPasswordModal 
+        user={selectedUser} 
+        isOpen={isResetPasswordModalOpen} 
+        onClose={() => { setIsResetPasswordModalOpen(false); setSelectedUser(null); }} 
+      />
+      <DeleteUserModal 
+        user={selectedUser} 
+        isOpen={isDeleteUserModalOpen} 
+        onClose={() => { setIsDeleteUserModalOpen(false); setSelectedUser(null); }} 
+        onSuccess={removeUserFromState} 
+      />
     </div>
   );
 };

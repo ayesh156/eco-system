@@ -613,15 +613,14 @@ How can I help you today? 😊`,
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 group"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+        type="button"
+        className="fixed bottom-6 right-6 z-50 group hover:scale-110 transition-transform duration-300"
         aria-label="Open AI Assistant"
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.15) rotate(5deg)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
-        }}
       >
         <div className="relative">
           {/* Multi-layer animated glow effect - Creative attention grabber */}

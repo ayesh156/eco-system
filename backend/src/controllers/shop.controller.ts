@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import type { AuthRequest } from '../types/express.d';
 
 const prisma = new PrismaClient();
 
@@ -647,6 +648,130 @@ export const createShopForUser = async (req: Request, res: Response, next: NextF
         shop: result.shop,
         user: result.user,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// SECTION VISIBILITY MANAGEMENT (Super Admin only)
+// ==========================================
+
+// Get hidden sections for a shop
+// Returns both superAdminHiddenSections (managed by SuperAdmin) and adminHiddenSections (managed by Shop ADMIN)
+export const getShopSections = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const shop = await prisma.shop.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        hiddenSections: true,
+        adminHiddenSections: true,
+      },
+    });
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      hiddenSections: shop.hiddenSections || [],
+      adminHiddenSections: shop.adminHiddenSections || [],
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update hidden sections for a shop
+// SuperAdmin updates hiddenSections (affects ADMIN + USER)
+// Shop ADMIN updates adminHiddenSections (affects USER only)
+export const updateShopSections = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { hiddenSections, adminHiddenSections } = req.body;
+    const authReq = req as AuthRequest;
+    const userRole = authReq.user?.role;
+    
+    // Check if shop exists
+    const existingShop = await prisma.shop.findUnique({
+      where: { id },
+    });
+
+    if (!existingShop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found',
+      });
+    }
+
+    const updateData: { hiddenSections?: string[]; adminHiddenSections?: string[] } = {};
+
+    // SuperAdmin can update hiddenSections
+    if (userRole === 'SUPER_ADMIN' && hiddenSections !== undefined) {
+      if (!Array.isArray(hiddenSections)) {
+        return res.status(400).json({
+          success: false,
+          error: 'hiddenSections must be an array of strings',
+        });
+      }
+      if (!hiddenSections.every(s => typeof s === 'string')) {
+        return res.status(400).json({
+          success: false,
+          error: 'All hidden sections must be string paths',
+        });
+      }
+      updateData.hiddenSections = hiddenSections;
+    }
+
+    // Shop ADMIN can update adminHiddenSections
+    if ((userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && adminHiddenSections !== undefined) {
+      if (!Array.isArray(adminHiddenSections)) {
+        return res.status(400).json({
+          success: false,
+          error: 'adminHiddenSections must be an array of strings',
+        });
+      }
+      if (!adminHiddenSections.every(s => typeof s === 'string')) {
+        return res.status(400).json({
+          success: false,
+          error: 'All admin hidden sections must be string paths',
+        });
+      }
+      updateData.adminHiddenSections = adminHiddenSections;
+    }
+
+    // If no valid update data, return error
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid section data to update',
+      });
+    }
+
+    // Update shop with new hidden sections
+    const updatedShop = await prisma.shop.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        hiddenSections: true,
+        adminHiddenSections: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Section visibility updated successfully',
+      hiddenSections: updatedShop.hiddenSections,
+      adminHiddenSections: updatedShop.adminHiddenSections,
     });
   } catch (error) {
     next(error);

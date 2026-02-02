@@ -30,6 +30,8 @@ import {
   ChevronsRight,
   Trash2,
   LayoutDashboard,
+  Activity,
+  LogIn,
 } from 'lucide-react';
 
 // API URL from environment
@@ -106,6 +108,7 @@ export const AdminDashboard: React.FC = () => {
   const activeSection = useMemo(() => {
     if (location.pathname === '/admin/shops') return 'shops';
     if (location.pathname === '/admin/users') return 'users';
+    if (location.pathname === '/admin/activity') return 'activity';
     return 'overview';
   }, [location.pathname]);
 
@@ -916,6 +919,179 @@ export const AdminDashboard: React.FC = () => {
               }}
             />
           )}
+        </div>
+      )}
+
+      {/* ===================================
+          ACTIVITY LOG SECTION
+      =================================== */}
+      {activeSection === 'activity' && (
+        <div className="space-y-6">
+          {/* Activity Header */}
+          <div className={`rounded-2xl border p-6 ${
+            theme === 'dark'
+              ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50'
+              : 'bg-white border-slate-200 shadow-sm'
+          }`}>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 shadow-lg shadow-purple-500/20">
+                <Activity className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  Activity Log
+                </h2>
+                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Monitor system-wide activities and changes across all shops
+                </p>
+              </div>
+            </div>
+
+            {/* Activity Filters */}
+            <div className="flex flex-wrap gap-3">
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${
+                theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <Search className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                <input
+                  type="text"
+                  placeholder="Search activities..."
+                  className={`bg-transparent border-none outline-none text-sm ${
+                    theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
+                  }`}
+                />
+              </div>
+              <select className={`px-4 py-2 rounded-xl border text-sm ${
+                theme === 'dark' 
+                  ? 'bg-slate-800/50 border-slate-700/50 text-white' 
+                  : 'bg-white border-slate-200 text-slate-900'
+              }`}>
+                <option value="all">All Activities</option>
+                <option value="user">User Actions</option>
+                <option value="shop">Shop Changes</option>
+                <option value="invoice">Invoice Activity</option>
+                <option value="system">System Events</option>
+              </select>
+              <select className={`px-4 py-2 rounded-xl border text-sm ${
+                theme === 'dark' 
+                  ? 'bg-slate-800/50 border-slate-700/50 text-white' 
+                  : 'bg-white border-slate-200 text-slate-900'
+              }`}>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="90d">Last 90 Days</option>
+                <option value="all">All Time</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Activity Timeline */}
+          <div className={`rounded-2xl border overflow-hidden ${
+            theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+          }`}>
+            <div className={`px-6 py-4 border-b ${
+              theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                Recent Activity
+              </h3>
+            </div>
+            <div className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}`}>
+              {/* Sample Activity Items */}
+              {[
+                { 
+                  type: 'user_created', 
+                  message: 'New user "John Doe" was created', 
+                  shop: 'Ecotec Mobile', 
+                  time: '2 minutes ago',
+                  icon: UserPlus,
+                  color: 'from-emerald-500 to-green-500'
+                },
+                { 
+                  type: 'shop_updated', 
+                  message: 'Shop settings updated for "Tech Store"', 
+                  shop: 'Tech Store', 
+                  time: '15 minutes ago',
+                  icon: Building2,
+                  color: 'from-blue-500 to-cyan-500'
+                },
+                { 
+                  type: 'invoice_created', 
+                  message: 'New invoice INV-10260045 created', 
+                  shop: 'Mobile World', 
+                  time: '1 hour ago',
+                  icon: FileText,
+                  color: 'from-purple-500 to-pink-500'
+                },
+                { 
+                  type: 'user_login', 
+                  message: 'Admin user logged in', 
+                  shop: 'Ecotec Mobile', 
+                  time: '2 hours ago',
+                  icon: LogIn,
+                  color: 'from-amber-500 to-orange-500'
+                },
+                { 
+                  type: 'shop_created', 
+                  message: 'New shop "Galaxy Electronics" registered', 
+                  shop: 'Galaxy Electronics', 
+                  time: '5 hours ago',
+                  icon: Store,
+                  color: 'from-teal-500 to-cyan-500'
+                },
+                { 
+                  type: 'password_reset', 
+                  message: 'Password reset for user "manager@shop.com"', 
+                  shop: 'Tech Store', 
+                  time: '1 day ago',
+                  icon: Key,
+                  color: 'from-red-500 to-rose-500'
+                },
+              ].map((activity, index) => {
+                const ActivityIcon = activity.icon;
+                return (
+                  <div 
+                    key={index}
+                    className={`px-6 py-4 transition-colors ${
+                      theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`p-2.5 rounded-xl bg-gradient-to-r ${activity.color} shadow-lg flex-shrink-0`}>
+                        <ActivityIcon className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          {activity.message}
+                        </p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            {activity.shop}
+                          </span>
+                          <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                            •
+                          </span>
+                          <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {activity.time}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* View More */}
+            <div className={`px-6 py-4 border-t ${
+              theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <button className={`w-full text-center text-sm font-medium ${
+                theme === 'dark' ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-700'
+              }`}>
+                Load More Activities
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

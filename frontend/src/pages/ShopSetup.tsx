@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { SearchableSelect } from '../components/ui/searchable-select';
 import { 
   Store, 
   MapPin, 
@@ -335,7 +336,7 @@ export const ShopSetup: React.FC = () => {
                     value={formData.businessRegNo}
                     onChange={handleChange}
                     placeholder="BR/2024/12345"
-                    className={`w-full px-3 py-2 rounded-lg border text-sm transition-all ${
+                    className={`w-full px-3 py-2 rounded-xl border text-sm transition-all ${
                       theme === 'dark'
                         ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500'
                         : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
@@ -354,7 +355,7 @@ export const ShopSetup: React.FC = () => {
                     value={formData.taxId}
                     onChange={handleChange}
                     placeholder="123456789V"
-                    className={`w-full px-3 py-2 rounded-lg border text-sm transition-all ${
+                    className={`w-full px-3 py-2 rounded-xl border text-sm transition-all ${
                       theme === 'dark'
                         ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500'
                         : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
@@ -367,25 +368,23 @@ export const ShopSetup: React.FC = () => {
                   <label className={`block text-xs font-medium mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     Currency
                   </label>
-                  <div className="relative">
-                    <DollarSign className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
-                      theme === 'dark' ? 'text-slate-500' : 'text-slate-400'
-                    }`} />
-                    <select
-                      name="currency"
-                      value={formData.currency}
-                      onChange={handleChange}
-                      className={`w-full pl-9 pr-3 py-2 rounded-lg border text-sm transition-all ${
-                        theme === 'dark'
-                          ? 'bg-slate-800/50 border-slate-700/50 text-white'
-                          : 'bg-white border-slate-200 text-slate-900'
-                      }`}
-                    >
-                      <option value="LKR">LKR (Rs.)</option>
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                    </select>
-                  </div>
+                  <SearchableSelect
+                    value={formData.currency}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}
+                    options={[
+                      { value: 'LKR', label: 'LKR (Rs.)' },
+                      { value: 'USD', label: 'USD ($)' },
+                      { value: 'EUR', label: 'EUR (€)' },
+                      { value: 'GBP', label: 'GBP (£)' },
+                      { value: 'INR', label: 'INR (₹)' },
+                      { value: 'AUD', label: 'AUD (A$)' },
+                      { value: 'CAD', label: 'CAD (C$)' },
+                    ]}
+                    placeholder="Select currency"
+                    icon={<DollarSign className="w-4 h-4" />}
+                    className="text-sm"
+                    theme={theme}
+                  />
                 </div>
 
                 {/* Tax Rate */}
@@ -406,7 +405,7 @@ export const ShopSetup: React.FC = () => {
                       max="100"
                       step="0.1"
                       placeholder="0"
-                      className={`w-full pl-9 pr-3 py-2 rounded-lg border text-sm transition-all ${
+                      className={`w-full pl-9 pr-3 py-2 rounded-xl border text-sm transition-all ${
                         theme === 'dark'
                           ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500'
                           : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'

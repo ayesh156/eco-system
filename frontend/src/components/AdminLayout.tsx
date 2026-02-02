@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useShopBranding } from '../contexts/ShopBrandingContext';
+import { useShopSections } from '../contexts/ShopSectionsContext';
 import {
   Package, FileText, Users, LayoutDashboard, Settings, Database,
   Moon, Sun, Menu, X, ChevronLeft, ChevronRight, Bell, Search,
   User, HelpCircle, ChevronDown, Sparkles, TrendingUp,
   FolderTree, Building, Shield, Truck, ClipboardCheck, Wrench, Layers, ClipboardList,
-  Calculator, FileCheck, Wallet, Brain, Zap, StickyNote, CalendarDays, Lightbulb, LogOut, Image
+  Calculator, FileCheck, Wallet, Brain, Zap, StickyNote, CalendarDays, Lightbulb, LogOut
 } from 'lucide-react';
 import { useIsMobile } from '../hooks/use-mobile';
 import ecosystemLogo from '../assets/logo.png';
@@ -18,6 +19,7 @@ interface SubNavItem {
   path: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  isDisabled?: boolean;
 }
 
 interface NavItem {
@@ -26,6 +28,7 @@ interface NavItem {
   label: string;
   badge: string | null;
   subItems?: SubNavItem[];
+  isDisabled?: boolean;
 }
 
 interface AdminLayoutProps {
@@ -36,6 +39,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { theme, toggleTheme, aiAutoFillEnabled, toggleAiAutoFill } = useTheme();
   const { user, logout, isViewingShop, viewingShop, exitViewingShop } = useAuth();
   const { branding } = useShopBranding();
+  const { isSectionHidden, isSuperAdminHidden, isAdminHidden, hiddenSections, adminHiddenSections, isLoading: sectionsLoading } = useShopSections();
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -227,34 +231,147 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   // Select navigation based on user role and viewing state
   // SUPER_ADMIN viewing a shop should see shop navigation
-  const navItems: NavItem[] = (user?.role === 'SUPER_ADMIN' && !isViewingShop) 
+  const rawNavItems: NavItem[] = (user?.role === 'SUPER_ADMIN' && !isViewingShop) 
     ? superAdminNavItems 
     : shopNavItems;
 
+  // Check if user can manage sections (SuperAdmin viewing shop OR Shop ADMIN)
+  const isSuperAdminViewingShop = user?.role === 'SUPER_ADMIN' && isViewingShop;
+  const isShopAdmin = user?.role === 'ADMIN';
+  const canManageSections = isSuperAdminViewingShop || isShopAdmin;
+
+  // Filter out hidden sections from navigation
+  // For SuperAdmin viewing a shop OR Shop ADMIN: show all sections but mark hidden ones with badge
+  // For regular users: filter out hidden sections completely
+  // For SuperAdmin/Shop ADMIN: Show all with appropriate badges
+  const navItems = useMemo(() => {
+    console.log('🔄 Recalculating navItems.');
+    console.log('User role:', user?.role);
+    console.log('Is viewing shop:', isViewingShop);
+    console.log('Can manage sections:', canManageSections);
+    console.log('Hidden sections (SuperAdmin):', hiddenSections);
+    console.log('Admin hidden sections:', adminHiddenSections);
+    
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+    const isShopAdmin = user?.role === 'ADMIN';
+    
+    if (isSuperAdmin && isViewingShop) {
+      // SuperAdmin viewing shop: show ALL sections, mark SuperAdmin-hidden as disabled
+      return rawNavItems.map(item => {
+        const itemDisabled = isSuperAdminHidden(item.path);
+        console.log(`SuperAdmin - Item ${item.path} - Hidden: ${itemDisabled}`);
+        return {
+          ...item,
+          isDisabled: itemDisabled,
+          subItems: item.subItems?.map(sub => ({
+            ...sub,
+            isDisabled: isSuperAdminHidden(sub.path)
+          }))
+        };
+      });
+    } else if (isShopAdmin) {
+      // Shop ADMIN: show sections NOT hidden by SuperAdmin, mark Admin-hidden as disabled
+      return rawNavItems
+        .filter(item => !isSuperAdminHidden(item.path)) // Filter out SuperAdmin hidden
+        .map(item => {
+          const itemDisabled = isAdminHidden(item.path); // Mark Admin-hidden as disabled
+          console.log(`Shop ADMIN - Item ${item.path} - Hidden from users: ${itemDisabled}`);
+          return {
+            ...item,
+            isDisabled: itemDisabled,
+            subItems: item.subItems
+              ?.filter(sub => !isSuperAdminHidden(sub.path)) // Filter out SuperAdmin hidden
+              ?.map(sub => ({
+                ...sub,
+                isDisabled: isAdminHidden(sub.path) // Mark Admin-hidden as disabled
+              }))
+          };
+        })
+        .filter(item => !item.subItems || item.subItems.length > 0);
+    } else {
+      // Regular users: filter out ALL hidden sections (both SuperAdmin and Admin hidden)
+      return rawNavItems
+        .filter(item => !isSectionHidden(item.path))
+        .map(item => {
+          if (item.subItems) {
+            return {
+              ...item,
+              subItems: item.subItems.filter(sub => !isSectionHidden(sub.path))
+            };
+          }
+          return item;
+        })
+        // Remove parent items that have no visible sub-items
+        .filter(item => !item.subItems || item.subItems.length > 0);
+    }
+  }, [rawNavItems, isSectionHidden, isSuperAdminHidden, isAdminHidden, hiddenSections, adminHiddenSections, canManageSections, user?.role, isViewingShop]);
+
   // Bottom nav items - different for SUPER_ADMIN (when not viewing shop)
-  const bottomNavItems: NavItem[] = (user?.role === 'SUPER_ADMIN' && !isViewingShop)
+  // Shop Admin features (Users, Branding, Sections) are now inside Settings page for both SHOP_ADMIN and SUPER_ADMIN viewing a shop
+  const rawBottomNavItems: NavItem[] = (user?.role === 'SUPER_ADMIN' && !isViewingShop)
     ? [
         { path: '/settings', icon: Settings, label: 'Settings', badge: null },
         { path: '/help', icon: HelpCircle, label: 'Help Center', badge: null },
       ]
     : [
-        // Show Shop Admin for both ADMIN users AND SUPER_ADMIN viewing a shop
-        ...((user?.role === 'ADMIN' || (user?.role === 'SUPER_ADMIN' && isViewingShop)) ? [
-          { 
-            path: '/shop-admin', 
-            icon: Shield, 
-            label: 'Shop Admin', 
-            badge: null,
-            subItems: [
-              { path: '/shop-admin/users', icon: Users, label: 'Users' },
-              { path: '/shop-admin/branding', icon: Image, label: 'Branding' },
-            ]
-          },
-        ] : []),
-        { path: '/data-export', icon: Database, label: 'Data Export', badge: null },
-        { path: '/settings', icon: Settings, label: 'Settings', badge: null },
-        { path: '/help', icon: HelpCircle, label: 'Help Center', badge: null },
-      ];
+          // For SHOP_ADMIN and SUPER_ADMIN viewing a shop: Shop Admin tabs are inside Settings
+          { path: '/data-export', icon: Database, label: 'Data Export', badge: null },
+          { path: '/settings', icon: Settings, label: 'Settings', badge: null },
+          { path: '/help', icon: HelpCircle, label: 'Help Center', badge: null },
+        ];
+
+  // Filter hidden sections from bottom nav items
+  const bottomNavItems = useMemo(() => {
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+    const isShopAdmin = user?.role === 'ADMIN';
+    
+    if (isSuperAdmin && isViewingShop) {
+      // SuperAdmin viewing shop: show ALL, mark SuperAdmin-hidden as disabled
+      return rawBottomNavItems.map(item => {
+        const itemDisabled = isSuperAdminHidden(item.path);
+        return {
+          ...item,
+          isDisabled: itemDisabled,
+          subItems: item.subItems?.map(sub => ({
+            ...sub,
+            isDisabled: isSuperAdminHidden(sub.path)
+          }))
+        };
+      });
+    } else if (isShopAdmin) {
+      // Shop ADMIN: filter SuperAdmin-hidden, mark Admin-hidden as disabled
+      return rawBottomNavItems
+        .filter(item => !isSuperAdminHidden(item.path))
+        .map(item => {
+          const itemDisabled = isAdminHidden(item.path);
+          return {
+            ...item,
+            isDisabled: itemDisabled,
+            subItems: item.subItems
+              ?.filter(sub => !isSuperAdminHidden(sub.path))
+              ?.map(sub => ({
+                ...sub,
+                isDisabled: isAdminHidden(sub.path)
+              }))
+          };
+        })
+        .filter(item => !item.subItems || item.subItems.length > 0);
+    } else {
+      // Regular users: filter out ALL hidden sections
+      return rawBottomNavItems
+        .filter(item => !isSectionHidden(item.path))
+        .map(item => {
+          if (item.subItems) {
+            return {
+              ...item,
+              subItems: item.subItems.filter(sub => !isSectionHidden(sub.path))
+            };
+          }
+          return item;
+        })
+        .filter(item => !item.subItems || item.subItems.length > 0);
+    }
+  }, [rawBottomNavItems, isSectionHidden, isSuperAdminHidden, isAdminHidden, hiddenSections, adminHiddenSections, canManageSections, user?.role, isViewingShop]);
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
   const isExactActive = (path: string) => location.pathname === path;
@@ -332,6 +449,21 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               Main Menu
             </span>
           )}
+          {/* Loading Skeleton for nav items */}
+          {sectionsLoading ? (
+            <div className="mt-2 space-y-2">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${
+                  theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-100'
+                }`}>
+                  <div className={`w-5 h-5 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} animate-pulse`} />
+                  {!sidebarCollapsed && (
+                    <div className={`h-4 rounded flex-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} animate-pulse`} />
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
           <div className="mt-2 space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -339,6 +471,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               const isExpanded = expandedMenus.includes(item.path);
               const parentActive = isParentActive(item);
               const exactActive = isExactActive(item.path);
+              const isItemDisabled = item.isDisabled;
 
               return (
                 <div key={item.path} className="relative">
@@ -348,6 +481,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       data-menu-id={item.path}
                       onClick={(e) => {
                         e.stopPropagation();
+                        // Allow interaction even for disabled items (SuperAdmin can navigate)
                         if (sidebarCollapsed) {
                           const rect = e.currentTarget.getBoundingClientRect();
                           setPopoverPosition(rect.top);
@@ -356,14 +490,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                           toggleMenu(item.path);
                         }
                       }}
-                      className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 cursor-pointer ${parentActive
+                      className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+                        parentActive
                           ? theme === 'dark'
-                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10'
-                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10 cursor-pointer'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10 cursor-pointer'
                           : theme === 'dark'
-                            ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                        }`}
+                            ? 'text-slate-400 hover:text-white hover:bg-slate-800/50 cursor-pointer'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer'
+                      }`}
                       title={sidebarCollapsed ? item.label : undefined}
                     >
                       {/* Active indicator bar */}
@@ -371,14 +506,26 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
                       )}
 
-                      <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${parentActive ? 'text-emerald-500' : ''
-                        }`} />
+                      <Icon className={`w-5 h-5 flex-shrink-0 transition-transform ${
+                        parentActive 
+                          ? 'text-emerald-500 group-hover:scale-110' 
+                          : 'group-hover:scale-110'
+                      }`} />
 
                       {!sidebarCollapsed && (
                         <>
                           <span className="flex-1">
                             {item.label}
                           </span>
+                          {isItemDisabled && (
+                            <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                              theme === 'dark'
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : 'bg-amber-100 text-amber-700 border border-amber-200'
+                            }`}>
+                              Hidden
+                            </span>
+                          )}
                           {item.badge && (
                             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${theme === 'dark'
                                 ? 'bg-emerald-500/20 text-emerald-400'
@@ -467,6 +614,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       {!sidebarCollapsed && (
                         <>
                           <span className="flex-1">{item.label}</span>
+                          {isItemDisabled && (
+                            <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                              theme === 'dark'
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : 'bg-amber-100 text-amber-700 border border-amber-200'
+                            }`}>
+                              Hidden
+                            </span>
+                          )}
                           {item.badge && (
                             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${theme === 'dark'
                                 ? 'bg-emerald-500/20 text-emerald-400'
@@ -500,6 +656,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       {item.subItems?.map((subItem) => {
                         const SubIcon = subItem.icon;
                         const subActive = isActive(subItem.path);
+                        const isSubDisabled = subItem.isDisabled;
+                        
                         return (
                           <Link
                             key={subItem.path}
@@ -518,7 +676,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                                 }`} />
                             )}
                             <SubIcon className={`w-4 h-4 flex-shrink-0 ${subActive ? 'text-emerald-500' : ''}`} />
-                            <span>{subItem.label}</span>
+                            <span className="flex-1">{subItem.label}</span>
+                            {isSubDisabled && (
+                              <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full ${
+                                theme === 'dark'
+                                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                  : 'bg-amber-100 text-amber-700 border border-amber-200'
+                              }`}>
+                                Hidden
+                              </span>
+                            )}
                           </Link>
                         );
                       })}
@@ -528,6 +695,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               );
             })}
           </div>
+          )}
         </div>
 
         {/* Bottom Section */}
@@ -544,6 +712,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               const isExpanded = expandedMenus.includes(item.path);
               const parentActive = isParentActive(item);
               const exactActive = isExactActive(item.path);
+              const isBottomItemDisabled = item.isDisabled;
 
               return (
                 <div key={item.path} className="relative">
@@ -552,6 +721,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       data-menu-id={item.path}
                       onClick={(e) => {
                         e.stopPropagation();
+                        // Allow interaction even for disabled items (SuperAdmin can navigate)
                         if (sidebarCollapsed) {
                           const rect = e.currentTarget.getBoundingClientRect();
                           setPopoverPosition(rect.top);
@@ -560,25 +730,35 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                           toggleMenu(item.path);
                         }
                       }}
-                      className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 cursor-pointer ${parentActive
+                      className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 ${
+                        parentActive
                           ? theme === 'dark'
-                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10'
-                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10 cursor-pointer'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10 cursor-pointer'
                           : theme === 'dark'
-                            ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                        }`}
+                            ? 'text-slate-400 hover:text-white hover:bg-slate-800/50 cursor-pointer'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer'
+                      }`}
                       title={sidebarCollapsed ? item.label : undefined}
                     >
                       {parentActive && (
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
                       )}
 
-                      <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${parentActive ? 'text-emerald-500' : ''}`} />
+                      <Icon className={`w-5 h-5 flex-shrink-0 transition-transform ${
+                        parentActive ? 'text-emerald-500 group-hover:scale-110' : 'group-hover:scale-110'
+                      }`} />
 
                       {!sidebarCollapsed && (
                         <>
                           <span className="flex-1">{item.label}</span>
+                          {isBottomItemDisabled && (
+                            <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                              theme === 'dark'
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : 'bg-amber-100 text-amber-700 border border-amber-200'
+                            }`}>Hidden</span>
+                          )}
                           <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''} ${parentActive ? 'text-emerald-500' : ''}`} />
                         </>
                       )}
@@ -645,7 +825,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
                       )}
                       <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${exactActive ? 'text-emerald-500' : ''}`} />
-                      {!sidebarCollapsed && <span>{item.label}</span>}
+                      {!sidebarCollapsed && (
+                        <>
+                          <span className="flex-1">{item.label}</span>
+                          {isBottomItemDisabled && (
+                            <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                              theme === 'dark'
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : 'bg-amber-100 text-amber-700 border border-amber-200'
+                            }`}>Hidden</span>
+                          )}
+                        </>
+                      )}
 
                       {sidebarCollapsed && (
                         <div className={`absolute left-full ml-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 ${theme === 'dark' ? 'bg-slate-800 text-white shadow-xl' : 'bg-slate-900 text-white shadow-xl'}`}>
@@ -661,6 +852,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       {item.subItems?.map((subItem) => {
                         const SubIcon = subItem.icon;
                         const subActive = isActive(subItem.path);
+                        const isSubDisabled = subItem.isDisabled;
+                        
                         return (
                           <Link
                             key={subItem.path}
@@ -678,7 +871,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                               <div className={`absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full ${theme === 'dark' ? 'bg-emerald-500' : 'bg-emerald-500'}`} />
                             )}
                             <SubIcon className={`w-4 h-4 flex-shrink-0 ${subActive ? 'text-emerald-500' : ''}`} />
-                            <span>{subItem.label}</span>
+                            <span className="flex-1">{subItem.label}</span>
+                            {isSubDisabled && (
+                              <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full ${
+                                theme === 'dark'
+                                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                  : 'bg-amber-100 text-amber-700 border border-amber-200'
+                              }`}>
+                                Hidden
+                              </span>
+                            )}
                           </Link>
                         );
                       })}
@@ -779,6 +981,20 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
         {/* Navigation */}
         <nav ref={mobileSidebarNavRef} className="px-3 py-4 space-y-1 overflow-y-auto max-h-[calc(100vh-5rem)]">
+          {/* Loading Skeleton for mobile nav */}
+          {sectionsLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${
+                  theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-100'
+                }`}>
+                  <div className={`w-5 h-5 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} animate-pulse`} />
+                  <div className={`h-4 rounded flex-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'} animate-pulse`} />
+                </div>
+              ))}
+            </div>
+          ) : (
+          <>
           {navItems.map((item) => {
             const Icon = item.icon;
             const hasSubItems = item.subItems && item.subItems.length > 0;
@@ -879,6 +1095,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               </div>
             );
           })}
+          </>
+          )}
 
           <div className={`my-4 border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`} />
 

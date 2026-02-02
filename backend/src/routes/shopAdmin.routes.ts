@@ -204,7 +204,7 @@ router.post('/users', sensitiveRateLimiter, [
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Password must contain uppercase, lowercase, and number'),
   body('name').trim().isLength({ min: 2, max: 100 }),
-  body('role').isIn(['MANAGER', 'STAFF']).withMessage('Can only create MANAGER or STAFF users'),
+  body('role').isIn(['ADMIN', 'MANAGER', 'STAFF']).withMessage('Invalid role'),
 ], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
@@ -213,10 +213,11 @@ router.post('/users', sensitiveRateLimiter, [
     }
 
     const authReq = req as AuthRequest;
+    const isSuperAdmin = authReq.user?.role === 'SUPER_ADMIN';
     
     // For SUPER_ADMIN, allow shopId in body; for ADMIN, use their own shop
     let shopId: string | null;
-    if (authReq.user?.role === 'SUPER_ADMIN' && req.body.shopId) {
+    if (isSuperAdmin && req.body.shopId) {
       shopId = req.body.shopId;
     } else {
       shopId = getEffectiveShopId(req);
@@ -228,11 +229,19 @@ router.post('/users', sensitiveRateLimiter, [
 
     const { email, password, name, role } = req.body;
 
-    // SECURITY: Shop admins can only create MANAGER or STAFF roles
-    if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
+    // SECURITY: Only SUPER_ADMIN can create ADMIN users; regular shop admins can only create MANAGER or STAFF
+    if (role === 'ADMIN' && !isSuperAdmin) {
       return res.status(403).json({ 
         success: false, 
-        message: 'You can only create MANAGER or STAFF users' 
+        message: 'Only Super Admin can create ADMIN users' 
+      });
+    }
+
+    // SECURITY: Nobody can create SUPER_ADMIN users via this endpoint
+    if (role === 'SUPER_ADMIN') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Cannot create SUPER_ADMIN users' 
       });
     }
 
@@ -330,13 +339,23 @@ router.put('/users/:id', sensitiveRateLimiter, [
     // Determine if editing own account
     const isOwnAccount = user.id === currentUserId;
 
-    // SECURITY: Prevent role elevation - only block if trying to CHANGE to ADMIN/SUPER_ADMIN
-    // (If user is already ADMIN and role='ADMIN' is sent, that's not a change - ignore it)
-    if (role && role !== user.role && (role === 'ADMIN' || role === 'SUPER_ADMIN')) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Cannot elevate user to ADMIN or SUPER_ADMIN' 
-      });
+    // SECURITY: Prevent unauthorized role changes
+    if (role && role !== user.role) {
+      // Nobody can elevate to SUPER_ADMIN
+      if (role === 'SUPER_ADMIN') {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Cannot elevate user to SUPER_ADMIN' 
+        });
+      }
+      
+      // Only SUPER_ADMIN can change role to/from ADMIN
+      if ((role === 'ADMIN' || user.role === 'ADMIN') && !isSuperAdmin) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Only Super Admin can modify ADMIN role' 
+        });
+      }
     }
 
     // Check email uniqueness if changing

@@ -11,6 +11,8 @@ import {
   listAllShops,
   toggleShopStatus,
   createShopForUser,
+  getShopSections,
+  updateShopSections,
 } from '../controllers/shop.controller';
 import { protect, authorize, requireShop, requireShopAccess } from '../middleware/auth';
 import { shopRegistrationRateLimiter, sensitiveRateLimiter } from '../middleware/rateLimiter';
@@ -59,6 +61,18 @@ router.post('/:id/users', protect, requireShopAccess, authorize('ADMIN', 'SUPER_
 
 // Update user role/status
 router.put('/:id/users/:userId', protect, requireShopAccess, authorize('ADMIN', 'SUPER_ADMIN'), sensitiveRateLimiter, updateUserRole);
+
+// ==========================================
+// SECTION VISIBILITY (shop access or super admin)
+// ==========================================
+
+// Get hidden sections for a shop (for navigation filtering)
+router.get('/:id/sections', protect, requireShopAccess, getShopSections);
+
+// Update hidden sections
+// SuperAdmin can update hiddenSections (affects ADMIN + USER)
+// Shop ADMIN can update adminHiddenSections (affects USER only)
+router.put('/:id/sections', protect, requireShopAccess, authorize('ADMIN', 'SUPER_ADMIN'), sensitiveRateLimiter, updateShopSections);
 
 // ==========================================
 // SUPER ADMIN ROUTES (platform-wide)

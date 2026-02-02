@@ -43,6 +43,13 @@ model Shop {
   paymentReminderTemplate   String?   @db.Text
   overdueReminderTemplate   String?   @db.Text
   
+  // Section Visibility (JSON array of hidden section paths)
+  // hiddenSections: SuperAdmin managed - hidden from ADMIN + USER
+  // adminHiddenSections: Shop ADMIN managed - hidden from USER only
+  // e.g., ["/services", "/quotations", "/estimates", "/cash-management"]
+  hiddenSections            String[]  @default([])
+  adminHiddenSections       String[]  @default([])
+  
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
