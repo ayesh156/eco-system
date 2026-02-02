@@ -8,13 +8,15 @@
       "memory": 512
     }
   },
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/index.ts"
-    }
-  ],
   "routes": [
+    {
+      "src": "/api/v1/(.*)",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.ts"
+    },
     {
       "src": "/assets/(.*)",
       "dest": "/assets/$1",
@@ -23,7 +25,7 @@
       }
     },
     {
-      "src": "/((?!api/).*)",
+      "src": "/((?!api).*)",
       "dest": "/index.html"
     }
   ]
