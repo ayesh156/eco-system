@@ -233,6 +233,10 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
+          // Force no-store to prevent caching of old data that didn't have hiddenSections
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
       });
 
