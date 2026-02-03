@@ -1,6 +1,6 @@
 // Vercel Serverless API Handler - Complete CRUD with all features
 // Optimized for Vercel Pro with caching and connection pooling
-// VERSION: 2026-02-03-v4 (sections route fixed - no file-based routing)
+// VERSION: 2026-02-03-v5 (CORS headers fixed for cache busting)
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient, InvoiceStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -378,7 +378,7 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-ID');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-ID, Cache-Control, Pragma, Expires');
   res.setHeader('Access-Control-Expose-Headers', 'set-cookie, X-Request-ID');
 }
 
