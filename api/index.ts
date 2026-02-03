@@ -3259,8 +3259,11 @@ Best regards,
 
     // GET shop sections (hiddenSections + adminHiddenSections)
     const shopSectionsMatch = path.match(/^\/api\/v1\/shops\/([^/]+)\/sections$/);
+    console.log('🔍 Section route check:', { path, method, matched: !!shopSectionsMatch });
+    
     if (shopSectionsMatch && method === 'GET') {
       const shopIdParam = shopSectionsMatch[1];
+      console.log('📦 Fetching sections for shop:', shopIdParam);
       
       const shop = await prisma.shop.findUnique({
         where: { id: shopIdParam },
@@ -3286,8 +3289,10 @@ Best regards,
     // SuperAdmin updates hiddenSections (affects ADMIN + USER)
     // Shop ADMIN updates adminHiddenSections (affects USER only)
     if (shopSectionsMatch && (method === 'PUT' || method === 'PATCH')) {
+      console.log('🔧 Updating sections for shop:', shopSectionsMatch[1]);
       const shopIdParam = shopSectionsMatch[1];
       const userRole = getUserRoleFromToken(req);
+      console.log('👤 User role:', userRole);
       
       if (!userRole) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
@@ -3529,6 +3534,7 @@ Best regards,
     }
 
     // 404
+    console.error('❌ 404 Route not found:', { path, method });
     return res.status(404).json({ success: false, error: 'Route not found', path, method });
 
   } catch (error) {
