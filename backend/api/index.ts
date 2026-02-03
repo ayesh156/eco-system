@@ -3748,18 +3748,21 @@ Best regards,
 
     // Shop Admin Users List
     if (path === '/api/v1/shop-admin/users' && method === 'GET') {
-      const shopId = getShopIdFromToken(req);
-      if (!shopId) {
+      // Support both shop admin's own shopId and SuperAdmin with shopId query param
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
       const users = await db.user.findMany({
-        where: { shopId },
+        where: { shopId: effectiveShopId },
         select: {
           id: true,
           email: true,
           name: true,
           role: true,
+          isActive: true,
+          lastLogin: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -3771,8 +3774,16 @@ Best regards,
 
     // Shop Admin Create User
     if (path === '/api/v1/shop-admin/users' && method === 'POST') {
-      const shopId = getShopIdFromToken(req);
-      if (!shopId) {
+      // Support both shop admin's own shopId and SuperAdmin with shopId in body/query
+      let effectiveShopId = getShopIdFromToken(req);
+      
+      // SuperAdmin can create users for any shop by providing shopId in body
+      const userRole = getUserRoleFromToken(req);
+      if (userRole === 'SUPER_ADMIN' && body.shopId) {
+        effectiveShopId = body.shopId;
+      }
+      
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
@@ -3791,14 +3802,17 @@ Best regards,
           password: hashedPassword,
           name,
           role: role || 'STAFF',
-          shopId,
+          shopId: effectiveShopId,
+          isActive: true,
         },
         select: {
           id: true,
           email: true,
           name: true,
           role: true,
+          isActive: true,
           createdAt: true,
+          updatedAt: true,
         },
       });
 
@@ -3808,17 +3822,18 @@ Best regards,
     // Shop Admin Update/Delete User
     const shopAdminUserMatch = path.match(/^\/api\/v1\/shop-admin\/users\/([^/]+)$/);
     if (shopAdminUserMatch && (method === 'PUT' || method === 'PATCH')) {
-      const shopId = getShopIdFromToken(req);
-      if (!shopId) {
+      // Support both shop admin's own shopId and SuperAdmin with shopId query param
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
       const userId = shopAdminUserMatch[1];
-      const { name, email, role, password } = body;
+      const { name, email, role, password, isActive } = body;
 
       // Verify user belongs to this shop
       const existingUser = await db.user.findFirst({
-        where: { id: userId, shopId },
+        where: { id: userId, shopId: effectiveShopId },
       });
       if (!existingUser) {
         return res.status(404).json({ success: false, message: 'User not found' });
@@ -3829,6 +3844,7 @@ Best regards,
       if (email) updateData.email = email;
       if (role) updateData.role = role;
       if (password) updateData.password = await bcrypt.hash(password, 12);
+      if (isActive !== undefined) updateData.isActive = isActive;
 
       const updatedUser = await db.user.update({
         where: { id: userId },
@@ -3838,6 +3854,8 @@ Best regards,
           email: true,
           name: true,
           role: true,
+          isActive: true,
+          lastLogin: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -3847,8 +3865,9 @@ Best regards,
     }
 
     if (shopAdminUserMatch && method === 'DELETE') {
-      const shopId = getShopIdFromToken(req);
-      if (!shopId) {
+      // Support both shop admin's own shopId and SuperAdmin with shopId query param
+      const effectiveShopId = getEffectiveShopId(req, query);
+      if (!effectiveShopId) {
         return res.status(401).json({ success: false, message: 'Unauthorized' });
       }
 
@@ -3856,7 +3875,7 @@ Best regards,
 
       // Verify user belongs to this shop
       const existingUser = await db.user.findFirst({
-        where: { id: userId, shopId },
+        where: { id: userId, shopId: effectiveShopId },
       });
       if (!existingUser) {
         return res.status(404).json({ success: false, message: 'User not found' });
