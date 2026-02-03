@@ -204,15 +204,16 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [hiddenSections, setHiddenSections] = useState<string[]>([]);
   const [adminHiddenSections, setAdminHiddenSections] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true); // Start with loading true to prevent flash
-  const [, setHasInitialized] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [lastFetchedShopId, setLastFetchedShopId] = useState<string | null>(null);
 
   // Get effective shop ID (viewing shop for Super Admin, own shop otherwise)
   const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : user?.shop?.id;
 
   // Fetch hidden sections from API
-  const fetchHiddenSections = useCallback(async () => {
+  const fetchHiddenSections = useCallback(async (forceRefresh = false) => {
     const token = getAccessToken();
-    console.log('🔍 Fetching hidden sections for shop:', effectiveShopId, 'token:', token ? 'present' : 'missing');
+    console.log('🔍 Fetching hidden sections for shop:', effectiveShopId, 'token:', token ? 'present' : 'missing', 'forceRefresh:', forceRefresh);
     
     if (!effectiveShopId || !token) {
       console.log('⏭️ Skipping fetch - no shop or token');
@@ -220,6 +221,12 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
       setAdminHiddenSections([]);
       setIsLoading(false);
       setHasInitialized(true);
+      return;
+    }
+
+    // Skip if we already fetched for this shop (unless forcing refresh)
+    if (!forceRefresh && hasInitialized && lastFetchedShopId === effectiveShopId) {
+      console.log('⏭️ Already fetched for this shop, skipping');
       return;
     }
 
@@ -246,6 +253,7 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
         console.log('📦 Loaded hidden sections:', data.hiddenSections, 'Admin hidden:', data.adminHiddenSections);
         setHiddenSections(data.hiddenSections || []);
         setAdminHiddenSections(data.adminHiddenSections || []);
+        setLastFetchedShopId(effectiveShopId);
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.warn('⚠️ Failed to fetch hidden sections:', response.status, errorData);
@@ -260,13 +268,18 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
       setIsLoading(false);
       setHasInitialized(true);
     }
-  }, [effectiveShopId, getAccessToken]);
+  }, [effectiveShopId, getAccessToken, hasInitialized, lastFetchedShopId]);
 
   // Load sections when shop changes - use effectiveShopId directly to trigger re-fetch
   useEffect(() => {
-    console.log('🔄 Shop changed, fetching sections. effectiveShopId:', effectiveShopId);
-    fetchHiddenSections();
-  }, [effectiveShopId, fetchHiddenSections]);
+    console.log('🔄 Shop changed, fetching sections. effectiveShopId:', effectiveShopId, 'lastFetchedShopId:', lastFetchedShopId);
+    // Force refresh if shop changed
+    if (effectiveShopId && effectiveShopId !== lastFetchedShopId) {
+      fetchHiddenSections(true);
+    } else if (effectiveShopId && !hasInitialized) {
+      fetchHiddenSections(false);
+    }
+  }, [effectiveShopId, lastFetchedShopId, hasInitialized, fetchHiddenSections]);
 
   // Helper to check if path matches any in a list (including related paths)
   const isPathInList = useCallback((path: string, list: string[]): boolean => {
@@ -441,7 +454,7 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
         isSectionHidden,
         updateHiddenSections,
         updateAdminHiddenSections,
-        refreshSections: fetchHiddenSections,
+        refreshSections: () => fetchHiddenSections(true), // Force refresh when called manually
         getAllSections,
         getAdminVisibleSections,
       }}
