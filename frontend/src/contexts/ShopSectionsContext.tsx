@@ -225,8 +225,9 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     setIsLoading(true);
     try {
-      const url = `${API_BASE_URL}/shops/${effectiveShopId}/sections`;
-      console.log('📡 Fetching:', url);
+      // Use standard shop fetch endpoint which includes full shop details
+      const url = `${API_BASE_URL}/shops/${effectiveShopId}`;
+      console.log('📡 Fetching sections via shop details:', url);
       
       const response = await fetch(url, {
         headers: {
@@ -236,7 +237,8 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const responseData = await response.json();
+        const data = responseData.data; // Shop object is in .data
         console.log('📦 Loaded hidden sections:', data.hiddenSections, 'Admin hidden:', data.adminHiddenSections);
         setHiddenSections(data.hiddenSections || []);
         setAdminHiddenSections(data.adminHiddenSections || []);
@@ -329,7 +331,11 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/shops/${effectiveShopId}/sections`, {
+      // Use standard shop update endpoint instead of dedicated sections endpoint
+      const url = `${API_BASE_URL}/shops/${effectiveShopId}`;
+      console.log('📡 Updating SuperAdmin sections via:', url);
+      
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -344,9 +350,12 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
         throw new Error(error.message || error.error || 'Failed to update sections');
       }
 
-      const data = await response.json();
-      console.log('✅ Updated SuperAdmin hidden sections. New state:', data.hiddenSections);
-      setHiddenSections(data.hiddenSections || []);
+      // Backend returns full shop object in data property
+      const responseData = await response.json();
+      const updatedData = responseData.data;
+      
+      console.log('✅ Updated SuperAdmin hidden sections. New state:', updatedData.hiddenSections);
+      setHiddenSections(updatedData.hiddenSections || []);
     } finally {
       setIsLoading(false);
     }
@@ -367,7 +376,11 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/shops/${effectiveShopId}/sections`, {
+      // Use standard shop update endpoint instead of dedicated sections endpoint
+      const url = `${API_BASE_URL}/shops/${effectiveShopId}`;
+      console.log('📡 Updating Admin sections via:', url);
+
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -382,9 +395,12 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
         throw new Error(error.message || error.error || 'Failed to update admin sections');
       }
 
-      const data = await response.json();
-      console.log('✅ Updated Admin hidden sections. New state:', data.adminHiddenSections);
-      setAdminHiddenSections(data.adminHiddenSections || []);
+      // Backend returns full shop object in data property
+      const responseData = await response.json();
+      const updatedData = responseData.data;
+      
+      console.log('✅ Updated Admin hidden sections. New state:', updatedData.adminHiddenSections);
+      setAdminHiddenSections(updatedData.adminHiddenSections || []);
     } finally {
       setIsLoading(false);
     }
