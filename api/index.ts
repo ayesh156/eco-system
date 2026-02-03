@@ -1,6 +1,6 @@
 // Vercel Serverless API Handler - Complete CRUD with all features
 // Optimized for Vercel Pro with caching and connection pooling
-// VERSION: 2026-02-03-v2 (with sections routes)
+// VERSION: 2026-02-03-v4 (sections route fixed - no file-based routing)
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient, InvoiceStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 
 // API Version for debugging deployment issues
-const API_VERSION = '2026-02-03-v2';
+const API_VERSION = '2026-02-03-v4';
 
 // Global Prisma instance to reuse across requests (prevents cold start issues)
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
@@ -524,7 +524,109 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = req.body || {};
   
   // 🔴 DEBUG: Log EVERY request at the very start
-  console.log('🚀 API Request:', { path, method, timestamp: new Date().toISOString() });
+  console.log('🚀 API Request:', { path, method, apiVersion: API_VERSION, timestamp: new Date().toISOString() });
+  
+  // ========================================
+  // 🚀 EARLY HANDLER: Shop sections route (priority route)
+  // ========================================
+  const sectionsMatch = path.match(/^\/api\/v1\/shops\/([^/]+)\/sections$/);
+  if (sectionsMatch) {
+    const shopIdParam = sectionsMatch[1];
+    console.log('✅ SECTIONS ROUTE MATCHED:', { shopId: shopIdParam, method });
+    
+    try {
+      // GET sections
+      if (method === 'GET') {
+        console.log('📦 Fetching sections for shop:', shopIdParam);
+        
+        const shop = await prisma.shop.findUnique({
+          where: { id: shopIdParam },
+          select: {
+            id: true,
+            hiddenSections: true,
+            adminHiddenSections: true,
+          },
+        });
+
+        if (!shop) {
+          return res.status(404).json({ success: false, error: 'Shop not found' });
+        }
+
+        return res.status(200).json({
+          success: true,
+          hiddenSections: shop.hiddenSections || [],
+          adminHiddenSections: shop.adminHiddenSections || [],
+        });
+      }
+      
+      // PUT/PATCH sections
+      if (method === 'PUT' || method === 'PATCH') {
+        console.log('🔧 Updating sections for shop:', shopIdParam);
+        const userRole = getUserRoleFromToken(req);
+        console.log('👤 User role:', userRole);
+        
+        if (!userRole) {
+          return res.status(401).json({ success: false, message: 'Authentication required' });
+        }
+
+        // Check if shop exists
+        const existingShop = await prisma.shop.findUnique({
+          where: { id: shopIdParam },
+        });
+
+        if (!existingShop) {
+          return res.status(404).json({ success: false, error: 'Shop not found' });
+        }
+
+        const { hiddenSections, adminHiddenSections } = body;
+        const updateData: { hiddenSections?: string[]; adminHiddenSections?: string[] } = {};
+
+        // SuperAdmin can update hiddenSections
+        if (userRole === 'SUPER_ADMIN' && hiddenSections !== undefined) {
+          if (!Array.isArray(hiddenSections)) {
+            return res.status(400).json({ success: false, error: 'hiddenSections must be an array of strings' });
+          }
+          updateData.hiddenSections = hiddenSections;
+        }
+
+        // Shop ADMIN or SUPER_ADMIN can update adminHiddenSections
+        if ((userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && adminHiddenSections !== undefined) {
+          if (!Array.isArray(adminHiddenSections)) {
+            return res.status(400).json({ success: false, error: 'adminHiddenSections must be an array of strings' });
+          }
+          updateData.adminHiddenSections = adminHiddenSections;
+        }
+
+        // If no valid update data, return error
+        if (Object.keys(updateData).length === 0) {
+          return res.status(400).json({ success: false, error: 'No valid section data to update' });
+        }
+
+        const updatedShop = await prisma.shop.update({
+          where: { id: shopIdParam },
+          data: updateData,
+          select: {
+            id: true,
+            hiddenSections: true,
+            adminHiddenSections: true,
+          },
+        });
+
+        return res.status(200).json({
+          success: true,
+          message: 'Section visibility updated successfully',
+          hiddenSections: updatedShop.hiddenSections,
+          adminHiddenSections: updatedShop.adminHiddenSections,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Sections route error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Internal server error' 
+      });
+    }
+  }
   
   // Merge Vercel's req.query with parsed query for compatibility
   // Vercel provides query params in req.query as string | string[] | undefined
@@ -3277,102 +3379,6 @@ Best regards,
           },
         },
         message: 'WhatsApp settings updated successfully',
-      });
-    }
-
-    // ========================================
-    // SHOP SECTION VISIBILITY ROUTES
-    // ========================================
-
-    // GET shop sections (hiddenSections + adminHiddenSections)
-    const shopSectionsMatch = path.match(/^\/api\/v1\/shops\/([^/]+)\/sections$/);
-    console.log('🔍 Section route check:', { path, method, matched: !!shopSectionsMatch });
-    
-    if (shopSectionsMatch && method === 'GET') {
-      const shopIdParam = shopSectionsMatch[1];
-      console.log('📦 Fetching sections for shop:', shopIdParam);
-      
-      const shop = await prisma.shop.findUnique({
-        where: { id: shopIdParam },
-        select: {
-          id: true,
-          hiddenSections: true,
-          adminHiddenSections: true,
-        },
-      });
-
-      if (!shop) {
-        return res.status(404).json({ success: false, error: 'Shop not found' });
-      }
-
-      return res.status(200).json({
-        success: true,
-        hiddenSections: shop.hiddenSections || [],
-        adminHiddenSections: shop.adminHiddenSections || [],
-      });
-    }
-
-    // PUT/PATCH shop sections
-    // SuperAdmin updates hiddenSections (affects ADMIN + USER)
-    // Shop ADMIN updates adminHiddenSections (affects USER only)
-    if (shopSectionsMatch && (method === 'PUT' || method === 'PATCH')) {
-      console.log('🔧 Updating sections for shop:', shopSectionsMatch[1]);
-      const shopIdParam = shopSectionsMatch[1];
-      const userRole = getUserRoleFromToken(req);
-      console.log('👤 User role:', userRole);
-      
-      if (!userRole) {
-        return res.status(401).json({ success: false, message: 'Authentication required' });
-      }
-
-      // Check if shop exists
-      const existingShop = await prisma.shop.findUnique({
-        where: { id: shopIdParam },
-      });
-
-      if (!existingShop) {
-        return res.status(404).json({ success: false, error: 'Shop not found' });
-      }
-
-      const { hiddenSections, adminHiddenSections } = body;
-      const updateData: { hiddenSections?: string[]; adminHiddenSections?: string[] } = {};
-
-      // SuperAdmin can update hiddenSections
-      if (userRole === 'SUPER_ADMIN' && hiddenSections !== undefined) {
-        if (!Array.isArray(hiddenSections)) {
-          return res.status(400).json({ success: false, error: 'hiddenSections must be an array of strings' });
-        }
-        updateData.hiddenSections = hiddenSections;
-      }
-
-      // Shop ADMIN or SUPER_ADMIN can update adminHiddenSections
-      if ((userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && adminHiddenSections !== undefined) {
-        if (!Array.isArray(adminHiddenSections)) {
-          return res.status(400).json({ success: false, error: 'adminHiddenSections must be an array of strings' });
-        }
-        updateData.adminHiddenSections = adminHiddenSections;
-      }
-
-      // If no valid update data, return error
-      if (Object.keys(updateData).length === 0) {
-        return res.status(400).json({ success: false, error: 'No valid section data to update' });
-      }
-
-      const updatedShop = await prisma.shop.update({
-        where: { id: shopIdParam },
-        data: updateData,
-        select: {
-          id: true,
-          hiddenSections: true,
-          adminHiddenSections: true,
-        },
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: 'Section visibility updated successfully',
-        hiddenSections: updatedShop.hiddenSections,
-        adminHiddenSections: updatedShop.adminHiddenSections,
       });
     }
 
