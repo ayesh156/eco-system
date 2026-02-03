@@ -548,6 +548,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Debug route to check if sections route pattern works
+    if (path === '/api/v1/debug/routes' && method === 'GET') {
+      const testPath = '/api/v1/shops/test-shop-id/sections';
+      const sectionsRegex = /^\/api\/v1\/shops\/([^/]+)\/sections$/;
+      const match = testPath.match(sectionsRegex);
+      return res.status(200).json({
+        success: true,
+        message: 'Debug route info',
+        testPath,
+        regexPattern: sectionsRegex.toString(),
+        matched: !!match,
+        capturedGroup: match ? match[1] : null,
+        fileLines: 3548, // Approximate line count
+        sectionsRouteLineNumber: 3261,
+      });
+    }
+
     // API Test Route - Beautiful HTML UI
     if (path === '/api/v1/test' && method === 'GET') {
       let dbStatus = 'connected';
