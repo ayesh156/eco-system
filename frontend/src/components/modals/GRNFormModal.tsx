@@ -25,6 +25,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Tag,
+  Loader2,
 } from 'lucide-react';
 
 interface GRNFormModalProps {
@@ -33,6 +34,7 @@ interface GRNFormModalProps {
   suppliers: Supplier[];
   onClose: () => void;
   onSave: (grn: GoodsReceivedNote) => void;
+  isLoading?: boolean;
 }
 
 // Modern Date Picker Component
@@ -229,6 +231,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
   suppliers,
   onClose,
   onSave,
+  isLoading = false,
 }) => {
   const { theme } = useTheme();
   const isEditing = !!grn;
@@ -975,21 +978,31 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
           <div className="flex gap-3">
             <button
               onClick={onClose}
+              disabled={isLoading}
               className={`px-6 py-2.5 rounded-xl font-medium transition-colors ${
                 theme === 'dark'
-                  ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                  ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50'
+                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-50'
               }`}
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              disabled={!formData.supplierId}
+              disabled={!formData.supplierId || isLoading}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/25"
             >
-              <Save className="w-4 h-4" />
-              {isEditing ? 'Update GRN' : 'Create GRN'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {isEditing ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  {isEditing ? 'Update GRN' : 'Create GRN'}
+                </>
+              )}
             </button>
           </div>
         </div>

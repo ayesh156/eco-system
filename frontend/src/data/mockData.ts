@@ -962,49 +962,56 @@ export type JobNotePriority = 'low' | 'normal' | 'high' | 'urgent';
 // Device Type
 export type DeviceType = 'laptop' | 'desktop' | 'printer' | 'monitor' | 'phone' | 'tablet' | 'other';
 
-// Job Note Interface
+// Job Note Interface - Optimized for Sri Lankan Repair Shop
+// Based on world-class systems: RepairDesk, RepairShopr, mHelpDesk
 export interface JobNote {
   id: string;
   jobNumber: string; // JOB-2026-0001 format
-  // Customer Info
+  
+  // Customer Info (Sri Lankan context)
   customerId?: string;
   customerName: string;
-  customerPhone: string;
-  customerEmail?: string;
+  customerPhone: string; // Primary contact method in SL
   customerAddress?: string;
+  
   // Device Info
   deviceType: DeviceType;
   deviceBrand: string;
   deviceModel: string;
-  serialNumber?: string;
-  accessories: string[]; // Charger, Bag, Mouse etc.
-  deviceCondition: string; // Physical condition notes
-  // Problem & Service
+  serialNumber?: string; // IMEI for phones, serial for laptops
+  accessories: string[]; // Charger, Bag, Mouse - important for handover
+  deviceCondition?: string; // Physical condition notes
+  password?: string; // Device password (common in SL shops)
+  
+  // Service Link (connects to Services catalog)
+  serviceId?: string; // Reference to Service from catalog
+  serviceName?: string; // Name of selected service
+  
+  // Problem & Diagnosis
   reportedIssue: string; // Customer's complaint
-  diagnosisNotes?: string; // Technician's diagnosis
-  serviceRequired?: string; // What needs to be done
-  // Pricing
+  diagnosis?: string; // Technician's findings
+  workPerformed?: string; // What was actually done
+  
+  // Pricing (Sri Lankan context - advance payments common)
   estimatedCost?: number;
-  actualCost?: number;
+  finalCost?: number;
   advancePayment?: number;
+  
   // Status & Timeline
   status: JobNoteStatus;
   priority: JobNotePriority;
   receivedDate: string;
-  expectedCompletionDate?: string;
+  estimatedCompletion?: string;
   completedDate?: string;
   deliveredDate?: string;
+  
   // Assignment
   assignedTechnician?: string;
+  
+  // Notes
+  internalNotes?: string; // Staff-only notes
+  
   // Tracking
-  statusHistory: {
-    status: JobNoteStatus;
-    date: string;
-    notes?: string;
-    updatedBy?: string;
-  }[];
-  // Additional
-  internalNotes?: string;
   customerNotified: boolean;
   createdAt: string;
   updatedAt?: string;
@@ -1146,18 +1153,6 @@ const generateMockJobNotes = (): JobNote[] => {
     const customerName = `${firstName} ${lastName}`;
     const phone = `077${Math.floor(1000000 + Math.random() * 9000000)}`;
     
-    const statusHistory: JobNote['statusHistory'] = [
-      { status: 'received', date: receivedDate.toISOString(), notes: 'Device received', updatedBy: 'Reception' }
-    ];
-
-    if (status !== 'received') {
-      statusHistory.push({ 
-        status: status === 'delivered' || status === 'completed' || status === 'cancelled' ? 'diagnosing' : status, 
-        date: new Date(receivedDate.getTime() + 3 * 60 * 60 * 1000).toISOString(), 
-        updatedBy: technicians[Math.floor(Math.random() * technicians.length)] 
-      });
-    }
-
     let completedDate: string | undefined;
     let deliveredDate: string | undefined;
     if (status === 'completed' || status === 'delivered') {
@@ -1170,30 +1165,41 @@ const generateMockJobNotes = (): JobNote[] => {
     jobNotes.push({
       id: `job-${i.toString().padStart(5, '0')}`,
       jobNumber: `JOB-${receivedDate.getFullYear()}-${i.toString().padStart(4, '0')}`,
+      // Customer Info
       customerName,
       customerPhone: phone,
-      customerEmail: Math.random() > 0.6 ? `${firstName.toLowerCase()}.${lastName.toLowerCase()}@email.com` : undefined,
       customerAddress: Math.random() > 0.7 ? `${Math.floor(Math.random() * 500) + 1}, ${['Colombo', 'Kandy', 'Galle', 'Negombo', 'Matara', 'Kurunegala'][Math.floor(Math.random() * 6)]}` : undefined,
+      // Device Info
       deviceType,
       deviceBrand: brand,
       deviceModel: `${brand} ${['Pro', 'Elite', 'Standard', 'Gaming', 'Business'][Math.floor(Math.random() * 5)]} ${Math.floor(Math.random() * 20) + 1}`,
       serialNumber: Math.random() > 0.4 ? `${brand.substring(0, 2).toUpperCase()}${Math.floor(Math.random() * 1000000)}` : undefined,
       accessories: accessories[deviceType][Math.floor(Math.random() * accessories[deviceType].length)],
       deviceCondition: conditions[Math.floor(Math.random() * conditions.length)],
+      password: Math.random() > 0.7 ? `${Math.floor(1000 + Math.random() * 9000)}` : undefined,
+      // Service link (will be assigned later)
+      serviceId: undefined,
+      serviceName: undefined,
+      // Problem & Diagnosis
       reportedIssue,
-      diagnosisNotes: status !== 'received' ? 'Under diagnosis' : undefined,
+      diagnosis: status !== 'received' ? 'Under diagnosis' : undefined,
+      workPerformed: status === 'completed' || status === 'delivered' ? 'Issue resolved' : undefined,
+      // Pricing
       estimatedCost,
-      actualCost: status === 'completed' || status === 'delivered' ? Math.floor(estimatedCost * (0.8 + Math.random() * 0.4)) : undefined,
+      finalCost: status === 'completed' || status === 'delivered' ? Math.floor(estimatedCost * (0.8 + Math.random() * 0.4)) : undefined,
       advancePayment,
+      // Status & Timeline
       status,
       priority,
       receivedDate: receivedDate.toISOString(),
-      expectedCompletionDate: expectedDate.toISOString(),
+      estimatedCompletion: expectedDate.toISOString(),
       completedDate,
       deliveredDate,
+      // Assignment
       assignedTechnician: status !== 'received' ? technicians[Math.floor(Math.random() * technicians.length)] : undefined,
-      statusHistory,
+      // Notes
       internalNotes: Math.random() > 0.7 ? 'Follow up required' : undefined,
+      // Tracking
       customerNotified: Math.random() > 0.3,
       createdAt: receivedDate.toISOString(),
       updatedAt: status !== 'received' ? new Date(receivedDate.getTime() + Math.random() * 5 * 24 * 60 * 60 * 1000).toISOString() : undefined,
@@ -1203,14 +1209,12 @@ const generateMockJobNotes = (): JobNote[] => {
   return jobNotes.sort((a, b) => new Date(b.receivedDate).getTime() - new Date(a.receivedDate).getTime());
 };
 
-export const mockJobNotes: JobNote[] = generateMockJobNotes();
+// Generate job notes first (without service links)
+const generatedJobNotes: JobNote[] = generateMockJobNotes();
 
 // ==========================================
 // SERVICES SYSTEM - Computer Shop Services
 // ==========================================
-
-// Service Status Types
-export type ServiceStatus = 'active' | 'inactive' | 'discontinued';
 
 // Service Category Types for Sri Lankan Computer Shops
 export type ServiceCategory = 
@@ -1225,36 +1229,29 @@ export type ServiceCategory =
   | 'cleaning' 
   | 'other';
 
-// Service Interface
+// Service Interface - Optimized for Sri Lankan Repair Shop
+// Based on world-class systems: RepairDesk, RepairShopr, Lightspeed
 export interface Service {
   id: string;
   name: string;
   category: ServiceCategory;
   description: string;
-  // Pricing
-  basePrice: number; // Base service charge
-  minPrice?: number; // Minimum price (for variable pricing)
-  maxPrice?: number; // Maximum price (for variable pricing)
-  priceType: 'fixed' | 'variable' | 'hourly' | 'quote'; // Pricing model
-  hourlyRate?: number; // For hourly services
-  // Timing
-  estimatedDuration: string; // e.g., "1-2 hours", "2-3 days"
-  turnaroundTime?: string; // Expected completion time
-  // Status & Availability
-  status: ServiceStatus;
-  isPopular: boolean; // Mark as popular/featured service
-  // Additional Info
-  warranty?: string; // Service warranty if any
-  requirements?: string; // What customer needs to bring/provide
-  notes?: string; // Internal notes
-  // Tracking
-  totalCompleted: number; // Total times service was provided
-  totalRevenue: number; // Total revenue from this service
-  lastPerformed?: string; // Last date service was performed
+  // Device Compatibility
+  applicableDeviceTypes: DeviceType[]; // Which devices this service applies to
+  // Pricing - Sri Lankan context (variable pricing common due to part costs)
+  basePrice: number; // Starting price / Base service charge
+  priceType: 'fixed' | 'starting-from' | 'quote-required'; // Sri Lankan pricing models
+  // Time Estimate
+  estimatedDuration: string; // e.g., "1-2 hours", "Same day", "2-3 days"
+  // Service Details
+  warranty?: string; // Service warranty (e.g., "3 months", "1 year")
+  notes?: string; // Internal notes for technicians
+  // Status
+  isActive: boolean; // Whether this service is currently offered
+  isPopular?: boolean; // Featured/highlighted service
   // Timestamps
   createdAt: string;
   updatedAt?: string;
-  image?: string; // Service icon/image
 }
 
 // Service Categories Configuration
@@ -1271,7 +1268,7 @@ export const serviceCategories: { value: ServiceCategory; label: string; icon: s
   { value: 'other', label: 'Other Services', icon: '📦', description: 'Miscellaneous services' },
 ];
 
-// Mock Services Data for Sri Lankan Computer Shop
+// Mock Services Data for Sri Lankan Computer Shop - Simplified & Professional
 export const mockServices: Service[] = [
   // REPAIR SERVICES
   {
@@ -1279,58 +1276,40 @@ export const mockServices: Service[] = [
     name: 'Laptop Screen Replacement',
     category: 'repair',
     description: 'Professional laptop screen replacement for all brands. Includes screen + labor.',
+    applicableDeviceTypes: ['laptop'],
     basePrice: 15000,
-    minPrice: 12000,
-    maxPrice: 45000,
-    priceType: 'variable',
+    priceType: 'starting-from',
     estimatedDuration: '1-2 days',
-    turnaroundTime: '24-48 hours',
-    status: 'active',
-    isPopular: true,
     warranty: '3 months',
-    requirements: 'Bring laptop with power adapter',
-    totalCompleted: 156,
-    totalRevenue: 2340000,
-    lastPerformed: '2026-01-13',
+    isActive: true,
+    isPopular: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'srv-002',
     name: 'Desktop PC Repair',
     category: 'repair',
-    description: 'Comprehensive desktop computer diagnostics and repair. Hardware and software issues.',
+    description: 'Comprehensive desktop computer diagnostics and repair.',
+    applicableDeviceTypes: ['desktop'],
     basePrice: 2500,
-    minPrice: 1500,
-    maxPrice: 15000,
-    priceType: 'variable',
+    priceType: 'starting-from',
     estimatedDuration: '1-3 days',
-    turnaroundTime: '48-72 hours',
-    status: 'active',
-    isPopular: true,
     warranty: '1 month',
-    requirements: 'Bring CPU unit only (no monitor/peripherals unless needed)',
-    totalCompleted: 423,
-    totalRevenue: 1057500,
-    lastPerformed: '2026-01-14',
+    isActive: true,
+    isPopular: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'srv-003',
     name: 'Keyboard Replacement (Laptop)',
     category: 'repair',
-    description: 'Laptop keyboard replacement service. Compatible keyboards sourced for all models.',
+    description: 'Laptop keyboard replacement. Compatible keyboards for all models.',
+    applicableDeviceTypes: ['laptop'],
     basePrice: 8000,
-    minPrice: 5000,
-    maxPrice: 20000,
-    priceType: 'variable',
+    priceType: 'starting-from',
     estimatedDuration: '2-4 hours',
-    turnaroundTime: '24 hours',
-    status: 'active',
-    isPopular: false,
     warranty: '3 months',
-    totalCompleted: 89,
-    totalRevenue: 712000,
-    lastPerformed: '2026-01-12',
+    isActive: true,
     createdAt: '2025-02-15T00:00:00Z',
   },
   {
@@ -1338,40 +1317,95 @@ export const mockServices: Service[] = [
     name: 'Power Jack Repair',
     category: 'repair',
     description: 'Laptop charging port / DC jack repair and replacement.',
+    applicableDeviceTypes: ['laptop'],
     basePrice: 3500,
-    minPrice: 2500,
-    maxPrice: 6000,
-    priceType: 'variable',
+    priceType: 'starting-from',
     estimatedDuration: '2-4 hours',
-    turnaroundTime: '24 hours',
-    status: 'active',
-    isPopular: true,
     warranty: '3 months',
-    requirements: 'Bring laptop with original charger',
-    totalCompleted: 201,
-    totalRevenue: 703500,
-    lastPerformed: '2026-01-14',
+    isActive: true,
+    isPopular: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'srv-005',
     name: 'Motherboard Repair',
     category: 'repair',
-    description: 'Advanced motherboard repair for laptops and desktops. Chip-level repairs available.',
+    description: 'Advanced motherboard repair. Chip-level repairs available.',
+    applicableDeviceTypes: ['laptop', 'desktop'],
     basePrice: 5000,
-    minPrice: 3000,
-    maxPrice: 25000,
-    priceType: 'variable',
+    priceType: 'quote-required',
     estimatedDuration: '3-7 days',
-    turnaroundTime: '5-7 business days',
-    status: 'active',
-    isPopular: false,
     warranty: '1 month',
     notes: 'Complex repairs may require additional time',
-    totalCompleted: 67,
-    totalRevenue: 335000,
-    lastPerformed: '2026-01-10',
+    isActive: true,
     createdAt: '2025-01-01T00:00:00Z',
+  },
+  {
+    id: 'srv-021',
+    name: 'Phone Screen Replacement',
+    category: 'repair',
+    description: 'Mobile screen replacement for all brands including iPhone & Samsung.',
+    applicableDeviceTypes: ['phone'],
+    basePrice: 8000,
+    priceType: 'starting-from',
+    estimatedDuration: '1-2 hours',
+    warranty: '3 months',
+    isActive: true,
+    isPopular: true,
+    createdAt: '2025-01-01T00:00:00Z',
+  },
+  {
+    id: 'srv-022',
+    name: 'Phone Battery Replacement',
+    category: 'repair',
+    description: 'Mobile phone battery replacement with quality batteries.',
+    applicableDeviceTypes: ['phone', 'tablet'],
+    basePrice: 3500,
+    priceType: 'starting-from',
+    estimatedDuration: '30-60 mins',
+    warranty: '6 months',
+    isActive: true,
+    isPopular: true,
+    createdAt: '2025-01-01T00:00:00Z',
+  },
+  {
+    id: 'srv-023',
+    name: 'Tablet Screen Repair',
+    category: 'repair',
+    description: 'Tablet screen and digitizer replacement for iPad and Android tablets.',
+    applicableDeviceTypes: ['tablet'],
+    basePrice: 12000,
+    priceType: 'starting-from',
+    estimatedDuration: '1-2 days',
+    warranty: '3 months',
+    isActive: true,
+    createdAt: '2025-03-01T00:00:00Z',
+  },
+  {
+    id: 'srv-024',
+    name: 'Printer Repair & Service',
+    category: 'repair',
+    description: 'Printer diagnostics, repair, and head cleaning.',
+    applicableDeviceTypes: ['printer'],
+    basePrice: 2500,
+    priceType: 'starting-from',
+    estimatedDuration: '1-2 days',
+    warranty: '1 month',
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00Z',
+  },
+  {
+    id: 'srv-025',
+    name: 'Monitor Repair',
+    category: 'repair',
+    description: 'LCD/LED monitor repair including backlight, power supply issues.',
+    applicableDeviceTypes: ['monitor'],
+    basePrice: 3500,
+    priceType: 'starting-from',
+    estimatedDuration: '2-5 days',
+    warranty: '1 month',
+    isActive: true,
+    createdAt: '2025-02-01T00:00:00Z',
   },
 
   // MAINTENANCE SERVICES
@@ -1379,18 +1413,14 @@ export const mockServices: Service[] = [
     id: 'srv-006',
     name: 'Full System Service',
     category: 'maintenance',
-    description: 'Complete PC/Laptop servicing: cleaning, thermal paste, OS optimization, virus scan.',
+    description: 'Complete servicing: cleaning, thermal paste, OS optimization, virus scan.',
+    applicableDeviceTypes: ['laptop', 'desktop'],
     basePrice: 2000,
     priceType: 'fixed',
     estimatedDuration: '2-4 hours',
-    turnaroundTime: 'Same day',
-    status: 'active',
+    warranty: '1 week',
+    isActive: true,
     isPopular: true,
-    warranty: '1 week service warranty',
-    requirements: 'Bring device with charger',
-    totalCompleted: 892,
-    totalRevenue: 1784000,
-    lastPerformed: '2026-01-14',
     createdAt: '2025-01-01T00:00:00Z',
   },
   {
@@ -1398,70 +1428,84 @@ export const mockServices: Service[] = [
     name: 'Thermal Paste Replacement',
     category: 'maintenance',
     description: 'CPU/GPU thermal paste replacement to fix overheating issues.',
+    applicableDeviceTypes: ['laptop', 'desktop'],
     basePrice: 1500,
     priceType: 'fixed',
     estimatedDuration: '1-2 hours',
-    turnaroundTime: 'Same day',
-    status: 'active',
-    isPopular: true,
     warranty: '6 months',
-    totalCompleted: 345,
-    totalRevenue: 517500,
-    lastPerformed: '2026-01-13',
+    isActive: true,
+    isPopular: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
 
-  // INSTALLATION SERVICES
+  // SOFTWARE SERVICES
   {
     id: 'srv-008',
     name: 'Windows Installation',
     category: 'software',
-    description: 'Fresh Windows 10/11 installation with drivers and basic software setup.',
+    description: 'Fresh Windows 10/11 installation with drivers and basic software.',
+    applicableDeviceTypes: ['laptop', 'desktop'],
     basePrice: 1500,
     priceType: 'fixed',
     estimatedDuration: '2-3 hours',
-    turnaroundTime: 'Same day',
-    status: 'active',
-    isPopular: true,
     warranty: '1 week',
     notes: 'Customer provides license or we can arrange',
-    totalCompleted: 567,
-    totalRevenue: 850500,
-    lastPerformed: '2026-01-14',
+    isActive: true,
+    isPopular: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
+  {
+    id: 'srv-015',
+    name: 'Virus Removal',
+    category: 'software',
+    description: 'Complete virus, malware, and adware removal with optimization.',
+    applicableDeviceTypes: ['laptop', 'desktop'],
+    basePrice: 1500,
+    priceType: 'fixed',
+    estimatedDuration: '2-4 hours',
+    warranty: '1 month',
+    isActive: true,
+    isPopular: true,
+    createdAt: '2025-01-01T00:00:00Z',
+  },
+  {
+    id: 'srv-016',
+    name: 'Software Installation Package',
+    category: 'software',
+    description: 'Installation of Office, Browsers, Media players, etc.',
+    applicableDeviceTypes: ['laptop', 'desktop'],
+    basePrice: 1000,
+    priceType: 'fixed',
+    estimatedDuration: '1-2 hours',
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00Z',
+  },
+
+  // INSTALLATION & UPGRADE SERVICES
   {
     id: 'srv-009',
     name: 'SSD/HDD Installation',
     category: 'installation',
-    description: 'Hard drive or SSD installation with data migration and OS setup.',
+    description: 'Hard drive or SSD installation with data migration.',
+    applicableDeviceTypes: ['laptop', 'desktop'],
     basePrice: 1000,
     priceType: 'fixed',
     estimatedDuration: '2-4 hours',
-    turnaroundTime: 'Same day',
-    status: 'active',
+    notes: 'Purchase drive from us or bring your own',
+    isActive: true,
     isPopular: true,
-    warranty: 'Hardware warranty applicable',
-    requirements: 'Purchase drive from us or bring your own',
-    totalCompleted: 234,
-    totalRevenue: 234000,
-    lastPerformed: '2026-01-13',
     createdAt: '2025-03-01T00:00:00Z',
   },
   {
     id: 'srv-010',
-    name: 'RAM Upgrade Installation',
+    name: 'RAM Upgrade',
     category: 'upgrade',
     description: 'RAM module installation and compatibility check.',
+    applicableDeviceTypes: ['laptop', 'desktop'],
     basePrice: 500,
     priceType: 'fixed',
     estimatedDuration: '30 mins',
-    turnaroundTime: 'Same day',
-    status: 'active',
-    isPopular: false,
-    totalCompleted: 456,
-    totalRevenue: 228000,
-    lastPerformed: '2026-01-14',
+    isActive: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
 
@@ -1471,38 +1515,40 @@ export const mockServices: Service[] = [
     name: 'Data Recovery - Basic',
     category: 'data_recovery',
     description: 'Data recovery from accessible drives with logical issues.',
+    applicableDeviceTypes: ['laptop', 'desktop', 'other'],
     basePrice: 3000,
-    minPrice: 2000,
-    maxPrice: 5000,
-    priceType: 'variable',
+    priceType: 'starting-from',
     estimatedDuration: '1-2 days',
-    turnaroundTime: '24-48 hours',
-    status: 'active',
-    isPopular: true,
     notes: 'No charge if recovery unsuccessful',
-    totalCompleted: 123,
-    totalRevenue: 369000,
-    lastPerformed: '2026-01-12',
+    isActive: true,
+    isPopular: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'srv-012',
     name: 'Data Recovery - Advanced',
     category: 'data_recovery',
-    description: 'Advanced data recovery from damaged/clicking drives. Clean room service available.',
+    description: 'Recovery from damaged/clicking drives. Clean room service.',
+    applicableDeviceTypes: ['laptop', 'desktop', 'other'],
     basePrice: 15000,
-    minPrice: 10000,
-    maxPrice: 50000,
-    priceType: 'quote',
+    priceType: 'quote-required',
     estimatedDuration: '5-14 days',
-    turnaroundTime: '1-2 weeks',
-    status: 'active',
-    isPopular: false,
-    notes: 'Diagnosis fee applies, waived if recovery successful',
-    totalCompleted: 34,
-    totalRevenue: 510000,
-    lastPerformed: '2026-01-08',
+    notes: 'Diagnosis fee waived if recovery successful',
+    isActive: true,
     createdAt: '2025-01-01T00:00:00Z',
+  },
+  {
+    id: 'srv-026',
+    name: 'Phone Data Recovery',
+    category: 'data_recovery',
+    description: 'Data recovery from damaged or non-functional mobile phones.',
+    applicableDeviceTypes: ['phone', 'tablet'],
+    basePrice: 5000,
+    priceType: 'starting-from',
+    estimatedDuration: '2-5 days',
+    notes: 'Success rate depends on device condition',
+    isActive: true,
+    createdAt: '2025-04-01T00:00:00Z',
   },
 
   // NETWORKING SERVICES
@@ -1510,17 +1556,14 @@ export const mockServices: Service[] = [
     id: 'srv-013',
     name: 'Home WiFi Setup',
     category: 'networking',
-    description: 'Home WiFi router setup, configuration, and security optimization.',
+    description: 'Home WiFi router setup, configuration, and security.',
+    applicableDeviceTypes: ['other'],
     basePrice: 1500,
     priceType: 'fixed',
     estimatedDuration: '1-2 hours',
-    turnaroundTime: 'Same day (on-site)',
-    status: 'active',
-    isPopular: true,
     warranty: '1 month support',
-    totalCompleted: 178,
-    totalRevenue: 267000,
-    lastPerformed: '2026-01-11',
+    isActive: true,
+    isPopular: true,
     createdAt: '2025-02-01T00:00:00Z',
   },
   {
@@ -1528,55 +1571,13 @@ export const mockServices: Service[] = [
     name: 'Office Network Setup',
     category: 'networking',
     description: 'Complete office network infrastructure setup with cabling.',
+    applicableDeviceTypes: ['other'],
     basePrice: 25000,
-    minPrice: 15000,
-    maxPrice: 100000,
-    priceType: 'quote',
-    hourlyRate: 2500,
+    priceType: 'quote-required',
     estimatedDuration: '1-5 days',
-    turnaroundTime: 'Based on scope',
-    status: 'active',
-    isPopular: false,
     warranty: '6 months',
     notes: 'Site survey required before quote',
-    totalCompleted: 23,
-    totalRevenue: 575000,
-    lastPerformed: '2026-01-05',
-    createdAt: '2025-01-01T00:00:00Z',
-  },
-
-  // SOFTWARE SERVICES
-  {
-    id: 'srv-015',
-    name: 'Virus Removal',
-    category: 'software',
-    description: 'Complete virus, malware, and adware removal with system optimization.',
-    basePrice: 1500,
-    priceType: 'fixed',
-    estimatedDuration: '2-4 hours',
-    turnaroundTime: 'Same day',
-    status: 'active',
-    isPopular: true,
-    warranty: '1 month protection guarantee',
-    totalCompleted: 445,
-    totalRevenue: 667500,
-    lastPerformed: '2026-01-14',
-    createdAt: '2025-01-01T00:00:00Z',
-  },
-  {
-    id: 'srv-016',
-    name: 'Software Installation Package',
-    category: 'software',
-    description: 'Installation of essential software: Office, Browsers, Media players, etc.',
-    basePrice: 1000,
-    priceType: 'fixed',
-    estimatedDuration: '1-2 hours',
-    turnaroundTime: 'Same day',
-    status: 'active',
-    isPopular: false,
-    totalCompleted: 312,
-    totalRevenue: 312000,
-    lastPerformed: '2026-01-14',
+    isActive: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
 
@@ -1585,33 +1586,25 @@ export const mockServices: Service[] = [
     id: 'srv-017',
     name: 'Deep Cleaning - Laptop',
     category: 'cleaning',
-    description: 'Comprehensive internal and external cleaning, dust removal, thermal paste.',
+    description: 'Internal and external cleaning, dust removal, thermal paste.',
+    applicableDeviceTypes: ['laptop'],
     basePrice: 2500,
     priceType: 'fixed',
     estimatedDuration: '2-3 hours',
-    turnaroundTime: 'Same day',
-    status: 'active',
+    isActive: true,
     isPopular: true,
-    warranty: 'Workmanship guaranteed',
-    totalCompleted: 567,
-    totalRevenue: 1417500,
-    lastPerformed: '2026-01-14',
     createdAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'srv-018',
     name: 'Deep Cleaning - Desktop',
     category: 'cleaning',
-    description: 'Full desktop PC cleaning including all components, fans, and filters.',
+    description: 'Full desktop PC cleaning including all components and fans.',
+    applicableDeviceTypes: ['desktop'],
     basePrice: 2000,
     priceType: 'fixed',
     estimatedDuration: '1-2 hours',
-    turnaroundTime: 'Same day',
-    status: 'active',
-    isPopular: false,
-    totalCompleted: 234,
-    totalRevenue: 468000,
-    lastPerformed: '2026-01-13',
+    isActive: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
 
@@ -1620,34 +1613,26 @@ export const mockServices: Service[] = [
     id: 'srv-019',
     name: 'PC Build Consultation',
     category: 'consultation',
-    description: 'Expert advice on custom PC builds based on budget and requirements.',
+    description: 'Expert advice on custom PC builds based on budget.',
+    applicableDeviceTypes: ['desktop'],
     basePrice: 0,
     priceType: 'fixed',
     estimatedDuration: '30-60 mins',
-    turnaroundTime: 'Walk-in available',
-    status: 'active',
-    isPopular: true,
     notes: 'Free with any purchase, Rs. 500 otherwise',
-    totalCompleted: 234,
-    totalRevenue: 0,
-    lastPerformed: '2026-01-14',
+    isActive: true,
+    isPopular: true,
     createdAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'srv-020',
     name: 'Corporate IT Consultation',
     category: 'consultation',
-    description: 'On-site IT infrastructure assessment and recommendations for businesses.',
+    description: 'On-site IT infrastructure assessment for businesses.',
+    applicableDeviceTypes: ['laptop', 'desktop', 'other'],
     basePrice: 5000,
-    hourlyRate: 3000,
-    priceType: 'hourly',
+    priceType: 'quote-required',
     estimatedDuration: '2-4 hours',
-    turnaroundTime: 'By appointment',
-    status: 'active',
-    isPopular: false,
-    totalCompleted: 45,
-    totalRevenue: 225000,
-    lastPerformed: '2026-01-10',
+    isActive: true,
     createdAt: '2025-04-01T00:00:00Z',
   },
 ];
@@ -1655,9 +1640,506 @@ export const mockServices: Service[] = [
 // Generate Service ID
 export const generateServiceId = () => `srv-${String(Date.now()).slice(-6)}`;
 
+// Helper function to find a suitable service for a device type
+const findServiceForDeviceType = (deviceType: DeviceType): Service | undefined => {
+  const applicableServices = mockServices.filter(s => 
+    s.applicableDeviceTypes.includes(deviceType) && s.isActive
+  );
+  if (applicableServices.length === 0) return undefined;
+  return applicableServices[Math.floor(Math.random() * applicableServices.length)];
+};
+
+// Link job notes to services after mockServices is defined
+const linkJobNotesToServices = (jobNotes: JobNote[]): JobNote[] => {
+  return jobNotes.map(job => {
+    // Randomly assign a service to 70% of job notes
+    if (Math.random() > 0.3) {
+      const service = findServiceForDeviceType(job.deviceType);
+      if (service) {
+        return {
+          ...job,
+          serviceId: service.id,
+          serviceName: service.name,
+          serviceCategory: service.category,
+          serviceRequired: service.name,
+          // Update estimated cost based on service price
+          estimatedCost: service.priceType === 'starting-from' 
+            ? Math.floor(service.basePrice + Math.random() * (service.basePrice * 0.5))
+            : service.basePrice,
+        };
+      }
+    }
+    return job;
+  });
+};
+
+// Export mockJobNotes with service links
+export const mockJobNotes: JobNote[] = linkJobNotesToServices(generatedJobNotes);
+
+// ==========================================
+// TECHNICIANS SYSTEM - Job Note Technicians
+// ==========================================
+
+// Technician Status
+export type TechnicianStatus = 'active' | 'on-leave' | 'inactive';
+
+// Technician Specialty
+export type TechnicianSpecialty = 
+  | 'laptop-repair'
+  | 'desktop-repair'
+  | 'mobile-repair'
+  | 'tablet-repair'
+  | 'printer-repair'
+  | 'networking'
+  | 'data-recovery'
+  | 'software'
+  | 'general';
+
+// Technician Interface - For Sri Lankan Computer/Mobile Repair Shop
+export interface Technician {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address?: string;
+  nic?: string; // National ID Card
+  // Professional Info
+  specialty: TechnicianSpecialty[];
+  designation?: string; // e.g., "Senior Technician", "Junior Technician"
+  // Performance Metrics
+  jobsCompleted: number;
+  jobsInProgress: number;
+  averageRating: number; // 1-5 rating
+  totalEarnings?: number; // Commission based earnings if applicable
+  // Status
+  status: TechnicianStatus;
+  joiningDate: string;
+  // Notes
+  notes?: string;
+  // Timestamps
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Specialty Configuration
+export const technicianSpecialties: { value: TechnicianSpecialty; label: string; icon: string }[] = [
+  { value: 'laptop-repair', label: 'Laptop Repair', icon: '💻' },
+  { value: 'desktop-repair', label: 'Desktop Repair', icon: '🖥️' },
+  { value: 'mobile-repair', label: 'Mobile Repair', icon: '📱' },
+  { value: 'printer-repair', label: 'Printer Repair', icon: '🖨️' },
+  { value: 'networking', label: 'Networking', icon: '🌐' },
+  { value: 'data-recovery', label: 'Data Recovery', icon: '💾' },
+  { value: 'software', label: 'Software', icon: '📀' },
+  { value: 'general', label: 'General', icon: '🔧' },
+];
+
+// Mock Technicians Data
+export const mockTechnicians: Technician[] = [
+  {
+    id: 'tech-001',
+    name: 'Nuwan Silva',
+    email: 'nuwan.silva@ecotec.lk',
+    phone: '0771234567',
+    address: '45, Galle Road, Colombo 03',
+    nic: '199512345678',
+    specialty: ['laptop-repair', 'desktop-repair', 'software'],
+    designation: 'Senior Technician',
+    jobsCompleted: 156,
+    jobsInProgress: 3,
+    averageRating: 4.8,
+    totalEarnings: 185000,
+    status: 'active',
+    joiningDate: '2022-03-15',
+    notes: 'Expert in HP and Dell laptop repairs',
+    createdAt: '2022-03-15T09:00:00Z',
+    updatedAt: '2026-01-20T14:30:00Z',
+  },
+  {
+    id: 'tech-002',
+    name: 'Pradeep Kumar',
+    email: 'pradeep.kumar@ecotec.lk',
+    phone: '0772345678',
+    address: '123, Kandy Road, Peradeniya',
+    nic: '199823456789',
+    specialty: ['mobile-repair', 'laptop-repair'],
+    designation: 'Mobile Specialist',
+    jobsCompleted: 243,
+    jobsInProgress: 5,
+    averageRating: 4.9,
+    totalEarnings: 220000,
+    status: 'active',
+    joiningDate: '2021-06-01',
+    notes: 'Samsung and Apple certified technician',
+    createdAt: '2021-06-01T09:00:00Z',
+    updatedAt: '2026-01-25T10:15:00Z',
+  },
+  {
+    id: 'tech-003',
+    name: 'Chaminda Perera',
+    email: 'chaminda.perera@ecotec.lk',
+    phone: '0773456789',
+    address: '78, High Level Road, Nugegoda',
+    nic: '199134567890',
+    specialty: ['networking', 'desktop-repair'],
+    designation: 'Network Specialist',
+    jobsCompleted: 98,
+    jobsInProgress: 2,
+    averageRating: 4.6,
+    totalEarnings: 125000,
+    status: 'active',
+    joiningDate: '2023-01-10',
+    notes: 'CCNA certified, handles all network projects',
+    createdAt: '2023-01-10T09:00:00Z',
+    updatedAt: '2026-01-18T16:45:00Z',
+  },
+  {
+    id: 'tech-004',
+    name: 'Tharaka Jayasuriya',
+    email: 'tharaka.j@ecotec.lk',
+    phone: '0774567890',
+    address: '56, Main Street, Negombo',
+    nic: '199645678901',
+    specialty: ['data-recovery', 'software'],
+    designation: 'Data Recovery Expert',
+    jobsCompleted: 67,
+    jobsInProgress: 1,
+    averageRating: 4.7,
+    totalEarnings: 95000,
+    status: 'active',
+    joiningDate: '2023-08-20',
+    notes: 'Specializes in HDD/SSD data recovery',
+    createdAt: '2023-08-20T09:00:00Z',
+    updatedAt: '2026-01-22T11:30:00Z',
+  },
+  {
+    id: 'tech-005',
+    name: 'Dinesh Fernando',
+    email: 'dinesh.f@ecotec.lk',
+    phone: '0775678901',
+    address: '234, Galle Road, Matara',
+    nic: '199956789012',
+    specialty: ['printer-repair', 'general'],
+    designation: 'Junior Technician',
+    jobsCompleted: 45,
+    jobsInProgress: 4,
+    averageRating: 4.3,
+    totalEarnings: 65000,
+    status: 'active',
+    joiningDate: '2024-02-15',
+    notes: 'New but quick learner, handles printers well',
+    createdAt: '2024-02-15T09:00:00Z',
+    updatedAt: '2026-01-28T09:00:00Z',
+  },
+  {
+    id: 'tech-006',
+    name: 'Lahiru Bandara',
+    email: 'lahiru.b@ecotec.lk',
+    phone: '0776789012',
+    address: '89, Lake Road, Kandy',
+    nic: '199767890123',
+    specialty: ['laptop-repair', 'mobile-repair', 'general'],
+    designation: 'Technician',
+    jobsCompleted: 112,
+    jobsInProgress: 0,
+    averageRating: 4.5,
+    totalEarnings: 145000,
+    status: 'on-leave',
+    joiningDate: '2022-11-01',
+    notes: 'On medical leave until Feb 15',
+    createdAt: '2022-11-01T09:00:00Z',
+    updatedAt: '2026-01-30T08:00:00Z',
+  },
+  {
+    id: 'tech-007',
+    name: 'Kasun Wickrama',
+    email: 'kasun.w@ecotec.lk',
+    phone: '0777890123',
+    address: '15, Beach Road, Galle',
+    nic: '199278901234',
+    specialty: ['desktop-repair', 'networking', 'software'],
+    designation: 'Senior Technician',
+    jobsCompleted: 189,
+    jobsInProgress: 4,
+    averageRating: 4.7,
+    totalEarnings: 210000,
+    status: 'active',
+    joiningDate: '2020-05-10',
+    notes: 'Expert in custom PC builds and server setup',
+    createdAt: '2020-05-10T09:00:00Z',
+    updatedAt: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'tech-008',
+    name: 'Asanka Rajapaksa',
+    email: 'asanka.r@ecotec.lk',
+    phone: '0778901234',
+    address: '67, Main Street, Kurunegala',
+    nic: '199489012345',
+    specialty: ['mobile-repair', 'tablet-repair'],
+    designation: 'Mobile Expert',
+    jobsCompleted: 278,
+    jobsInProgress: 6,
+    averageRating: 4.9,
+    totalEarnings: 285000,
+    status: 'active',
+    joiningDate: '2019-08-15',
+    notes: 'Highest rated technician for mobile repairs',
+    createdAt: '2019-08-15T09:00:00Z',
+    updatedAt: '2026-02-02T14:30:00Z',
+  },
+  {
+    id: 'tech-009',
+    name: 'Roshan Mendis',
+    email: 'roshan.m@ecotec.lk',
+    phone: '0779012345',
+    address: '234, Temple Road, Anuradhapura',
+    nic: '199690123456',
+    specialty: ['printer-repair', 'desktop-repair'],
+    designation: 'Technician',
+    jobsCompleted: 87,
+    jobsInProgress: 2,
+    averageRating: 4.4,
+    totalEarnings: 98000,
+    status: 'active',
+    joiningDate: '2023-04-01',
+    notes: 'Specializes in laser printer repairs',
+    createdAt: '2023-04-01T09:00:00Z',
+    updatedAt: '2026-01-28T16:00:00Z',
+  },
+  {
+    id: 'tech-010',
+    name: 'Sampath Liyanage',
+    email: 'sampath.l@ecotec.lk',
+    phone: '0770123456',
+    address: '45, Station Road, Ratnapura',
+    nic: '199301234567',
+    specialty: ['data-recovery', 'laptop-repair', 'software'],
+    designation: 'Data Specialist',
+    jobsCompleted: 134,
+    jobsInProgress: 3,
+    averageRating: 4.8,
+    totalEarnings: 175000,
+    status: 'active',
+    joiningDate: '2021-02-20',
+    notes: 'Clean room data recovery certified',
+    createdAt: '2021-02-20T09:00:00Z',
+    updatedAt: '2026-02-01T11:15:00Z',
+  },
+  {
+    id: 'tech-011',
+    name: 'Harsha Gunasekara',
+    email: 'harsha.g@ecotec.lk',
+    phone: '0771234890',
+    address: '12, Market Street, Badulla',
+    nic: '199812345890',
+    specialty: ['networking', 'software', 'general'],
+    designation: 'Junior Technician',
+    jobsCompleted: 34,
+    jobsInProgress: 2,
+    averageRating: 4.2,
+    totalEarnings: 45000,
+    status: 'active',
+    joiningDate: '2025-06-01',
+    notes: 'Fresh graduate, good with networking',
+    createdAt: '2025-06-01T09:00:00Z',
+    updatedAt: '2026-01-25T09:30:00Z',
+  },
+  {
+    id: 'tech-012',
+    name: 'Nimal Jayawardena',
+    email: 'nimal.j@ecotec.lk',
+    phone: '0772345890',
+    address: '78, Hospital Road, Polonnaruwa',
+    nic: '198823456789',
+    specialty: ['desktop-repair', 'printer-repair', 'general'],
+    designation: 'Senior Technician',
+    jobsCompleted: 312,
+    jobsInProgress: 1,
+    averageRating: 4.6,
+    totalEarnings: 320000,
+    status: 'active',
+    joiningDate: '2017-03-10',
+    notes: 'Most experienced technician, great mentor',
+    createdAt: '2017-03-10T09:00:00Z',
+    updatedAt: '2026-02-03T08:00:00Z',
+  },
+  {
+    id: 'tech-013',
+    name: 'Ruwan De Silva',
+    email: 'ruwan.ds@ecotec.lk',
+    phone: '0773456890',
+    address: '90, New Town, Jaffna',
+    nic: '199734567890',
+    specialty: ['mobile-repair', 'laptop-repair'],
+    designation: 'Technician',
+    jobsCompleted: 76,
+    jobsInProgress: 0,
+    averageRating: 4.1,
+    totalEarnings: 82000,
+    status: 'inactive',
+    joiningDate: '2023-09-15',
+    notes: 'Resigned - last working day was Jan 31',
+    createdAt: '2023-09-15T09:00:00Z',
+    updatedAt: '2026-01-31T17:00:00Z',
+  },
+  {
+    id: 'tech-014',
+    name: 'Saman Kumara',
+    email: 'saman.k@ecotec.lk',
+    phone: '0774567890',
+    address: '156, Hill Street, Nuwara Eliya',
+    nic: '199045678901',
+    specialty: ['laptop-repair', 'desktop-repair', 'networking'],
+    designation: 'Lead Technician',
+    jobsCompleted: 256,
+    jobsInProgress: 5,
+    averageRating: 4.9,
+    totalEarnings: 290000,
+    status: 'active',
+    joiningDate: '2018-07-01',
+    notes: 'Team lead for hardware department',
+    createdAt: '2018-07-01T09:00:00Z',
+    updatedAt: '2026-02-02T10:45:00Z',
+  },
+  {
+    id: 'tech-015',
+    name: 'Ajith Kumara',
+    email: 'ajith.k@ecotec.lk',
+    phone: '0775678012',
+    address: '23, Garden Lane, Moratuwa',
+    nic: '199556780123',
+    specialty: ['software', 'data-recovery'],
+    designation: 'Software Specialist',
+    jobsCompleted: 145,
+    jobsInProgress: 2,
+    averageRating: 4.5,
+    totalEarnings: 165000,
+    status: 'active',
+    joiningDate: '2022-01-15',
+    notes: 'Expert in OS troubleshooting and malware removal',
+    createdAt: '2022-01-15T09:00:00Z',
+    updatedAt: '2026-01-30T15:20:00Z',
+  },
+  {
+    id: 'tech-016',
+    name: 'Thilina Peris',
+    email: 'thilina.p@ecotec.lk',
+    phone: '0776780123',
+    address: '34, Beach Road, Trincomalee',
+    nic: '199867801234',
+    specialty: ['mobile-repair', 'tablet-repair', 'general'],
+    designation: 'Junior Technician',
+    jobsCompleted: 28,
+    jobsInProgress: 3,
+    averageRating: 4.0,
+    totalEarnings: 35000,
+    status: 'active',
+    joiningDate: '2025-09-01',
+    notes: 'Training under Asanka for mobile repairs',
+    createdAt: '2025-09-01T09:00:00Z',
+    updatedAt: '2026-02-01T16:30:00Z',
+  },
+  {
+    id: 'tech-017',
+    name: 'Prasanna Weerasinghe',
+    email: 'prasanna.w@ecotec.lk',
+    phone: '0777801234',
+    address: '67, Railway Avenue, Panadura',
+    nic: '199178012345',
+    specialty: ['networking', 'desktop-repair', 'software'],
+    designation: 'Network Engineer',
+    jobsCompleted: 167,
+    jobsInProgress: 4,
+    averageRating: 4.7,
+    totalEarnings: 195000,
+    status: 'active',
+    joiningDate: '2020-11-20',
+    notes: 'CCNP certified, handles corporate clients',
+    createdAt: '2020-11-20T09:00:00Z',
+    updatedAt: '2026-01-29T12:00:00Z',
+  },
+  {
+    id: 'tech-018',
+    name: 'Buddhika Fernando',
+    email: 'buddhika.f@ecotec.lk',
+    phone: '0778012345',
+    address: '89, Temple Junction, Dambulla',
+    nic: '199389012345',
+    specialty: ['printer-repair', 'general'],
+    designation: 'Technician',
+    jobsCompleted: 92,
+    jobsInProgress: 0,
+    averageRating: 4.3,
+    totalEarnings: 105000,
+    status: 'on-leave',
+    joiningDate: '2022-08-10',
+    notes: 'Annual leave until Feb 10',
+    createdAt: '2022-08-10T09:00:00Z',
+    updatedAt: '2026-02-01T08:00:00Z',
+  },
+  {
+    id: 'tech-019',
+    name: 'Dilshan Rathnayake',
+    email: 'dilshan.r@ecotec.lk',
+    phone: '0779123456',
+    address: '12, Clock Tower Road, Matale',
+    nic: '200001234567',
+    specialty: ['laptop-repair', 'mobile-repair', 'software'],
+    designation: 'Technician',
+    jobsCompleted: 89,
+    jobsInProgress: 3,
+    averageRating: 4.4,
+    totalEarnings: 98000,
+    status: 'active',
+    joiningDate: '2023-05-15',
+    notes: 'Quick learner, good customer service skills',
+    createdAt: '2023-05-15T09:00:00Z',
+    updatedAt: '2026-02-02T09:15:00Z',
+  },
+  {
+    id: 'tech-020',
+    name: 'Gayan Senanayake',
+    email: 'gayan.s@ecotec.lk',
+    phone: '0770234567',
+    address: '45, Bus Stand Road, Hambantota',
+    nic: '199502345678',
+    specialty: ['data-recovery', 'desktop-repair', 'laptop-repair'],
+    designation: 'Senior Technician',
+    jobsCompleted: 178,
+    jobsInProgress: 2,
+    averageRating: 4.8,
+    totalEarnings: 205000,
+    status: 'active',
+    joiningDate: '2019-12-01',
+    notes: 'Expert in SSD and NVMe data recovery',
+    createdAt: '2019-12-01T09:00:00Z',
+    updatedAt: '2026-01-31T14:45:00Z',
+  },
+  {
+    id: 'tech-021',
+    name: 'Mahesh Jayakody',
+    email: 'mahesh.j@ecotec.lk',
+    phone: '0771345678',
+    address: '78, New Road, Chilaw',
+    nic: '199713456789',
+    specialty: ['mobile-repair', 'general'],
+    designation: 'Junior Technician',
+    jobsCompleted: 42,
+    jobsInProgress: 2,
+    averageRating: 4.1,
+    totalEarnings: 52000,
+    status: 'active',
+    joiningDate: '2024-08-01',
+    notes: 'Specializes in budget phone repairs',
+    createdAt: '2024-08-01T09:00:00Z',
+    updatedAt: '2026-01-28T11:30:00Z',
+  },
+];
+
 // Supplier interface for managing suppliers with credit tracking
 export interface Supplier {
   id: string;
+  apiId?: string; // Actual database UUID for API operations
   name: string;
   company: string;
   email: string;
@@ -1714,6 +2196,7 @@ export interface GRNItem {
 // Main GRN Interface
 export interface GoodsReceivedNote {
   id: string;
+  apiId?: string; // Actual database UUID for API operations
   grnNumber: string; // GRN-2026-0001 format
   supplierId: string;
   supplierName: string;

@@ -5,8 +5,8 @@ import {
   mockServices, 
   serviceCategories, 
   type Service, 
-  type ServiceCategory, 
-  type ServiceStatus 
+  type ServiceCategory,
+  type DeviceType
 } from '../data/mockData';
 import { SearchableSelect } from '../components/ui/searchable-select';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
@@ -25,13 +25,11 @@ import {
   Shield,
   Sparkles,
   Clock,
-  TrendingUp,
   Star,
   LayoutGrid,
   List,
   CheckCircle,
   XCircle,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -39,10 +37,26 @@ import {
   Zap,
   Package,
   Users,
-  Activity,
   ArrowUpRight,
   Layers,
+  Laptop,
+  Smartphone,
+  Tablet,
+  FileText,
 } from 'lucide-react';
+
+// Device type icon mapping
+const getDeviceIcon = (deviceType: DeviceType) => {
+  switch (deviceType) {
+    case 'laptop': return <Laptop className="w-3 h-3" />;
+    case 'desktop': return <HardDrive className="w-3 h-3" />;
+    case 'phone': return <Smartphone className="w-3 h-3" />;
+    case 'tablet': return <Tablet className="w-3 h-3" />;
+    case 'printer': return <FileText className="w-3 h-3" />;
+    case 'monitor': return <Monitor className="w-3 h-3" />;
+    default: return <Package className="w-3 h-3" />;
+  }
+};
 
 export const Services: React.FC = () => {
   const { theme } = useTheme();
@@ -76,35 +90,12 @@ export const Services: React.FC = () => {
     }))
   ];
 
-  // Status options
+  // Status options - Simplified to Active/Inactive
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'active', label: '✅ Active' },
     { value: 'inactive', label: '⏸️ Inactive' },
-    { value: 'discontinued', label: '❌ Discontinued' },
   ];
-
-  // Status config
-  const statusConfig: Record<ServiceStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-    active: {
-      label: 'Active',
-      color: 'text-emerald-500',
-      bgColor: theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50',
-      icon: <CheckCircle className="w-4 h-4" />,
-    },
-    inactive: {
-      label: 'Inactive',
-      color: 'text-amber-500',
-      bgColor: theme === 'dark' ? 'bg-amber-500/10' : 'bg-amber-50',
-      icon: <AlertCircle className="w-4 h-4" />,
-    },
-    discontinued: {
-      label: 'Discontinued',
-      color: 'text-red-500',
-      bgColor: theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50',
-      icon: <XCircle className="w-4 h-4" />,
-    },
-  };
 
   // Get category icon
   const getCategoryIcon = (category: ServiceCategory) => {
@@ -129,7 +120,9 @@ export const Services: React.FC = () => {
       const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            service.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || service.category === selectedCategory;
-      const matchesStatus = selectedStatus === 'all' || service.status === selectedStatus;
+      const matchesStatus = selectedStatus === 'all' || 
+                           (selectedStatus === 'active' && service.isActive) ||
+                           (selectedStatus === 'inactive' && !service.isActive);
       const matchesPopular = !showPopularOnly || service.isPopular;
       
       return matchesSearch && matchesCategory && matchesStatus && matchesPopular;
@@ -143,29 +136,25 @@ export const Services: React.FC = () => {
     currentPage * itemsPerPage
   );
 
-  // Statistics
+  // Statistics - Simplified
   const stats = useMemo(() => {
-    const active = services.filter(s => s.status === 'active').length;
+    const active = services.filter(s => s.isActive).length;
     const popular = services.filter(s => s.isPopular).length;
-    const totalRevenue = services.reduce((sum, s) => sum + s.totalRevenue, 0);
-    const totalCompleted = services.reduce((sum, s) => sum + s.totalCompleted, 0);
     
-    return { active, popular, totalRevenue, totalCompleted, total: services.length };
+    return { active, popular, total: services.length };
   }, [services]);
 
   // Format currency
   const formatCurrency = (amount: number) => `Rs. ${amount.toLocaleString('en-LK')}`;
 
-  // Format price display
+  // Format price display - Simplified
   const formatPriceDisplay = (service: Service) => {
     if (service.priceType === 'fixed') {
       return service.basePrice === 0 ? 'Free' : formatCurrency(service.basePrice);
-    } else if (service.priceType === 'hourly') {
-      return `${formatCurrency(service.hourlyRate || 0)}/hr`;
-    } else if (service.priceType === 'quote') {
-      return 'Get Quote';
+    } else if (service.priceType === 'starting-from') {
+      return `From ${formatCurrency(service.basePrice)}`;
     } else {
-      return `${formatCurrency(service.minPrice || 0)} - ${formatCurrency(service.maxPrice || 0)}`;
+      return 'Quote Required';
     }
   };
 
@@ -231,8 +220,8 @@ export const Services: React.FC = () => {
         </button>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* Statistics Cards - Simplified */}
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         {/* Total Services */}
         <div className={`p-4 rounded-2xl border ${
           theme === 'dark' 
@@ -246,7 +235,7 @@ export const Services: React.FC = () => {
               <Layers className="w-6 h-6 text-blue-500" />
             </div>
             <div>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Services</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total</p>
               <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{stats.total}</p>
             </div>
           </div>
@@ -271,26 +260,7 @@ export const Services: React.FC = () => {
           </div>
         </div>
 
-        {/* Jobs Completed */}
-        <div className={`p-4 rounded-2xl border ${
-          theme === 'dark' 
-            ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50' 
-            : 'bg-gradient-to-br from-white to-slate-50 border-slate-200'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-xl ${
-              theme === 'dark' ? 'bg-purple-500/10' : 'bg-purple-50'
-            }`}>
-              <Activity className="w-6 h-6 text-purple-500" />
-            </div>
-            <div>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Jobs Done</p>
-              <p className={`text-2xl font-bold text-purple-500`}>{stats.totalCompleted.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Total Revenue */}
+        {/* Popular Services */}
         <div className={`p-4 rounded-2xl border ${
           theme === 'dark' 
             ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50' 
@@ -300,11 +270,11 @@ export const Services: React.FC = () => {
             <div className={`p-3 rounded-xl ${
               theme === 'dark' ? 'bg-amber-500/10' : 'bg-amber-50'
             }`}>
-              <TrendingUp className="w-6 h-6 text-amber-500" />
+              <Star className="w-6 h-6 text-amber-500" />
             </div>
             <div>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Revenue</p>
-              <p className={`text-xl font-bold text-amber-500`}>Rs. {(stats.totalRevenue / 1000000).toFixed(1)}M</p>
+              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Popular</p>
+              <p className={`text-2xl font-bold text-amber-500`}>{stats.popular}</p>
             </div>
           </div>
         </div>
@@ -460,6 +430,23 @@ export const Services: React.FC = () => {
                 {service.description}
               </p>
 
+              {/* Applicable Device Types */}
+              <div className="flex flex-wrap gap-1 mb-3">
+                {service.applicableDeviceTypes?.map((deviceType) => (
+                  <span
+                    key={deviceType}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs ${
+                      theme === 'dark'
+                        ? 'bg-slate-700/50 text-slate-400'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {getDeviceIcon(deviceType)}
+                    {deviceType}
+                  </span>
+                ))}
+              </div>
+
               {/* Price & Duration */}
               <div className="flex items-center justify-between mb-3">
                 <div className={`text-lg font-bold ${
@@ -475,21 +462,23 @@ export const Services: React.FC = () => {
                 </div>
               </div>
 
-              {/* Stats Row */}
+              {/* Status Row */}
               <div className={`flex items-center justify-between py-2 border-t ${
                 theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
               }`}>
-                <div className="flex items-center gap-4 text-xs">
-                  <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>
-                    <Activity className="w-3 h-3 inline mr-1" />
-                    {service.totalCompleted} done
+                <div className="flex items-center gap-2">
+                  <Clock className={`w-3 h-3 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {service.estimatedDuration}
                   </span>
                 </div>
                 <span className={`px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${
-                  statusConfig[service.status].bgColor
-                } ${statusConfig[service.status].color}`}>
-                  {statusConfig[service.status].icon}
-                  {statusConfig[service.status].label}
+                  service.isActive 
+                    ? 'bg-emerald-500/10 text-emerald-500' 
+                    : 'bg-slate-500/10 text-slate-500'
+                }`}>
+                  {service.isActive ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                  {service.isActive ? 'Active' : 'Inactive'}
                 </span>
               </div>
 
@@ -554,9 +543,6 @@ export const Services: React.FC = () => {
                   }`}>Duration</th>
                   <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
                     theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                  }`}>Completed</th>
-                  <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${
-                    theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                   }`}>Status</th>
                   <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider ${
                     theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
@@ -609,16 +595,13 @@ export const Services: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                        {service.totalCompleted}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
-                        statusConfig[service.status].bgColor
-                      } ${statusConfig[service.status].color}`}>
-                        {statusConfig[service.status].icon}
-                        {statusConfig[service.status].label}
+                        service.isActive 
+                          ? 'bg-emerald-500/10 text-emerald-500' 
+                          : 'bg-slate-500/10 text-slate-500'
+                      }`}>
+                        {service.isActive ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                        {service.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -860,10 +843,12 @@ export const Services: React.FC = () => {
               {/* Status & Popular */}
               <div className="flex items-center gap-3">
                 <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium ${
-                  statusConfig[selectedService.status].bgColor
-                } ${statusConfig[selectedService.status].color}`}>
-                  {statusConfig[selectedService.status].icon}
-                  {statusConfig[selectedService.status].label}
+                  selectedService.isActive 
+                    ? 'bg-emerald-500/10 text-emerald-500' 
+                    : 'bg-slate-500/10 text-slate-500'
+                }`}>
+                  {selectedService.isActive ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                  {selectedService.isActive ? 'Active' : 'Inactive'}
                 </span>
                 {selectedService.isPopular && (
                   <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-white">
@@ -930,58 +915,15 @@ export const Services: React.FC = () => {
                 </div>
               </div>
 
-              {/* Statistics */}
-              <div className={`p-4 rounded-xl ${
-                theme === 'dark' ? 'bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/30' : 'bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200'
-              }`}>
-                <h3 className={`text-sm font-semibold mb-3 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                  Performance Stats
-                </h3>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                      {selectedService.totalCompleted}
-                    </p>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Jobs Completed</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-emerald-500">
-                      {formatCurrency(selectedService.totalRevenue)}
-                    </p>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Revenue</p>
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                      {selectedService.lastPerformed || 'N/A'}
-                    </p>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Last Performed</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Requirements & Notes */}
-              {(selectedService.requirements || selectedService.notes) && (
-                <div className="space-y-3">
-                  {selectedService.requirements && (
-                    <div>
-                      <h3 className={`text-sm font-semibold mb-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Requirements
-                      </h3>
-                      <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {selectedService.requirements}
-                      </p>
-                    </div>
-                  )}
-                  {selectedService.notes && (
-                    <div>
-                      <h3 className={`text-sm font-semibold mb-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Notes
-                      </h3>
-                      <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {selectedService.notes}
-                      </p>
-                    </div>
-                  )}
+              {/* Notes */}
+              {selectedService.notes && (
+                <div>
+                  <h3 className={`text-sm font-semibold mb-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Notes
+                  </h3>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {selectedService.notes}
+                  </p>
                 </div>
               )}
             </div>

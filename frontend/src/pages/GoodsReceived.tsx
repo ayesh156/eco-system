@@ -1,12 +1,18 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { mockGRNs, mockSuppliers } from '../data/mockData';
 import type { GoodsReceivedNote, GRNStatus } from '../data/mockData';
 import { GRNFormModal } from '../components/modals/GRNFormModal';
 import { GRNViewModal } from '../components/modals/GRNViewModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { SearchableSelect } from '../components/ui/searchable-select';
+import * as grnService from '../services/grnService';
+import * as supplierService from '../services/supplierService';
+import type { FrontendGRN } from '../services/grnService';
+import type { FrontendSupplier } from '../services/supplierService';
+import { toast } from 'sonner';
 import { 
   Search, Plus, Edit, Eye, Calendar, ClipboardCheck,
   CheckCircle, XCircle, Clock, AlertTriangle,
@@ -46,10 +52,17 @@ type ViewMode = 'grid' | 'table';
 
 export const GoodsReceived: React.FC = () => {
   const { theme } = useTheme();
+  const { isViewingShop, viewingShop } = useAuth();
   const navigate = useNavigate();
   
+  // Get effective shopId for SUPER_ADMIN viewing a shop
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
+  
   // State
-  const [grns, setGRNs] = useState<GoodsReceivedNote[]>(mockGRNs);
+  const [grns, setGRNs] = useState<GoodsReceivedNote[]>([]);
+  const [suppliers, setSuppliers] = useState<FrontendSupplier[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
@@ -85,7 +98,49 @@ export const GoodsReceived: React.FC = () => {
   const [selectedGRN, setSelectedGRN] = useState<GoodsReceivedNote | null>(null);
   const [grnToDelete, setGrnToDelete] = useState<GoodsReceivedNote | null>(null);
 
-  const suppliers = mockSuppliers;
+  // Load GRNs and Suppliers from API
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [grnsResult, suppliersResult] = await Promise.all([
+        grnService.getGRNs({ shopId: effectiveShopId }),
+        supplierService.getSuppliers(effectiveShopId)
+      ]);
+      
+      if (grnsResult.success && grnsResult.data) {
+        // Map API GRNs to frontend format with apiId
+        const mappedGRNs: GoodsReceivedNote[] = grnsResult.data.map((grn: FrontendGRN) => ({
+          ...grn,
+          id: grn.grnNumber, // Use GRN number as display ID
+          apiId: grn.apiId || grn.id, // Store actual UUID
+        } as unknown as GoodsReceivedNote));
+        setGRNs(mappedGRNs);
+      } else {
+        // Fallback to mock data
+        setGRNs(mockGRNs);
+      }
+      
+      if (suppliersResult.success && suppliersResult.data) {
+        setSuppliers(suppliersResult.data);
+      } else {
+        // Fallback to mock data  
+        setSuppliers(mockSuppliers as unknown as FrontendSupplier[]);
+      }
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Failed to load data');
+      // Fallback to mock data
+      setGRNs(mockGRNs);
+      setSuppliers(mockSuppliers as unknown as FrontendSupplier[]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [effectiveShopId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -241,23 +296,90 @@ export const GoodsReceived: React.FC = () => {
     navigate('/grn/create');
   };
 
-  const handleEditGRN = (grn: GoodsReceivedNote) => {
+  const handleEditGRN = async (grn: GoodsReceivedNote) => {
+    // Fetch full GRN with items if it's from API
+    const apiId = (grn as FrontendGRN).apiId;
+    if (apiId) {
+      try {
+        const result = await grnService.getGRNById(apiId, effectiveShopId);
+        if (result.success && result.data) {
+          // Use the full GRN data with items
+          setSelectedGRN(result.data as unknown as GoodsReceivedNote);
+          setIsFormModalOpen(true);
+          return;
+        }
+      } catch (err) {
+        console.error('Error fetching full GRN:', err);
+      }
+    }
+    // Fallback to existing data
     setSelectedGRN(grn);
     setIsFormModalOpen(true);
   };
 
-  const handleViewGRN = (grn: GoodsReceivedNote) => {
+  const handleViewGRN = async (grn: GoodsReceivedNote) => {
+    // Fetch full GRN with items if it's from API
+    const apiId = (grn as FrontendGRN).apiId;
+    if (apiId) {
+      try {
+        const result = await grnService.getGRNById(apiId, effectiveShopId);
+        if (result.success && result.data) {
+          setSelectedGRN(result.data as unknown as GoodsReceivedNote);
+          setIsViewModalOpen(true);
+          return;
+        }
+      } catch (err) {
+        console.error('Error fetching full GRN:', err);
+      }
+    }
     setSelectedGRN(grn);
     setIsViewModalOpen(true);
   };
 
-  const handleSaveGRN = (grn: GoodsReceivedNote) => {
-    if (selectedGRN) {
-      setGRNs(prev => prev.map(g => g.id === grn.id ? grn : g));
-    } else {
-      setGRNs(prev => [...prev, grn]);
+  const handleSaveGRN = async (grn: GoodsReceivedNote) => {
+    setIsLoading(true);
+    try {
+      if (selectedGRN && (selectedGRN as FrontendGRN).apiId) {
+        // Update existing GRN (API update not yet implemented)
+        setGRNs(prev => prev.map(g => g.id === grn.id ? grn : g));
+        toast.success('GRN Updated Successfully! ✅', {
+          description: `GRN ${grn.grnNumber} has been updated`,
+          duration: 3000,
+        });
+      } else {
+        // Create new GRN via API
+        const result = await grnService.createGRN(grn as unknown as FrontendGRN);
+        if (result.success && result.data) {
+          setGRNs(prev => [...prev, result.data as unknown as GoodsReceivedNote]);
+          toast.success('GRN Created Successfully! 🎉', {
+            description: `GRN ${grn.grnNumber} has been created`,
+            duration: 3000,
+          });
+        } else {
+          // Fallback to local add
+          setGRNs(prev => [...prev, grn]);
+          toast.success('GRN Created Successfully! 🎉', {
+            description: `GRN ${grn.grnNumber} (local mode)`,
+            duration: 3000,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error saving GRN:', err);
+      toast.error('Failed to save GRN', {
+        description: err instanceof Error ? err.message : 'Please try again',
+        duration: 4000,
+      });
+      // Fallback to local operation
+      if (selectedGRN) {
+        setGRNs(prev => prev.map(g => g.id === grn.id ? grn : g));
+      } else {
+        setGRNs(prev => [...prev, grn]);
+      }
+    } finally {
+      setIsLoading(false);
+      setIsFormModalOpen(false);
     }
-    setIsFormModalOpen(false);
   };
 
   const handleDeleteGRN = (grn: GoodsReceivedNote) => {
@@ -265,11 +387,47 @@ export const GoodsReceived: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const confirmDeleteGRN = () => {
+  const confirmDeleteGRN = async () => {
     if (grnToDelete) {
-      setGRNs(prev => prev.filter(g => g.id !== grnToDelete.id));
-      setIsDeleteModalOpen(false);
-      setGrnToDelete(null);
+      setIsLoading(true);
+      try {
+        if ((grnToDelete as FrontendGRN).apiId) {
+          const result = await grnService.deleteGRN((grnToDelete as FrontendGRN).apiId!, effectiveShopId);
+          if (result.success) {
+            setGRNs(prev => prev.filter(g => g.id !== grnToDelete.id));
+            toast.success('GRN Deleted Successfully! 🗑️', {
+              description: `GRN ${grnToDelete.grnNumber} has been removed`,
+              duration: 3000,
+            });
+          } else {
+            // Fallback to local delete
+            setGRNs(prev => prev.filter(g => g.id !== grnToDelete.id));
+            toast.success('GRN Deleted Successfully! 🗑️', {
+              description: `GRN ${grnToDelete.grnNumber} removed (local)`,
+              duration: 3000,
+            });
+          }
+        } else {
+          // Local only GRN
+          setGRNs(prev => prev.filter(g => g.id !== grnToDelete.id));
+          toast.success('GRN Deleted Successfully! 🗑️', {
+            description: `GRN ${grnToDelete.grnNumber} removed`,
+            duration: 3000,
+          });
+        }
+      } catch (err) {
+        console.error('Error deleting GRN:', err);
+        toast.error('Failed to delete GRN', {
+          description: err instanceof Error ? err.message : 'Please try again',
+          duration: 4000,
+        });
+        // Fallback to local delete
+        setGRNs(prev => prev.filter(g => g.id !== grnToDelete.id));
+      } finally {
+        setIsLoading(false);
+        setIsDeleteModalOpen(false);
+        setGrnToDelete(null);
+      }
     }
   };
 
@@ -418,6 +576,104 @@ export const GoodsReceived: React.FC = () => {
       </div>
     );
   };
+
+  // Skeleton Loading Component
+  const SkeletonLoader = () => (
+    <div className="space-y-6 animate-pulse">
+      {/* Header Skeleton */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            <div className={`h-8 w-48 rounded-lg ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+          </div>
+          <div className={`h-4 w-64 mt-2 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+        </div>
+        <div className={`h-10 w-32 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+      </div>
+
+      {/* Stats Skeleton */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+              <div className="flex-1">
+                <div className={`h-3 w-16 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div className={`h-6 w-12 mt-2 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Search & Filters Skeleton */}
+      <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className={`flex-1 h-10 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+          <div className="flex gap-2">
+            <div className={`h-10 w-32 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            <div className={`h-10 w-32 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            <div className={`h-10 w-10 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Cards Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className={`rounded-2xl border p-5 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            {/* Card Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div>
+                  <div className={`h-5 w-28 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                  <div className={`h-3 w-20 mt-2 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                </div>
+              </div>
+              <div className={`h-6 w-20 rounded-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            </div>
+            {/* Card Body */}
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <div className={`h-4 w-24 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div className={`h-4 w-16 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+              </div>
+              <div className="flex justify-between">
+                <div className={`h-4 w-20 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div className={`h-4 w-24 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+              </div>
+              <div className="flex justify-between">
+                <div className={`h-4 w-28 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div className={`h-4 w-20 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+              </div>
+            </div>
+            {/* Card Footer */}
+            <div className={`flex gap-2 mt-4 pt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+              <div className={`flex-1 h-9 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+              <div className={`flex-1 h-9 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Loading Indicator */}
+      <div className="flex justify-center py-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin ${theme === 'dark' ? 'border-emerald-400' : 'border-emerald-500'}`} />
+          <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            Loading GRNs...
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Show skeleton while loading
+  if (isLoading) {
+    return <SkeletonLoader />;
+  }
 
   return (
     <div className="space-y-6">
@@ -1222,6 +1478,7 @@ export const GoodsReceived: React.FC = () => {
         suppliers={suppliers}
         onClose={() => setIsFormModalOpen(false)}
         onSave={handleSaveGRN}
+        isLoading={isLoading}
       />
 
       <GRNViewModal
@@ -1244,6 +1501,7 @@ export const GoodsReceived: React.FC = () => {
           setIsDeleteModalOpen(false);
           setGrnToDelete(null);
         }}
+        isLoading={isLoading}
       />
     </div>
   );

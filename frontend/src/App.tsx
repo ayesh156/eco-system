@@ -46,6 +46,7 @@ const Quotations = lazy(() => import('./pages/Quotations').then(m => ({ default:
 const QuotationForm = lazy(() => import('./pages/QuotationForm').then(m => ({ default: m.QuotationForm })));
 const JobNotes = lazy(() => import('./pages/JobNotes').then(m => ({ default: m.JobNotes })));
 const JobNoteForm = lazy(() => import('./pages/JobNoteForm').then(m => ({ default: m.JobNoteForm })));
+const Technicians = lazy(() => import('./pages/Technicians').then(m => ({ default: m.Technicians })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 const Help = lazy(() => import('./pages/Help').then(m => ({ default: m.Help })));
 const CashManagement = lazy(() => import('./pages/CashManagement').then(m => ({ default: m.CashManagement })));
@@ -145,6 +146,7 @@ function App() {
                               <Route path="/job-notes" element={<SectionGuard path="/job-notes"><JobNotes /></SectionGuard>} />
                               <Route path="/job-notes/create" element={<SectionGuard path="/job-notes"><JobNoteForm /></SectionGuard>} />
                               <Route path="/job-notes/edit/:id" element={<SectionGuard path="/job-notes"><JobNoteForm /></SectionGuard>} />
+                              <Route path="/technicians" element={<SectionGuard path="/job-notes"><Technicians /></SectionGuard>} />
                               <Route path="/reports" element={<SectionGuard path="/reports"><Reports /></SectionGuard>} />
                               <Route path="/cash-management" element={<SectionGuard path="/cash-management"><CashManagement /></SectionGuard>} />
                               <Route path="/cash-management/transactions" element={<SectionGuard path="/cash-management"><CashManagement /></SectionGuard>} />

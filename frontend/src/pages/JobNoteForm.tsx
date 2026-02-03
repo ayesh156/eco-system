@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import { mockJobNotes, mockCustomers, generateJobNumber } from '../data/mockData';
+import { mockJobNotes, mockCustomers, mockServices, mockTechnicians, generateJobNumber } from '../data/mockData';
 import type { JobNote, JobNotePriority, DeviceType, Customer } from '../data/mockData';
 import { SearchableSelect } from '../components/ui/searchable-select';
 import {
-  ArrowLeft, Save, Printer, User, Phone, Mail, MapPin,
+  ArrowLeft, Save, Printer, User, Phone, MapPin,
   Laptop, Monitor, Smartphone, Tablet, HardDrive, FileText, Package,
   Wrench, Calendar, Clock, DollarSign, UserPlus, Search, X,
-  ChevronLeft, ChevronRight, AlertCircle
+  ChevronLeft, ChevronRight, AlertCircle, Settings2
 } from 'lucide-react';
 
 // Device type options
@@ -30,15 +30,11 @@ const priorityOptions = [
   { value: 'urgent', label: 'Urgent', color: 'red' },
 ];
 
-// Technicians
-const technicians = ['Nuwan Silva', 'Kasun Fernando', 'Amila Perera', 'Sanjaya Mendis'];
-
 interface FormData {
   // Customer Info
   customerId: string;
   customerName: string;
   customerPhone: string;
-  customerEmail: string;
   customerAddress: string;
   isNewCustomer: boolean;
   // Device Info
@@ -47,12 +43,17 @@ interface FormData {
   deviceModel: string;
   serialNumber: string;
   accessories: string;
-  // Problem
-  reportedIssue: string;
+  password: string;
   deviceCondition: string;
+  // Service Selection (linked to Services catalog)
+  serviceId: string;
+  serviceName: string;
+  // Problem & Diagnosis
+  reportedIssue: string;
+  diagnosis: string;
   // Job Details
   receivedDate: string;
-  expectedCompletionDate: string;
+  estimatedCompletion: string;
   estimatedCost: number;
   advancePayment: number;
   priority: JobNotePriority;
@@ -75,7 +76,6 @@ const initialFormData: FormData = {
   customerId: '',
   customerName: '',
   customerPhone: '',
-  customerEmail: '',
   customerAddress: '',
   isNewCustomer: false,
   deviceType: 'laptop',
@@ -83,10 +83,14 @@ const initialFormData: FormData = {
   deviceModel: '',
   serialNumber: '',
   accessories: '',
-  reportedIssue: '',
+  password: '',
   deviceCondition: '',
+  serviceId: '',
+  serviceName: '',
+  reportedIssue: '',
+  diagnosis: '',
   receivedDate: getDefaultDate(),
-  expectedCompletionDate: getDefaultCompletionDate(),
+  estimatedCompletion: getDefaultCompletionDate(),
   estimatedCost: 0,
   advancePayment: 0,
   priority: 'normal',
@@ -119,7 +123,6 @@ export const JobNoteForm: React.FC = () => {
         customerId: existingJob.customerId || '',
         customerName: existingJob.customerName,
         customerPhone: existingJob.customerPhone,
-        customerEmail: existingJob.customerEmail || '',
         customerAddress: existingJob.customerAddress || '',
         isNewCustomer: false,
         deviceType: existingJob.deviceType,
@@ -127,10 +130,14 @@ export const JobNoteForm: React.FC = () => {
         deviceModel: existingJob.deviceModel,
         serialNumber: existingJob.serialNumber || '',
         accessories: existingJob.accessories.join(', '),
-        reportedIssue: existingJob.reportedIssue,
+        password: existingJob.password || '',
         deviceCondition: existingJob.deviceCondition || '',
+        serviceId: existingJob.serviceId || '',
+        serviceName: existingJob.serviceName || '',
+        reportedIssue: existingJob.reportedIssue,
+        diagnosis: existingJob.diagnosis || '',
         receivedDate: existingJob.receivedDate.split('T')[0],
-        expectedCompletionDate: existingJob.expectedCompletionDate?.split('T')[0] || getDefaultCompletionDate(),
+        estimatedCompletion: existingJob.estimatedCompletion?.split('T')[0] || getDefaultCompletionDate(),
         estimatedCost: existingJob.estimatedCost || 0,
         advancePayment: existingJob.advancePayment || 0,
         priority: existingJob.priority,
@@ -165,9 +172,68 @@ export const JobNoteForm: React.FC = () => {
     ).slice(0, 5);
   }, [customerSearch]);
 
+  // Filter services based on selected device type
+  const availableServices = useMemo(() => {
+    return mockServices.filter(s => 
+      s.isActive && 
+      s.applicableDeviceTypes.includes(formData.deviceType)
+    );
+  }, [formData.deviceType]);
+
+  // Service options for SearchableSelect
+  const serviceOptions = useMemo(() => {
+    return [
+      { value: '', label: 'Select Service (Optional)' },
+      ...availableServices.map(s => ({
+        value: s.id,
+        label: `${s.name} - Rs. ${s.basePrice.toLocaleString()}${s.priceType === 'starting-from' ? '+' : ''}`,
+      }))
+    ];
+  }, [availableServices]);
+
   const handleInputChange = (field: keyof FormData, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
+  };
+
+  // Handle service selection - auto-fill pricing
+  const handleServiceSelect = (serviceId: string) => {
+    if (!serviceId) {
+      setFormData(prev => ({
+        ...prev,
+        serviceId: '',
+        serviceName: '',
+      }));
+      return;
+    }
+
+    const service = mockServices.find(s => s.id === serviceId);
+    if (service) {
+      setFormData(prev => ({
+        ...prev,
+        serviceId: service.id,
+        serviceName: service.name,
+        reportedIssue: prev.reportedIssue || service.name, // Auto-fill if empty
+        estimatedCost: service.basePrice,
+      }));
+    }
+  };
+
+  // Handle device type change - reset service if not applicable
+  const handleDeviceTypeChange = (deviceType: DeviceType) => {
+    setFormData(prev => {
+      // Check if current service is still applicable
+      const currentService = mockServices.find(s => s.id === prev.serviceId);
+      const isServiceApplicable = currentService?.applicableDeviceTypes.includes(deviceType);
+      
+      return {
+        ...prev,
+        deviceType,
+        // Reset service if not applicable to new device type
+        serviceId: isServiceApplicable ? prev.serviceId : '',
+        serviceName: isServiceApplicable ? prev.serviceName : '',
+      };
+    });
   };
 
   const handleCustomerSelect = (customer: Customer) => {
@@ -176,7 +242,6 @@ export const JobNoteForm: React.FC = () => {
       customerId: customer.id,
       customerName: customer.name,
       customerPhone: customer.phone,
-      customerEmail: customer.email || '',
       customerAddress: customer.address || '',
       isNewCustomer: false,
     }));
@@ -190,7 +255,6 @@ export const JobNoteForm: React.FC = () => {
       customerId: '',
       customerName: customerSearch,
       customerPhone: '',
-      customerEmail: '',
       customerAddress: '',
       isNewCustomer: true,
     }));
@@ -203,7 +267,6 @@ export const JobNoteForm: React.FC = () => {
       customerId: '',
       customerName: '',
       customerPhone: '',
-      customerEmail: '',
       customerAddress: '',
       isNewCustomer: false,
     }));
@@ -231,24 +294,27 @@ export const JobNoteForm: React.FC = () => {
       customerId: formData.customerId || undefined,
       customerName: formData.customerName,
       customerPhone: formData.customerPhone,
-      customerEmail: formData.customerEmail || undefined,
       customerAddress: formData.customerAddress || undefined,
       deviceType: formData.deviceType,
       deviceBrand: formData.deviceBrand,
       deviceModel: formData.deviceModel,
       serialNumber: formData.serialNumber || undefined,
       accessories: formData.accessories ? formData.accessories.split(',').map(a => a.trim()).filter(Boolean) : [],
-      deviceCondition: formData.deviceCondition || '',
+      deviceCondition: formData.deviceCondition || undefined,
+      password: formData.password || undefined,
+      // Service link fields
+      serviceId: formData.serviceId || undefined,
+      serviceName: formData.serviceName || undefined,
       reportedIssue: formData.reportedIssue,
+      diagnosis: formData.diagnosis || undefined,
       internalNotes: formData.internalNotes || undefined,
       estimatedCost: formData.estimatedCost || undefined,
       advancePayment: formData.advancePayment || undefined,
       status: isEditing && existingJob ? existingJob.status : 'received',
       priority: formData.priority,
       receivedDate: new Date(formData.receivedDate).toISOString(),
-      expectedCompletionDate: formData.expectedCompletionDate ? new Date(formData.expectedCompletionDate).toISOString() : undefined,
+      estimatedCompletion: formData.estimatedCompletion ? new Date(formData.estimatedCompletion).toISOString() : undefined,
       assignedTechnician: formData.assignedTechnician || undefined,
-      statusHistory: isEditing && existingJob ? existingJob.statusHistory : [{ status: 'received', date: new Date().toISOString() }],
       customerNotified: false,
       createdAt: isEditing && existingJob ? existingJob.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -363,9 +429,14 @@ export const JobNoteForm: React.FC = () => {
   const labelClass = `block text-xs font-semibold uppercase tracking-wider mb-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`;
   const errorClass = 'text-red-500 text-xs mt-1 flex items-center gap-1';
 
+  // Filter only active technicians and sort by name
+  const activeTechnicians = mockTechnicians
+    .filter(t => t.status === 'active')
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   const technicianSelectOptions = [
     { value: '', label: 'Select Technician' },
-    ...technicians.map(t => ({ value: t, label: t }))
+    ...activeTechnicians.map(t => ({ value: t.name, label: t.name }))
   ];
 
   const deviceTypeSelectOptions = deviceTypeOptions.map(d => ({ value: d.value, label: d.label }));
@@ -513,20 +584,6 @@ export const JobNoteForm: React.FC = () => {
                   <div>
                     <label className={labelClass}>
                       <span className="flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5" /> Email
-                      </span>
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.customerEmail}
-                      onChange={(e) => handleInputChange('customerEmail', e.target.value)}
-                      className={inputClass}
-                      placeholder="email@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass}>
-                      <span className="flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5" /> Address
                       </span>
                     </label>
@@ -560,7 +617,7 @@ export const JobNoteForm: React.FC = () => {
                     <SearchableSelect
                       options={deviceTypeSelectOptions}
                       value={formData.deviceType}
-                      onValueChange={(val) => handleInputChange('deviceType', val as DeviceType)}
+                      onValueChange={(val) => handleDeviceTypeChange(val as DeviceType)}
                       placeholder="Select type"
                       theme={theme}
                     />
@@ -606,6 +663,36 @@ export const JobNoteForm: React.FC = () => {
                       className={inputClass}
                       placeholder="e.g., Charger, Battery, Bag"
                     />
+                  </div>
+                </div>
+
+                {/* Service Selection */}
+                <div className="mt-6 pt-6 border-t border-slate-700/30">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
+                      <Settings2 className={`w-4 h-4 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                    </div>
+                    <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      Select Service from Catalog
+                    </h3>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Service Type</label>
+                    <SearchableSelect
+                      options={serviceOptions}
+                      value={formData.serviceId}
+                      onValueChange={(val) => handleServiceSelect(val)}
+                      placeholder="Search or select a service..."
+                      theme={theme}
+                    />
+                    {formData.serviceId && (
+                      <p className={`mt-2 text-sm ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                        ✓ Selected: {formData.serviceName}
+                      </p>
+                    )}
+                    <p className={`mt-1 text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                      {availableServices.length} services available for {formData.deviceType}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -703,16 +790,16 @@ export const JobNoteForm: React.FC = () => {
                       onClick={() => {
                         setShowCompletionCalendar(!showCompletionCalendar);
                         setShowReceivedCalendar(false);
-                        setCalendarMonth(formData.expectedCompletionDate ? new Date(formData.expectedCompletionDate) : new Date());
+                        setCalendarMonth(formData.estimatedCompletion ? new Date(formData.estimatedCompletion) : new Date());
                       }}
                       className={`${inputClass} text-left flex items-center justify-between`}
                     >
-                      <span>{formatDateDisplay(formData.expectedCompletionDate) || 'Select date'}</span>
+                      <span>{formatDateDisplay(formData.estimatedCompletion) || 'Select date'}</span>
                       <Clock className="w-4 h-4 text-slate-400" />
                     </button>
                     {showCompletionCalendar && renderCalendar(
-                      formData.expectedCompletionDate,
-                      (date) => handleInputChange('expectedCompletionDate', date),
+                      formData.estimatedCompletion,
+                      (date) => handleInputChange('estimatedCompletion', date),
                       setShowCompletionCalendar
                     )}
                   </div>

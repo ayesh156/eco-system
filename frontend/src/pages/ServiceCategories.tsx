@@ -100,7 +100,7 @@ export const ServiceCategories: React.FC = () => {
   // Convert serviceCategories to ExtendedServiceCategory objects with counts
   const initialCategories: ExtendedServiceCategory[] = serviceCategories.map((cat, index) => {
     const services = mockServices.filter(s => s.category === cat.value);
-    const totalRevenue = services.reduce((sum, s) => sum + (s.totalRevenue || 0), 0);
+    const totalRevenue = services.reduce((sum, s) => sum + (s.basePrice || 0), 0);
     return {
       id: `scat-${index + 1}`,
       value: cat.value,

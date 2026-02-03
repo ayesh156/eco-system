@@ -4,6 +4,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useShopBranding } from '../contexts/ShopBrandingContext';
 import { useShopSections } from '../contexts/ShopSectionsContext';
+import { useDataCache } from '../contexts/DataCacheContext';
+import { mockJobNotes } from '../data/mockData';
 import {
   Package, FileText, Users, LayoutDashboard, Settings, Database,
   Moon, Sun, Menu, X, ChevronLeft, ChevronRight, Bell, Search,
@@ -19,6 +21,7 @@ interface SubNavItem {
   path: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  badge?: string | null;
   isDisabled?: boolean;
 }
 
@@ -40,6 +43,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { user, logout, isViewingShop, viewingShop, exitViewingShop } = useAuth();
   const { branding } = useShopBranding();
   const { isSectionHidden, isSuperAdminHidden, isAdminHidden, hiddenSections, adminHiddenSections, isLoading: sectionsLoading } = useShopSections();
+  const { invoices: cachedInvoices, customers: cachedCustomers, loadInvoices, loadCustomers, invoicesLoaded, customersLoaded } = useDataCache();
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -158,6 +162,74 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     );
   };
 
+  // Load data for sidebar counts if not already loaded
+  // SUPER_ADMIN viewing shop should also load data, only skip for SUPER_ADMIN not viewing any shop
+  const shouldLoadShopData = user?.role !== 'SUPER_ADMIN' || isViewingShop;
+  
+  useEffect(() => {
+    if (!invoicesLoaded && shouldLoadShopData) {
+      loadInvoices();
+    }
+    if (!customersLoaded && shouldLoadShopData) {
+      loadCustomers();
+    }
+  }, [invoicesLoaded, customersLoaded, loadInvoices, loadCustomers, shouldLoadShopData]);
+
+  // Calculate dynamic counts from shop data (API data)
+  const invoicesPendingCount = useMemo(() => {
+    return cachedInvoices.filter(inv => inv.status === 'unpaid' || inv.status === 'halfpay').length;
+  }, [cachedInvoices]);
+
+  const overdueCustomersCount = useMemo(() => {
+    // Count customers who are overdue based on:
+    // 1. creditStatus is 'overdue' OR
+    // 2. Has credit balance > 0 AND creditDueDate has passed OR
+    // 3. Has any overdue invoice (based on cachedInvoices, matching Customer page logic)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today for fair comparison
+    
+    // Find all customers with overdue invoices from loaded invoices
+    const customersWithOverdueInvoices = new Set<string>();
+    
+    cachedInvoices.forEach(inv => {
+      // Check if invoice is unpaid/halfpay and overdue
+      if (inv.status !== 'fullpaid') {
+        const dueDate = new Date(inv.dueDate);
+        dueDate.setHours(0, 0, 0, 0);
+        
+        // If invoice is overdue, add customer to set
+        if (dueDate < today && inv.customerId) {
+          customersWithOverdueInvoices.add(inv.customerId);
+        }
+      }
+    });
+    
+    return cachedCustomers.filter(c => {
+      // 1. Explicitly marked as overdue
+      if (c.creditStatus === 'overdue') return true;
+      
+      // 2. Has credit balance and property-level due date passed
+      if (c.creditBalance > 0 && c.creditDueDate) {
+        const dueDate = new Date(c.creditDueDate);
+        dueDate.setHours(0, 0, 0, 0);
+        if (dueDate < today) return true;
+      }
+      
+      // 3. Has any overdue invoice based on actual invoice data
+      if (customersWithOverdueInvoices.has(c.id)) return true;
+      
+      return false;
+    }).length;
+  }, [cachedCustomers, cachedInvoices]);
+
+  const pendingJobNotesCount = useMemo(() => {
+    // Pending = not completed, not delivered, not cancelled
+    // TODO: Replace with API data when job notes are added to DataCacheContext
+    return mockJobNotes.filter(jn => 
+      !['completed', 'delivered', 'cancelled'].includes(jn.status)
+    ).length;
+  }, []);
+
   // Super Admin navigation - Only admin-related sections
   const superAdminNavItems: NavItem[] = [
     { path: '/admin', icon: LayoutDashboard, label: 'Overview', badge: null },
@@ -168,8 +240,17 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   // Regular shop navigation - for ADMIN, MANAGER, STAFF
   const shopNavItems: NavItem[] = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard', badge: null },
-    { path: '/invoices', icon: FileText, label: 'Invoices', badge: '12' },
-    { path: '/job-notes', icon: ClipboardList, label: 'Job Notes', badge: '4' },
+    { path: '/invoices', icon: FileText, label: 'Invoices', badge: invoicesPendingCount > 0 ? String(invoicesPendingCount) : null },
+    {
+      path: '/job-notes',
+      icon: ClipboardList,
+      label: 'Job Notes',
+      badge: null,
+      subItems: [
+        { path: '/job-notes', icon: ClipboardList, label: 'All Job Notes', badge: pendingJobNotesCount > 0 ? String(pendingJobNotesCount) : null },
+        { path: '/technicians', icon: Wrench, label: 'Technicians' },
+      ]
+    },
     {
       path: '/products',
       icon: Package,
@@ -202,7 +283,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       ]
     },
     { path: '/warranties', icon: Shield, label: 'Warranties', badge: '3' },
-    { path: '/customers', icon: Users, label: 'Customers', badge: '3' },
+    { path: '/customers', icon: Users, label: 'Customers', badge: overdueCustomersCount > 0 ? String(overdueCustomersCount) : null },
     { path: '/suppliers', icon: Truck, label: 'Suppliers', badge: '2' },
     { path: '/grn', icon: ClipboardCheck, label: 'GRN', badge: null },
     {
@@ -677,6 +758,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                             )}
                             <SubIcon className={`w-4 h-4 flex-shrink-0 ${subActive ? 'text-emerald-500' : ''}`} />
                             <span className="flex-1">{subItem.label}</span>
+                            {subItem.badge && (
+                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full min-w-[20px] text-center ${
+                                theme === 'dark'
+                                  ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-600 border border-emerald-200'
+                              }`}>
+                                {subItem.badge}
+                              </span>
+                            )}
                             {isSubDisabled && (
                               <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full ${
                                 theme === 'dark'
@@ -872,6 +962,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                             )}
                             <SubIcon className={`w-4 h-4 flex-shrink-0 ${subActive ? 'text-emerald-500' : ''}`} />
                             <span className="flex-1">{subItem.label}</span>
+                            {subItem.badge && (
+                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full min-w-[20px] text-center ${
+                                theme === 'dark'
+                                  ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-600 border border-emerald-200'
+                              }`}>
+                                {subItem.badge}
+                              </span>
+                            )}
                             {isSubDisabled && (
                               <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full ${
                                 theme === 'dark'
@@ -1059,7 +1158,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                                 <div className={`absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-emerald-500`} />
                               )}
                               <SubIcon className={`w-4 h-4 ${subActive ? 'text-emerald-500' : ''}`} />
-                              <span>{subItem.label}</span>
+                              <span className="flex-1">{subItem.label}</span>
+                              {subItem.badge && (
+                                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full min-w-[20px] text-center ${
+                                  theme === 'dark'
+                                    ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-600 border border-emerald-200'
+                                }`}>
+                                  {subItem.badge}
+                                </span>
+                              )}
                             </Link>
                           );
                         })}
@@ -1154,7 +1262,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                                 <div className={`absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-emerald-500`} />
                               )}
                               <SubIcon className={`w-4 h-4 ${subActive ? 'text-emerald-500' : ''}`} />
-                              <span>{subItem.label}</span>
+                              <span className="flex-1">{subItem.label}</span>
+                              {subItem.badge && (
+                                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full min-w-[20px] text-center ${
+                                  theme === 'dark'
+                                    ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-600 border border-emerald-200'
+                                }`}>
+                                  {subItem.badge}
+                                </span>
+                              )}
                             </Link>
                           );
                         })}

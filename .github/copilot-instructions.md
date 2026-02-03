@@ -763,6 +763,121 @@ estimates: mockEstimates.map(e => ({
 
 ---
 
+## 🌱 AUTO-UPDATE DATABASE SEED (MANDATORY)
+
+**CRITICAL INSTRUCTION:** When creating or modifying ANY database model/table in the Prisma schema, you MUST update the `backend/prisma/seed.ts` file to include sample data for that new section. This ensures the database can be reset with complete sample data anytime.
+
+### When to Update Seed File:
+1. **New Prisma Model Added** - Add sample data creation for the new model
+2. **New Fields Added to Existing Model** - Update seed data to include new fields
+3. **New Relationships Created** - Ensure related data is seeded properly
+4. **New Enum Values Added** - Include sample data using new enum values
+
+### Step-by-Step Seed Update Process:
+
+#### Step 1: Add Data Array (if new model)
+Add a new constant array with sample data at the top of the seed file:
+```typescript
+const NEW_MODEL_DATA = [
+  { name: 'Sample 1', field1: 'value1', field2: 123 },
+  { name: 'Sample 2', field1: 'value2', field2: 456 },
+  // Add more varied samples covering all use cases
+];
+```
+
+#### Step 2: Add Creation Logic in `seedShopData` Function
+Add the creation loop inside the `seedShopData` function:
+```typescript
+// ==========================================
+// NEW MODEL
+// ==========================================
+console.log('   📋 Creating New Models...');
+for (const item of NEW_MODEL_DATA) {
+  await prisma.newModel.create({
+    data: {
+      ...item,
+      shopId,  // Always include shopId for multi-tenant data
+    },
+  });
+}
+console.log(`      ✅ Created ${NEW_MODEL_DATA.length} new models`);
+```
+
+#### Step 3: Handle Relationships
+If the new model has relationships, ensure parent data exists first:
+```typescript
+// Get existing related data
+const categories = await prisma.category.findMany({ where: { shopId } });
+const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+
+await prisma.newModel.create({
+  data: {
+    name: item.name,
+    categoryId: randomCategory.id,  // Link to existing data
+    shopId,
+  },
+});
+```
+
+### Seed Data Guidelines:
+
+**INCLUDE for each model:**
+- ✅ At least 4-8 sample records per shop
+- ✅ All required fields with realistic Sri Lankan context
+- ✅ Various status values (e.g., active, pending, completed, cancelled)
+- ✅ Date variations (past dates, today, future dates)
+- ✅ Amount variations (small, medium, large values)
+- ✅ All enum values should be represented
+
+**Sample Data Quality:**
+- Use realistic Sri Lankan names, addresses, phone numbers
+- Use LKR currency values (e.g., 15000, 85000, 250000)
+- Include edge cases (zero values, max values, null optional fields)
+- Create both positive and negative scenarios
+
+### Running the Seed:
+
+```bash
+cd backend
+
+# Reset database and run seed (WARNING: Deletes all data!)
+npx prisma migrate reset
+
+# Or just run seed on existing database
+npx prisma db seed
+# OR
+npm run prisma:seed
+# OR
+npx tsx prisma/seed.ts
+```
+
+### Verification Checklist:
+After updating seed.ts, verify:
+- [ ] No TypeScript errors in seed file
+- [ ] All new models have sample data
+- [ ] Relationships are properly linked
+- [ ] Data is created for BOTH shops
+- [ ] Run `npx prisma db seed` successfully
+- [ ] Check Prisma Studio to verify data: `npx prisma studio`
+
+### Current Seed Coverage:
+
+| Model | Sample Count (per shop) |
+|-------|------------------------|
+| Categories | 12 |
+| Brands | 16 |
+| Products | 50+ |
+| Suppliers | 8 |
+| Customers | 16 (all types) |
+| GRNs | 4 (various statuses) |
+| Invoices | 8 (all statuses) |
+| Invoice Payments | Auto-generated |
+| Stock Movements | Auto-generated |
+| Invoice Reminders | Auto-generated |
+| Invoice Item History | Auto-generated |
+
+---
+
 **Remember:** You are building a **premium, world-class** computer shop management system. Every component should look professional, modern, and polished. Think like a senior software engineer at a top tech company!
 
 ---

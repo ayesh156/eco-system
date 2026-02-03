@@ -7,7 +7,7 @@ import {
   generateServiceId,
   type Service,
   type ServiceCategory,
-  type ServiceStatus 
+  type DeviceType
 } from '../data/mockData';
 import { SearchableSelect } from '../components/ui/searchable-select';
 import {
@@ -20,42 +20,53 @@ import {
   FileText,
   Tag,
   Info,
+  Laptop,
+  Monitor,
+  Smartphone,
+  Tablet,
+  HardDrive,
+  Package,
+  Check,
 } from 'lucide-react';
 
+// Device type options with icons
+const deviceTypeOptions: { value: DeviceType; label: string; icon: React.ReactNode }[] = [
+  { value: 'laptop', label: 'Laptop', icon: <Laptop className="w-4 h-4" /> },
+  { value: 'desktop', label: 'Desktop', icon: <HardDrive className="w-4 h-4" /> },
+  { value: 'phone', label: 'Phone', icon: <Smartphone className="w-4 h-4" /> },
+  { value: 'tablet', label: 'Tablet', icon: <Tablet className="w-4 h-4" /> },
+  { value: 'printer', label: 'Printer', icon: <FileText className="w-4 h-4" /> },
+  { value: 'monitor', label: 'Monitor', icon: <Monitor className="w-4 h-4" /> },
+  { value: 'other', label: 'Other', icon: <Package className="w-4 h-4" /> },
+];
+
+// Simplified form data matching the new Service interface
 interface ServiceFormData {
   name: string;
   category: ServiceCategory;
   description: string;
+  applicableDeviceTypes: DeviceType[];
   basePrice: number;
-  minPrice: number;
-  maxPrice: number;
-  priceType: 'fixed' | 'variable' | 'hourly' | 'quote';
-  hourlyRate: number;
+  priceType: 'fixed' | 'starting-from' | 'quote-required';
   estimatedDuration: string;
-  turnaroundTime: string;
-  status: ServiceStatus;
-  isPopular: boolean;
   warranty: string;
-  requirements: string;
   notes: string;
+  isActive: boolean;
+  isPopular: boolean;
 }
 
 const initialFormData: ServiceFormData = {
   name: '',
   category: 'repair',
   description: '',
+  applicableDeviceTypes: ['laptop', 'desktop'],
   basePrice: 0,
-  minPrice: 0,
-  maxPrice: 0,
   priceType: 'fixed',
-  hourlyRate: 0,
   estimatedDuration: '',
-  turnaroundTime: '',
-  status: 'active',
-  isPopular: false,
   warranty: '',
-  requirements: '',
   notes: '',
+  isActive: true,
+  isPopular: false,
 };
 
 export const ServiceForm: React.FC = () => {
@@ -77,22 +88,31 @@ export const ServiceForm: React.FC = () => {
           name: service.name,
           category: service.category,
           description: service.description,
+          applicableDeviceTypes: service.applicableDeviceTypes || ['laptop', 'desktop'],
           basePrice: service.basePrice,
-          minPrice: service.minPrice || 0,
-          maxPrice: service.maxPrice || 0,
           priceType: service.priceType,
-          hourlyRate: service.hourlyRate || 0,
           estimatedDuration: service.estimatedDuration,
-          turnaroundTime: service.turnaroundTime || '',
-          status: service.status,
-          isPopular: service.isPopular,
           warranty: service.warranty || '',
-          requirements: service.requirements || '',
           notes: service.notes || '',
+          isActive: service.isActive,
+          isPopular: service.isPopular || false,
         });
       }
     }
   }, [id, isEditing]);
+
+  // Toggle device type selection
+  const toggleDeviceType = (deviceType: DeviceType) => {
+    setFormData(prev => {
+      const isSelected = prev.applicableDeviceTypes.includes(deviceType);
+      return {
+        ...prev,
+        applicableDeviceTypes: isSelected
+          ? prev.applicableDeviceTypes.filter(dt => dt !== deviceType)
+          : [...prev.applicableDeviceTypes, deviceType]
+      };
+    });
+  };
 
   // Category options
   const categoryOptions = serviceCategories.map(cat => ({
@@ -100,19 +120,11 @@ export const ServiceForm: React.FC = () => {
     label: `${cat.icon} ${cat.label}`,
   }));
 
-  // Status options
-  const statusOptions = [
-    { value: 'active', label: '✅ Active' },
-    { value: 'inactive', label: '⏸️ Inactive' },
-    { value: 'discontinued', label: '❌ Discontinued' },
-  ];
-
-  // Price type options
+  // Price type options - Simplified for Sri Lankan context
   const priceTypeOptions = [
     { value: 'fixed', label: '💰 Fixed Price' },
-    { value: 'variable', label: '📊 Variable (Range)' },
-    { value: 'hourly', label: '⏱️ Hourly Rate' },
-    { value: 'quote', label: '📝 Quote Based' },
+    { value: 'starting-from', label: '📊 Starting From' },
+    { value: 'quote-required', label: '📝 Quote Required' },
   ];
 
   // Handle input change
@@ -146,25 +158,16 @@ export const ServiceForm: React.FC = () => {
       newErrors.description = 'Description is required';
     }
 
-    if (formData.priceType === 'fixed' && formData.basePrice < 0) {
+    if (formData.applicableDeviceTypes.length === 0) {
+      newErrors.applicableDeviceTypes = 'At least one device type is required';
+    }
+
+    if (formData.basePrice < 0) {
       newErrors.basePrice = 'Price cannot be negative';
     }
 
-    if (formData.priceType === 'variable') {
-      if (formData.minPrice < 0) {
-        newErrors.minPrice = 'Min price cannot be negative';
-      }
-      if (formData.maxPrice < formData.minPrice) {
-        newErrors.maxPrice = 'Max price must be greater than min price';
-      }
-    }
-
-    if (formData.priceType === 'hourly' && formData.hourlyRate <= 0) {
-      newErrors.hourlyRate = 'Hourly rate must be greater than 0';
-    }
-
     if (!formData.estimatedDuration.trim()) {
-      newErrors.estimatedDuration = 'Duration is required';
+      newErrors.estimatedDuration = 'Estimated duration is required';
     }
 
     setErrors(newErrors);
@@ -188,20 +191,14 @@ export const ServiceForm: React.FC = () => {
         name: formData.name,
         category: formData.category,
         description: formData.description,
+        applicableDeviceTypes: formData.applicableDeviceTypes,
         basePrice: formData.basePrice,
-        minPrice: formData.priceType === 'variable' ? formData.minPrice : undefined,
-        maxPrice: formData.priceType === 'variable' ? formData.maxPrice : undefined,
         priceType: formData.priceType,
-        hourlyRate: formData.priceType === 'hourly' ? formData.hourlyRate : undefined,
         estimatedDuration: formData.estimatedDuration,
-        turnaroundTime: formData.turnaroundTime || undefined,
-        status: formData.status,
-        isPopular: formData.isPopular,
         warranty: formData.warranty || undefined,
-        requirements: formData.requirements || undefined,
         notes: formData.notes || undefined,
-        totalCompleted: isEditing ? (mockServices.find(s => s.id === id)?.totalCompleted || 0) : 0,
-        totalRevenue: isEditing ? (mockServices.find(s => s.id === id)?.totalRevenue || 0) : 0,
+        isActive: formData.isActive,
+        isPopular: formData.isPopular,
         createdAt: isEditing ? (mockServices.find(s => s.id === id)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -302,18 +299,58 @@ export const ServiceForm: React.FC = () => {
               />
             </div>
 
-            {/* Status */}
-            <div>
-              <label className={labelClass}>
-                Status <span className="text-red-500">*</span>
+            {/* Active Status Toggle */}
+            <div className="flex items-center">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="isActive"
+                  checked={formData.isActive}
+                  onChange={handleChange}
+                  className="w-5 h-5 rounded-md border-slate-300 text-emerald-500 focus:ring-emerald-500"
+                />
+                <span className={`${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Service is Active
+                </span>
               </label>
-              <SearchableSelect
-                options={statusOptions}
-                value={formData.status}
-                onValueChange={(val) => setFormData(prev => ({ ...prev, status: val as ServiceStatus }))}
-                placeholder="Select status"
-                theme={theme}
-              />
+            </div>
+
+            {/* Applicable Device Types */}
+            <div className="md:col-span-2">
+              <label className={labelClass}>
+                Applicable Device Types <span className="text-red-500">*</span>
+              </label>
+              <p className={`text-xs mb-3 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                Select which device types this service can be performed on
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {deviceTypeOptions.map((option) => {
+                  const isSelected = formData.applicableDeviceTypes.includes(option.value);
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => toggleDeviceType(option.value)}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${
+                        isSelected
+                          ? theme === 'dark'
+                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                            : 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                          : theme === 'dark'
+                            ? 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {option.icon}
+                      <span className="font-medium">{option.label}</span>
+                      {isSelected && <Check className="w-4 h-4" />}
+                    </button>
+                  );
+                })}
+              </div>
+              {errors.applicableDeviceTypes && (
+                <p className={errorClass}>{errors.applicableDeviceTypes}</p>
+              )}
             </div>
 
             {/* Description */}
@@ -393,10 +430,10 @@ export const ServiceForm: React.FC = () => {
             </div>
 
             {/* Dynamic Price Fields based on Price Type */}
-            {formData.priceType === 'fixed' && (
+            {(formData.priceType === 'fixed' || formData.priceType === 'starting-from') && (
               <div className="md:col-span-2">
                 <label className={labelClass}>
-                  Fixed Price (Rs.) <span className="text-red-500">*</span>
+                  {formData.priceType === 'fixed' ? 'Fixed Price' : 'Starting Price'} (Rs.) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-medium ${
@@ -415,93 +452,21 @@ export const ServiceForm: React.FC = () => {
                 </div>
                 {errors.basePrice && <p className={errorClass}>{errors.basePrice}</p>}
                 <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Set to 0 for free services
+                  {formData.priceType === 'fixed' 
+                    ? 'Set to 0 for free services' 
+                    : 'Actual price may vary based on device model and parts required'}
                 </p>
               </div>
             )}
 
-            {formData.priceType === 'variable' && (
-              <>
-                <div>
-                  <label className={labelClass}>
-                    Minimum Price (Rs.) <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-medium ${
-                      theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                    }`}>Rs.</span>
-                    <input
-                      type="number"
-                      name="minPrice"
-                      value={formData.minPrice}
-                      onChange={handleChange}
-                      min="0"
-                      step="100"
-                      placeholder="0"
-                      className={`${inputClass} pl-12 ${errors.minPrice ? 'border-red-500' : ''}`}
-                    />
-                  </div>
-                  {errors.minPrice && <p className={errorClass}>{errors.minPrice}</p>}
-                </div>
-                <div>
-                  <label className={labelClass}>
-                    Maximum Price (Rs.) <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-medium ${
-                      theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                    }`}>Rs.</span>
-                    <input
-                      type="number"
-                      name="maxPrice"
-                      value={formData.maxPrice}
-                      onChange={handleChange}
-                      min="0"
-                      step="100"
-                      placeholder="0"
-                      className={`${inputClass} pl-12 ${errors.maxPrice ? 'border-red-500' : ''}`}
-                    />
-                  </div>
-                  {errors.maxPrice && <p className={errorClass}>{errors.maxPrice}</p>}
-                </div>
-              </>
-            )}
-
-            {formData.priceType === 'hourly' && (
-              <div className="md:col-span-2">
-                <label className={labelClass}>
-                  Hourly Rate (Rs.) <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-medium ${
-                    theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                  }`}>Rs.</span>
-                  <input
-                    type="number"
-                    name="hourlyRate"
-                    value={formData.hourlyRate}
-                    onChange={handleChange}
-                    min="0"
-                    step="50"
-                    placeholder="0"
-                    className={`${inputClass} pl-12 ${errors.hourlyRate ? 'border-red-500' : ''}`}
-                  />
-                  <span className={`absolute right-4 top-1/2 -translate-y-1/2 font-medium ${
-                    theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                  }`}>/hour</span>
-                </div>
-                {errors.hourlyRate && <p className={errorClass}>{errors.hourlyRate}</p>}
-              </div>
-            )}
-
-            {formData.priceType === 'quote' && (
+            {formData.priceType === 'quote-required' && (
               <div className={`md:col-span-2 p-4 rounded-xl ${
                 theme === 'dark' ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'
               }`}>
                 <div className="flex items-center gap-2">
                   <Info className="w-5 h-5 text-blue-500" />
                   <p className={`text-sm ${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}`}>
-                    Price will be quoted based on customer requirements
+                    Price will be quoted after diagnosis based on device condition and parts required
                   </p>
                 </div>
               </div>
@@ -535,27 +500,14 @@ export const ServiceForm: React.FC = () => {
                 name="estimatedDuration"
                 value={formData.estimatedDuration}
                 onChange={handleChange}
-                placeholder="e.g., 1-2 hours"
+                placeholder="e.g., 1-2 hours, Same day, 2-3 days"
                 className={`${inputClass} ${errors.estimatedDuration ? 'border-red-500' : ''}`}
               />
               {errors.estimatedDuration && <p className={errorClass}>{errors.estimatedDuration}</p>}
             </div>
 
-            {/* Turnaround Time */}
-            <div>
-              <label className={labelClass}>Turnaround Time</label>
-              <input
-                type="text"
-                name="turnaroundTime"
-                value={formData.turnaroundTime}
-                onChange={handleChange}
-                placeholder="e.g., Same day, 2-3 days"
-                className={inputClass}
-              />
-            </div>
-
             {/* Warranty */}
-            <div className="md:col-span-2">
+            <div>
               <label className={labelClass}>Service Warranty</label>
               <div className="relative">
                 <Shield className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 ${
@@ -566,7 +518,7 @@ export const ServiceForm: React.FC = () => {
                   name="warranty"
                   value={formData.warranty}
                   onChange={handleChange}
-                  placeholder="e.g., 30 days service warranty"
+                  placeholder="e.g., 3 months, 1 year"
                   className={`${inputClass} pl-11`}
                 />
               </div>
@@ -574,7 +526,7 @@ export const ServiceForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Additional Information Card */}
+        {/* Internal Notes Card */}
         <div className={`p-6 rounded-2xl border ${
           theme === 'dark' 
             ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50' 
@@ -585,36 +537,20 @@ export const ServiceForm: React.FC = () => {
               <Tag className="w-5 h-5" />
             </div>
             <h2 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              Additional Information
+              Internal Notes
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 gap-6">
-            {/* Requirements */}
-            <div>
-              <label className={labelClass}>Requirements</label>
-              <textarea
-                name="requirements"
-                value={formData.requirements}
-                onChange={handleChange}
-                rows={2}
-                placeholder="What customers need to provide or know..."
-                className={`${inputClass} resize-none`}
-              />
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label className={labelClass}>Internal Notes</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                rows={2}
-                placeholder="Any internal notes about this service..."
-                className={`${inputClass} resize-none`}
-              />
-            </div>
+          <div>
+            <label className={labelClass}>Notes (Staff Only)</label>
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              rows={3}
+              placeholder="Any internal notes about this service..."
+              className={`${inputClass} resize-none`}
+            />
           </div>
         </div>
 

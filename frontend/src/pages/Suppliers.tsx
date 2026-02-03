@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { mockSuppliers, mockWhatsAppSettings, mockSupplierPurchases } from '../data/mockData';
 import type { Supplier, SupplierPurchase } from '../data/mockData';
 import { SupplierFormModal } from '../components/modals/SupplierFormModal';
@@ -15,11 +16,18 @@ import {
   Calendar, MessageCircle, Package, DollarSign, Zap, Eye,
   ShoppingCart, History,
   X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal,
-  List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc
+  List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc, Loader2, Filter
 } from 'lucide-react';
+import * as supplierService from '../services/supplierService';
+import type { FrontendSupplier } from '../services/supplierService';
 
 export const Suppliers: React.FC = () => {
   const { theme } = useTheme();
+  const { isViewingShop, viewingShop } = useAuth();
+  
+  // Get effective shopId for SUPER_ADMIN viewing a shop
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
@@ -46,8 +54,58 @@ export const Suppliers: React.FC = () => {
   const endCalendarRef = useRef<HTMLDivElement>(null);
   
   // Local suppliers state
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<SupplierPurchase[]>(mockSupplierPurchases);
+  const [isLoading, setIsLoading] = useState(true);
+  const [, setError] = useState<string | null>(null);
+
+  // Load suppliers from API
+  const loadSuppliers = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await supplierService.getSuppliers(effectiveShopId);
+      if (result.success && result.data) {
+        // Convert FrontendSupplier to Supplier format for UI compatibility
+        const suppliersData: Supplier[] = result.data.map((s: FrontendSupplier) => ({
+          id: s.id,
+          apiId: s.apiId || s.id, // Store API ID for updates/deletes
+          name: s.name,
+          company: s.company,
+          email: s.email,
+          phone: s.phone,
+          address: s.address,
+          totalPurchases: s.totalPurchases,
+          totalOrders: s.totalOrders,
+          lastOrder: s.lastOrder,
+          creditBalance: s.creditBalance,
+          creditLimit: s.creditLimit,
+          creditDueDate: s.creditDueDate,
+          creditStatus: s.creditStatus,
+          bankDetails: s.bankDetails,
+          notes: s.notes,
+          rating: s.rating,
+          categories: s.categories,
+        }));
+        setSuppliers(suppliersData);
+      } else {
+        // Fallback to mock data if API fails
+        console.warn('Using mock data:', result.error);
+        setSuppliers(mockSuppliers);
+      }
+    } catch (err) {
+      console.error('Error loading suppliers:', err);
+      setSuppliers(mockSuppliers);
+      setError('Failed to load suppliers from server');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [effectiveShopId]);
+
+  // Load on mount
+  useEffect(() => {
+    loadSuppliers();
+  }, [loadSuppliers]);
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -171,16 +229,18 @@ export const Suppliers: React.FC = () => {
   // Advanced filters count
   const advancedFiltersCount = useMemo(() => {
     let count = 0;
+    if (statusFilter !== 'all') count++;
     if (categoryFilter !== 'all') count++;
     if (minCreditBalance) count++;
     if (maxCreditBalance) count++;
     if (startDate) count++;
     if (endDate) count++;
     return count;
-  }, [categoryFilter, minCreditBalance, maxCreditBalance, startDate, endDate]);
+  }, [statusFilter, categoryFilter, minCreditBalance, maxCreditBalance, startDate, endDate]);
 
   // Clear advanced filters
   const clearAdvancedFilters = () => {
+    setStatusFilter('all');
     setCategoryFilter('all');
     setMinCreditBalance('');
     setMaxCreditBalance('');
@@ -356,19 +416,66 @@ export const Suppliers: React.FC = () => {
     setIsPaymentModalOpen(true);
   };
 
-  const handleSaveSupplier = (supplier: Supplier) => {
-    if (selectedSupplier) {
-      setSuppliers(prev => prev.map(s => s.id === supplier.id ? supplier : s));
-    } else {
-      setSuppliers(prev => [...prev, supplier]);
+  const handleSaveSupplier = async (supplier: Supplier) => {
+    setIsLoading(true);
+    try {
+      if (selectedSupplier && selectedSupplier.apiId) {
+        // Update existing supplier
+        const result = await supplierService.updateSupplier(selectedSupplier.apiId, supplier as FrontendSupplier, effectiveShopId);
+        if (result.success && result.data) {
+          setSuppliers(prev => prev.map(s => s.id === supplier.id ? result.data! : s));
+        } else {
+          // Fallback to local update
+          setSuppliers(prev => prev.map(s => s.id === supplier.id ? supplier : s));
+        }
+      } else {
+        // Create new supplier
+        const result = await supplierService.createSupplier(supplier as FrontendSupplier, effectiveShopId);
+        if (result.success && result.data) {
+          setSuppliers(prev => [...prev, result.data!]);
+        } else {
+          // Fallback to local add
+          setSuppliers(prev => [...prev, supplier]);
+        }
+      }
+    } catch (err) {
+      console.error('Error saving supplier:', err);
+      // Fallback to local operation
+      if (selectedSupplier) {
+        setSuppliers(prev => prev.map(s => s.id === supplier.id ? supplier : s));
+      } else {
+        setSuppliers(prev => [...prev, supplier]);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (supplierToDelete) {
-      setSuppliers(prev => prev.filter(s => s.id !== supplierToDelete.id));
-      setIsDeleteModalOpen(false);
-      setSupplierToDelete(null);
+      setIsLoading(true);
+      try {
+        if (supplierToDelete.apiId) {
+          const result = await supplierService.deleteSupplier(supplierToDelete.apiId, effectiveShopId);
+          if (result.success) {
+            setSuppliers(prev => prev.filter(s => s.id !== supplierToDelete.id));
+          } else {
+            // Fallback to local delete
+            setSuppliers(prev => prev.filter(s => s.id !== supplierToDelete.id));
+          }
+        } else {
+          // Local only supplier
+          setSuppliers(prev => prev.filter(s => s.id !== supplierToDelete.id));
+        }
+      } catch (err) {
+        console.error('Error deleting supplier:', err);
+        // Fallback to local delete
+        setSuppliers(prev => prev.filter(s => s.id !== supplierToDelete.id));
+      } finally {
+        setIsLoading(false);
+        setIsDeleteModalOpen(false);
+        setSupplierToDelete(null);
+      }
     }
   };
 
@@ -545,6 +652,106 @@ ECOTEC Computer Solutions`;
     window.location.href = whatsappUrl;
   };
 
+  // Loading state - World-class skeleton UI
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              Suppliers
+            </h1>
+            <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              Loading suppliers...
+            </p>
+          </div>
+          <div className={`w-36 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+        </div>
+
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className="flex-1 space-y-2">
+                  <div className={`h-3 w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-6 w-24 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter Bar Skeleton */}
+        <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className={`h-10 w-64 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div className={`h-10 w-32 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div className="ml-auto flex gap-2">
+              <div className={`h-10 w-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              <div className={`h-10 w-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Supplier Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className={`relative p-5 rounded-2xl border overflow-hidden ${
+              theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
+            }`}>
+              {/* Shimmer Effect */}
+              <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+              
+              {/* Supplier Header */}
+              <div className="flex items-start gap-3 mb-4">
+                <div className={`w-12 h-12 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className="flex-1 space-y-2">
+                  <div className={`h-5 w-32 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-4 w-24 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+                <div className={`h-6 w-16 rounded-full animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              </div>
+              
+              {/* Contact Info */}
+              <div className="space-y-2 mb-4">
+                <div className={`h-4 w-3/4 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`h-4 w-1/2 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              </div>
+              
+              {/* Credit Info */}
+              <div className={`p-3 rounded-xl mb-4 ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
+                <div className="flex justify-between">
+                  <div className={`h-4 w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-600' : 'bg-slate-200'}`}></div>
+                  <div className={`h-5 w-24 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-600' : 'bg-slate-200'}`}></div>
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-3 border-t border-slate-700/30">
+                {[1, 2, 3, 4].map((j) => (
+                  <div key={j} className={`h-8 w-8 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Loading Indicator */}
+        <div className="flex items-center justify-center py-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className={`w-5 h-5 animate-spin ${theme === 'dark' ? 'text-violet-400' : 'text-violet-500'}`} />
+            <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              Fetching suppliers from server...
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -657,22 +864,6 @@ ECOTEC Computer Solutions`;
 
           {/* Filters Row */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Category Filter */}
-            <div className="w-full sm:w-44">
-              <SearchableSelect
-                options={[
-                  { value: 'all', label: 'All Categories' },
-                  ...allCategories.map(cat => ({ value: cat, label: cat }))
-                ]}
-                value={categoryFilter}
-                onValueChange={setCategoryFilter}
-                placeholder="All Categories"
-                searchPlaceholder="Search categories..."
-                emptyMessage="No categories found"
-                theme={theme}
-              />
-            </div>
-
             {/* Filter Toggle Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -755,46 +946,52 @@ ECOTEC Computer Solutions`;
           </div>
         </div>
 
-        {/* Status Filter Buttons */}
-        <div className="flex flex-wrap gap-2 mt-4">
-          {[
-            { value: 'all', label: 'All', icon: Package, count: suppliers.length },
-            { value: 'overdue', label: 'Overdue', icon: AlertTriangle, count: suppliers.filter(s => s.creditStatus === 'overdue').length },
-            { value: 'active', label: 'Active', icon: Clock, count: suppliers.filter(s => s.creditStatus === 'active').length },
-            { value: 'clear', label: 'Clear', icon: CheckCircle, count: suppliers.filter(s => s.creditStatus === 'clear').length },
-          ].map(({ value, label, icon: Icon, count }) => (
-            <button
-              key={value}
-              onClick={() => setStatusFilter(value)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                statusFilter === value
-                  ? value === 'overdue' 
-                    ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg'
-                    : value === 'active'
-                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
-                      : value === 'clear'
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
-                        : 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-lg'
-                  : theme === 'dark' 
-                    ? 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50' 
-                    : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{label}</span>
-              <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                statusFilter === value ? 'bg-white/20' : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'
-              }`}>
-                {count}
-              </span>
-            </button>
-          ))}
-        </div>
-
         {/* Advanced Filters (Collapsible) */}
         {showFilters && (
           <div className={`pt-4 mt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
             <div className="flex flex-wrap items-center gap-4">
+              {/* Status Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <Filter className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Status:</span>
+                <SearchableSelect
+                  options={[
+                    { value: 'all', label: 'All Suppliers', icon: <Package className="w-4 h-4 text-violet-500" />, count: suppliers.length },
+                    { value: 'overdue', label: 'Overdue', icon: <AlertTriangle className="w-4 h-4 text-red-500" />, count: suppliers.filter(s => s.creditStatus === 'overdue').length },
+                    { value: 'active', label: 'Active Credit', icon: <Clock className="w-4 h-4 text-blue-500" />, count: suppliers.filter(s => s.creditStatus === 'active').length },
+                    { value: 'clear', label: 'Clear', icon: <CheckCircle className="w-4 h-4 text-emerald-500" />, count: suppliers.filter(s => s.creditStatus === 'clear').length },
+                  ]}
+                  value={statusFilter}
+                  onValueChange={setStatusFilter}
+                  placeholder="Select status..."
+                  searchPlaceholder="Search status..."
+                  theme={theme}
+                  triggerClassName="w-[180px]"
+                />
+              </div>
+
+              {/* Category Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <Package className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Category:</span>
+                <SearchableSelect
+                  options={[
+                    { value: 'all', label: 'All Categories', count: suppliers.length },
+                    ...allCategories.map(cat => ({
+                      value: cat,
+                      label: cat,
+                      count: suppliers.filter(s => s.categories.includes(cat)).length
+                    }))
+                  ]}
+                  value={categoryFilter}
+                  onValueChange={setCategoryFilter}
+                  placeholder="Select category..."
+                  searchPlaceholder="Search category..."
+                  theme={theme}
+                  triggerClassName="w-[180px]"
+                />
+              </div>
+
               {/* Credit Balance Range */}
               <div className="flex items-center gap-2">
                 <CreditCard className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
@@ -888,8 +1085,54 @@ ECOTEC Computer Solutions`;
         )}
       </div>
 
+      {/* Empty State */}
+      {filteredSuppliers.length === 0 && (
+        <div className={`text-center py-16 rounded-2xl border ${
+          theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
+        }`}>
+          <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+            theme === 'dark' ? 'bg-gradient-to-br from-violet-500/20 to-purple-500/20' : 'bg-gradient-to-br from-violet-50 to-purple-50'
+          }`}>
+            <Package className={`w-10 h-10 ${theme === 'dark' ? 'text-violet-400' : 'text-violet-500'}`} />
+          </div>
+          <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            No suppliers found
+          </h3>
+          <p className={`mb-6 max-w-sm mx-auto ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || minCreditBalance || maxCreditBalance || startDate || endDate
+              ? 'Try adjusting your search or filter criteria to find what you\'re looking for'
+              : 'Get started by adding your first supplier to manage your supply chain'}
+          </p>
+          {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || minCreditBalance || maxCreditBalance || startDate || endDate ? (
+            <button 
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+                setCategoryFilter('all');
+                setMinCreditBalance('');
+                setMaxCreditBalance('');
+                setStartDate('');
+                setEndDate('');
+              }}
+              className="px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-xl font-medium hover:opacity-90 transition-all shadow-lg shadow-violet-500/20"
+            >
+              Clear All Filters
+            </button>
+          ) : (
+            <button 
+              onClick={handleAddSupplier}
+              className="px-6 py-2.5 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-xl font-medium hover:opacity-90 transition-all shadow-lg shadow-violet-500/20 flex items-center gap-2 mx-auto"
+            >
+              <Plus className="w-5 h-5" />
+              Add First Supplier
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Suppliers Display */}
-      {viewMode === 'list' ? (
+      {filteredSuppliers.length > 0 && (
+        viewMode === 'list' ? (
         /* Table View */
         <div className={`rounded-2xl border overflow-hidden ${
           theme === 'dark' 
@@ -1444,7 +1687,7 @@ ECOTEC Computer Solutions`;
           );
           })}
         </div>
-      )}
+      ))}
 
       {/* Pagination */}
       {filteredSuppliers.length > 0 && (

@@ -1249,12 +1249,106 @@ export const Customers: React.FC = () => {
     });
   };
 
-  // Loading state
+  // Loading state - World-class skeleton UI
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <Loader2 className={`w-10 h-10 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
-        <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Loading customers...</p>
+      <div className="space-y-6 animate-in fade-in duration-300">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              Customers
+            </h1>
+            <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              Loading customers...
+            </p>
+          </div>
+          <div className={`w-36 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+        </div>
+
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className="flex-1 space-y-2">
+                  <div className={`h-3 w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-6 w-24 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter Bar Skeleton */}
+        <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className={`h-10 w-64 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div className={`h-10 w-32 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div className="ml-auto flex gap-2">
+              <div className={`h-10 w-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              <div className={`h-10 w-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Customer Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className={`relative p-5 rounded-2xl border overflow-hidden ${
+              theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
+            }`}>
+              {/* Shimmer Effect */}
+              <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+              
+              {/* Customer Header */}
+              <div className="flex items-start gap-3 mb-4">
+                <div className={`w-12 h-12 rounded-full animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className="flex-1 space-y-2">
+                  <div className={`h-5 w-32 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-4 w-40 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+                <div className={`h-6 w-16 rounded-full animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              </div>
+              
+              {/* Contact Info */}
+              <div className="space-y-2 mb-4">
+                <div className={`h-4 w-3/4 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`h-4 w-1/2 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              </div>
+              
+              {/* Stats Row */}
+              <div className="flex gap-4 mb-4">
+                <div className="flex-1">
+                  <div className={`h-3 w-16 rounded animate-pulse mb-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-5 w-24 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+                <div className="flex-1">
+                  <div className={`h-3 w-16 rounded animate-pulse mb-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-5 w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-3 border-t border-slate-700/30">
+                {[1, 2, 3, 4].map((j) => (
+                  <div key={j} className={`h-8 w-8 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Loading Indicator */}
+        <div className="flex items-center justify-center py-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className={`w-5 h-5 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+            <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              Fetching customers from server...
+            </span>
+          </div>
+        </div>
       </div>
     );
   }

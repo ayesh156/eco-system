@@ -481,12 +481,80 @@ export const Categories: React.FC = () => {
     );
   };
 
-  // Loading state
+  // Loading state - World-class skeleton UI
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <Loader2 className={`w-10 h-10 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
-        <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Loading categories...</p>
+      <div className="space-y-6 animate-in fade-in duration-300">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              Categories
+            </h1>
+            <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              Loading categories...
+            </p>
+          </div>
+          <div className={`w-36 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+        </div>
+
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className="flex-1 space-y-2">
+                  <div className={`h-3 w-24 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-6 w-12 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter Bar Skeleton */}
+        <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className={`h-10 w-64 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div className={`h-10 w-32 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            <div className="ml-auto flex gap-2">
+              <div className={`h-10 w-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              <div className={`h-10 w-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Category Cards Skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((i) => (
+            <div key={i} className={`relative p-4 rounded-2xl border overflow-hidden text-center ${
+              theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
+            }`}>
+              {/* Shimmer Effect */}
+              <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+              
+              {/* Category Icon */}
+              <div className={`w-14 h-14 mx-auto rounded-xl mb-3 animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              
+              {/* Category Name */}
+              <div className={`h-5 w-24 mx-auto rounded animate-pulse mb-2 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              
+              {/* Product Count */}
+              <div className={`h-4 w-16 mx-auto rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Loading Indicator */}
+        <div className="flex items-center justify-center py-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className={`w-5 h-5 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+            <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              Fetching categories from server...
+            </span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1035,16 +1103,42 @@ export const Categories: React.FC = () => {
 
       {/* Empty State */}
       {paginatedCategories.length === 0 && (
-        <div className={`text-center py-12 rounded-2xl border ${
+        <div className={`text-center py-16 rounded-2xl border ${
           theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
         }`}>
-          <FolderTree className={`w-12 h-12 mx-auto mb-3 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
-          <h3 className={`text-lg font-semibold mb-1 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+          <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+            theme === 'dark' ? 'bg-gradient-to-br from-blue-500/20 to-indigo-500/20' : 'bg-gradient-to-br from-blue-50 to-indigo-50'
+          }`}>
+            <FolderTree className={`w-10 h-10 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-500'}`} />
+          </div>
+          <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
             No categories found
           </h3>
-          <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            {hasActiveFilters ? 'Try adjusting your filters' : 'Add your first category to get started'}
+          <p className={`mb-6 max-w-sm mx-auto ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            {hasActiveFilters 
+              ? 'Try adjusting your search or filter criteria to find what you\'re looking for'
+              : 'Get started by adding your first category to organize your products'}
           </p>
+          {hasActiveFilters ? (
+            <button 
+              onClick={() => {
+                setSearchQuery('');
+                setStartDate('');
+                setEndDate('');
+              }}
+              className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:opacity-90 transition-all shadow-lg shadow-blue-500/20"
+            >
+              Clear All Filters
+            </button>
+          ) : (
+            <button 
+              onClick={handleAddCategory}
+              className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:opacity-90 transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2 mx-auto"
+            >
+              <Plus className="w-5 h-5" />
+              Add First Category
+            </button>
+          )}
         </div>
       )}
 

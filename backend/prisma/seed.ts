@@ -1,620 +1,986 @@
-import { PrismaClient, InvoiceStatus, PaymentMethod, CreditStatus, SalesChannel, UserRole } from '@prisma/client';
+/**
+ * 🌱 EcoSystem Comprehensive Database Seed
+ * ==========================================
+ * World-class database seeding for all system sections.
+ * 
+ * This seed file can be run anytime to repopulate the database with:
+ * - SuperAdmin user
+ * - 2 complete shops with users, products, customers, suppliers, etc.
+ * - Sample data for all features/variants of the system
+ * 
+ * Usage:
+ *   npx prisma db seed
+ *   OR
+ *   npx tsx prisma/seed.ts
+ * 
+ * Author: World-class Database Engineer @ EcoSystem
+ * Version: 2.0.0
+ * Last Updated: 2026-02-03
+ */
+
+import { 
+  PrismaClient, 
+  InvoiceStatus, 
+  PaymentMethod, 
+  CreditStatus, 
+  SalesChannel, 
+  UserRole,
+  CustomerType,
+  StockMovementType,
+  GRNStatus,
+  PaymentStatus,
+  ItemHistoryAction,
+  ReminderType
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// Type definitions for seed data
-interface InvoiceItemData {
-  productId: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  originalPrice?: number;
-  total: number;
-  warrantyDueDate?: Date;
+// ==========================================
+// CONFIGURATION - Edit these as needed
+// ==========================================
+
+const CONFIG = {
+  // Password hashing rounds
+  BCRYPT_ROUNDS: 10,
+  
+  // Shop 1 Configuration
+  SHOP1: {
+    name: 'Eco-User',
+    slug: 'eco-user',
+    subName: 'SOLUTIONS',
+    tagline: 'Computer Solutions',
+    admin: {
+      email: 'ecotec@gmail.com',
+      password: 'Eco,1234',
+      name: 'Eco Admin'
+    }
+  },
+  
+  // Shop 2 Configuration
+  SHOP2: {
+    name: 'Ecotec',
+    slug: 'ecotec',
+    subName: 'TECHNOLOGIES',
+    tagline: 'Tech & Mobile Solutions',
+    admin: {
+      email: 'ecotec@ecotec.lk',
+      password: 'Ecotec,1234',
+      name: 'Ecotec Admin'
+    }
+  },
+  
+  // SuperAdmin Configuration
+  SUPER_ADMIN: {
+    email: 'sdachathuranga@gmail.com',
+    password: 'SuperAdmin@123',
+    name: 'Sachitha Chathuranga'
+  }
+};
+
+// ==========================================
+// HELPER FUNCTIONS
+// ==========================================
+
+/**
+ * Hash password using bcrypt
+ */
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, CONFIG.BCRYPT_ROUNDS);
 }
 
-interface PaymentData {
-  amount: number;
-  paymentMethod: PaymentMethod;
-  paymentDate: Date;
-  notes?: string;
+/**
+ * Generate random date within range
+ */
+function randomDate(start: Date, end: Date): Date {
+  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 }
 
-interface InvoiceData {
-  id: string;
-  invoiceNumber: string;
-  customerId: string;
-  customerName: string;
-  subtotal: number;
-  tax: number;
-  total: number;
-  paidAmount: number;
-  dueAmount: number;
-  status: InvoiceStatus;
-  date: Date;
-  dueDate: Date;
-  paymentMethod: PaymentMethod;
-  salesChannel: SalesChannel;
-  items: InvoiceItemData[];
-  payments?: PaymentData[];
-  createdById?: string;
+/**
+ * Generate invoice number with format INV-YYYY-XXXX
+ */
+function generateInvoiceNumber(index: number, year: number = 2026): string {
+  return `INV-${year}-${String(index).padStart(4, '0')}`;
 }
+
+/**
+ * Generate GRN number with format GRN-YYYY-XXXX
+ */
+function generateGRNNumber(index: number, year: number = 2026): string {
+  return `GRN-${year}-${String(index).padStart(4, '0')}`;
+}
+
+/**
+ * Get random item from array
+ */
+function randomItem<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/**
+ * Calculate warranty due date from months
+ */
+function getWarrantyDueDate(warrantyMonths: number): Date {
+  const date = new Date();
+  date.setMonth(date.getMonth() + warrantyMonths);
+  return date;
+}
+
+// ==========================================
+// CATEGORY DATA
+// ==========================================
+
+const CATEGORIES_DATA = [
+  { name: 'Laptops', description: 'Laptop computers and notebooks' },
+  { name: 'Desktops', description: 'Desktop computers and workstations' },
+  { name: 'Monitors', description: 'Computer monitors and displays' },
+  { name: 'Keyboards & Mice', description: 'Input devices and peripherals' },
+  { name: 'Storage', description: 'Hard drives, SSDs, and USB drives' },
+  { name: 'Networking', description: 'Routers, switches, and cables' },
+  { name: 'Mobile Phones', description: 'Smartphones and feature phones' },
+  { name: 'Tablets', description: 'Tablets and iPads' },
+  { name: 'Accessories', description: 'Computer and mobile accessories' },
+  { name: 'Printers', description: 'Printers and scanners' },
+  { name: 'Components', description: 'Computer components and parts' },
+  { name: 'Audio', description: 'Headphones, speakers, and microphones' }
+];
+
+// ==========================================
+// BRAND DATA
+// ==========================================
+
+const BRANDS_DATA = [
+  { name: 'HP', description: 'Hewlett-Packard', website: 'https://hp.com' },
+  { name: 'Dell', description: 'Dell Technologies', website: 'https://dell.com' },
+  { name: 'Lenovo', description: 'Lenovo Group', website: 'https://lenovo.com' },
+  { name: 'Asus', description: 'ASUSTeK Computer Inc.', website: 'https://asus.com' },
+  { name: 'Acer', description: 'Acer Inc.', website: 'https://acer.com' },
+  { name: 'Samsung', description: 'Samsung Electronics', website: 'https://samsung.com' },
+  { name: 'Apple', description: 'Apple Inc.', website: 'https://apple.com' },
+  { name: 'LG', description: 'LG Electronics', website: 'https://lg.com' },
+  { name: 'Sony', description: 'Sony Corporation', website: 'https://sony.com' },
+  { name: 'Logitech', description: 'Logitech International', website: 'https://logitech.com' },
+  { name: 'Microsoft', description: 'Microsoft Corporation', website: 'https://microsoft.com' },
+  { name: 'TP-Link', description: 'TP-Link Technologies', website: 'https://tp-link.com' },
+  { name: 'Western Digital', description: 'WD Storage Solutions', website: 'https://wd.com' },
+  { name: 'Seagate', description: 'Seagate Technology', website: 'https://seagate.com' },
+  { name: 'Kingston', description: 'Kingston Technology', website: 'https://kingston.com' },
+  { name: 'SanDisk', description: 'SanDisk (WD)', website: 'https://sandisk.com' }
+];
+
+// ==========================================
+// PRODUCT DATA (By Category)
+// ==========================================
+
+const PRODUCTS_DATA = [
+  // Laptops
+  { name: 'HP Pavilion 15', category: 'Laptops', brand: 'HP', price: 185000, costPrice: 165000, stock: 8, warranty: '1 Year', warrantyMonths: 12, barcode: 'HP-PAV-15-001' },
+  { name: 'HP EliteBook 840', category: 'Laptops', brand: 'HP', price: 295000, costPrice: 265000, stock: 5, warranty: '2 Years', warrantyMonths: 24, barcode: 'HP-ELT-840-001' },
+  { name: 'Dell Inspiron 15', category: 'Laptops', brand: 'Dell', price: 175000, costPrice: 155000, stock: 12, warranty: '1 Year', warrantyMonths: 12, barcode: 'DL-INS-15-001' },
+  { name: 'Dell XPS 13', category: 'Laptops', brand: 'Dell', price: 385000, costPrice: 345000, stock: 4, warranty: '2 Years', warrantyMonths: 24, barcode: 'DL-XPS-13-001' },
+  { name: 'Lenovo ThinkPad X1 Carbon', category: 'Laptops', brand: 'Lenovo', price: 425000, costPrice: 380000, stock: 3, warranty: '3 Years', warrantyMonths: 36, barcode: 'LN-X1C-001' },
+  { name: 'Lenovo IdeaPad 3', category: 'Laptops', brand: 'Lenovo', price: 145000, costPrice: 125000, stock: 15, warranty: '1 Year', warrantyMonths: 12, barcode: 'LN-IP3-001' },
+  { name: 'Asus VivoBook 15', category: 'Laptops', brand: 'Asus', price: 155000, costPrice: 135000, stock: 10, warranty: '1 Year', warrantyMonths: 12, barcode: 'AS-VB15-001' },
+  { name: 'Acer Aspire 5', category: 'Laptops', brand: 'Acer', price: 135000, costPrice: 115000, stock: 18, warranty: '1 Year', warrantyMonths: 12, barcode: 'AC-ASP5-001' },
+  
+  // Desktops
+  { name: 'HP ProDesk 400 G7', category: 'Desktops', brand: 'HP', price: 165000, costPrice: 145000, stock: 6, warranty: '3 Years', warrantyMonths: 36, barcode: 'HP-PD400-001' },
+  { name: 'Dell OptiPlex 7080', category: 'Desktops', brand: 'Dell', price: 195000, costPrice: 175000, stock: 4, warranty: '3 Years', warrantyMonths: 36, barcode: 'DL-OP7080-001' },
+  { name: 'Lenovo ThinkCentre M70s', category: 'Desktops', brand: 'Lenovo', price: 175000, costPrice: 155000, stock: 5, warranty: '3 Years', warrantyMonths: 36, barcode: 'LN-TC70S-001' },
+  
+  // Monitors
+  { name: 'HP 24" FHD Monitor', category: 'Monitors', brand: 'HP', price: 45000, costPrice: 38000, stock: 20, warranty: '3 Years', warrantyMonths: 36, barcode: 'HP-M24-001' },
+  { name: 'Dell 27" 4K Monitor', category: 'Monitors', brand: 'Dell', price: 85000, costPrice: 72000, stock: 8, warranty: '3 Years', warrantyMonths: 36, barcode: 'DL-M27-4K-001' },
+  { name: 'LG 27" IPS Monitor', category: 'Monitors', brand: 'LG', price: 65000, costPrice: 55000, stock: 12, warranty: '3 Years', warrantyMonths: 36, barcode: 'LG-M27-IPS-001' },
+  { name: 'Samsung 32" Curved Monitor', category: 'Monitors', brand: 'Samsung', price: 95000, costPrice: 82000, stock: 6, warranty: '3 Years', warrantyMonths: 36, barcode: 'SM-M32-CRV-001' },
+  
+  // Keyboards & Mice
+  { name: 'Logitech MK270 Combo', category: 'Keyboards & Mice', brand: 'Logitech', price: 8500, costPrice: 6500, stock: 50, warranty: '1 Year', warrantyMonths: 12, barcode: 'LG-MK270-001' },
+  { name: 'Logitech MX Master 3', category: 'Keyboards & Mice', brand: 'Logitech', price: 32000, costPrice: 27000, stock: 15, warranty: '2 Years', warrantyMonths: 24, barcode: 'LG-MXM3-001' },
+  { name: 'Microsoft Surface Keyboard', category: 'Keyboards & Mice', brand: 'Microsoft', price: 28000, costPrice: 23000, stock: 10, warranty: '1 Year', warrantyMonths: 12, barcode: 'MS-SRFK-001' },
+  { name: 'HP Wireless Mouse', category: 'Keyboards & Mice', brand: 'HP', price: 3500, costPrice: 2500, stock: 80, warranty: '1 Year', warrantyMonths: 12, barcode: 'HP-WM-001' },
+  
+  // Storage
+  { name: 'WD Blue 1TB HDD', category: 'Storage', brand: 'Western Digital', price: 15500, costPrice: 12500, stock: 40, warranty: '2 Years', warrantyMonths: 24, barcode: 'WD-BL1TB-001' },
+  { name: 'WD Black 2TB HDD', category: 'Storage', brand: 'Western Digital', price: 28000, costPrice: 23000, stock: 25, warranty: '5 Years', warrantyMonths: 60, barcode: 'WD-BK2TB-001' },
+  { name: 'Seagate Barracuda 2TB', category: 'Storage', brand: 'Seagate', price: 22000, costPrice: 18000, stock: 30, warranty: '2 Years', warrantyMonths: 24, barcode: 'SG-BC2TB-001' },
+  { name: 'Samsung 970 EVO 500GB SSD', category: 'Storage', brand: 'Samsung', price: 35000, costPrice: 28000, stock: 20, warranty: '5 Years', warrantyMonths: 60, barcode: 'SM-970EVO-001' },
+  { name: 'Kingston A2000 1TB NVMe', category: 'Storage', brand: 'Kingston', price: 42000, costPrice: 35000, stock: 15, warranty: '5 Years', warrantyMonths: 60, barcode: 'KN-A2000-001' },
+  { name: 'SanDisk 64GB USB Drive', category: 'Storage', brand: 'SanDisk', price: 2800, costPrice: 2000, stock: 100, warranty: '5 Years', warrantyMonths: 60, barcode: 'SD-USB64-001' },
+  { name: 'SanDisk 128GB USB Drive', category: 'Storage', brand: 'SanDisk', price: 4500, costPrice: 3500, stock: 75, warranty: '5 Years', warrantyMonths: 60, barcode: 'SD-USB128-001' },
+  
+  // Networking
+  { name: 'TP-Link Archer AX50', category: 'Networking', brand: 'TP-Link', price: 18500, costPrice: 14500, stock: 25, warranty: '3 Years', warrantyMonths: 36, barcode: 'TP-AX50-001' },
+  { name: 'TP-Link 8-Port Switch', category: 'Networking', brand: 'TP-Link', price: 5500, costPrice: 4000, stock: 40, warranty: '5 Years', warrantyMonths: 60, barcode: 'TP-SW8-001' },
+  { name: 'TP-Link RE305 Range Extender', category: 'Networking', brand: 'TP-Link', price: 8500, costPrice: 6500, stock: 30, warranty: '2 Years', warrantyMonths: 24, barcode: 'TP-RE305-001' },
+  
+  // Mobile Phones
+  { name: 'Samsung Galaxy S23', category: 'Mobile Phones', brand: 'Samsung', price: 285000, costPrice: 255000, stock: 10, warranty: '1 Year', warrantyMonths: 12, barcode: 'SM-GS23-001' },
+  { name: 'Samsung Galaxy A54', category: 'Mobile Phones', brand: 'Samsung', price: 135000, costPrice: 115000, stock: 15, warranty: '1 Year', warrantyMonths: 12, barcode: 'SM-GA54-001' },
+  { name: 'Apple iPhone 15', category: 'Mobile Phones', brand: 'Apple', price: 385000, costPrice: 345000, stock: 8, warranty: '1 Year', warrantyMonths: 12, barcode: 'AP-IP15-001' },
+  { name: 'Apple iPhone 15 Pro', category: 'Mobile Phones', brand: 'Apple', price: 485000, costPrice: 435000, stock: 5, warranty: '1 Year', warrantyMonths: 12, barcode: 'AP-IP15P-001' },
+  
+  // Tablets
+  { name: 'Apple iPad 10th Gen', category: 'Tablets', brand: 'Apple', price: 145000, costPrice: 125000, stock: 12, warranty: '1 Year', warrantyMonths: 12, barcode: 'AP-IPD10-001' },
+  { name: 'Samsung Galaxy Tab S9', category: 'Tablets', brand: 'Samsung', price: 195000, costPrice: 170000, stock: 8, warranty: '1 Year', warrantyMonths: 12, barcode: 'SM-TABS9-001' },
+  
+  // Accessories
+  { name: 'Laptop Bag 15.6"', category: 'Accessories', brand: 'HP', price: 4500, costPrice: 3200, stock: 60, warranty: '6 Months', warrantyMonths: 6, barcode: 'HP-BAG15-001' },
+  { name: 'USB-C Hub 7-in-1', category: 'Accessories', brand: 'Dell', price: 12500, costPrice: 9500, stock: 35, warranty: '1 Year', warrantyMonths: 12, barcode: 'DL-HUB7-001' },
+  { name: 'Laptop Cooling Pad', category: 'Accessories', brand: 'Asus', price: 6500, costPrice: 4800, stock: 45, warranty: '1 Year', warrantyMonths: 12, barcode: 'AS-COOL-001' },
+  { name: 'Webcam HD 1080p', category: 'Accessories', brand: 'Logitech', price: 15000, costPrice: 11500, stock: 25, warranty: '2 Years', warrantyMonths: 24, barcode: 'LG-WC1080-001' },
+  
+  // Printers
+  { name: 'HP LaserJet Pro M404n', category: 'Printers', brand: 'HP', price: 85000, costPrice: 72000, stock: 8, warranty: '1 Year', warrantyMonths: 12, barcode: 'HP-LJ404-001' },
+  { name: 'HP DeskJet 2720', category: 'Printers', brand: 'HP', price: 22000, costPrice: 17500, stock: 15, warranty: '1 Year', warrantyMonths: 12, barcode: 'HP-DJ2720-001' },
+  { name: 'Brother HL-L2350DW', category: 'Printers', brand: 'HP', price: 45000, costPrice: 38000, stock: 10, warranty: '2 Years', warrantyMonths: 24, barcode: 'BR-HLL2350-001' },
+  
+  // Components
+  { name: 'Corsair 16GB DDR4 RAM', category: 'Components', brand: 'Kingston', price: 18500, costPrice: 15000, stock: 30, warranty: 'Lifetime', warrantyMonths: 120, barcode: 'CR-RAM16-001' },
+  { name: 'Kingston 8GB DDR4 RAM', category: 'Components', brand: 'Kingston', price: 9500, costPrice: 7500, stock: 45, warranty: 'Lifetime', warrantyMonths: 120, barcode: 'KN-RAM8-001' },
+  { name: 'Asus GTX 1660 Super', category: 'Components', brand: 'Asus', price: 95000, costPrice: 82000, stock: 6, warranty: '3 Years', warrantyMonths: 36, barcode: 'AS-GTX1660-001' },
+  
+  // Audio
+  { name: 'Sony WH-1000XM5', category: 'Audio', brand: 'Sony', price: 125000, costPrice: 105000, stock: 10, warranty: '1 Year', warrantyMonths: 12, barcode: 'SN-WH1000-001' },
+  { name: 'Logitech H390 USB Headset', category: 'Audio', brand: 'Logitech', price: 12500, costPrice: 9500, stock: 30, warranty: '2 Years', warrantyMonths: 24, barcode: 'LG-H390-001' },
+  { name: 'JBL Flip 6 Speaker', category: 'Audio', brand: 'Sony', price: 38000, costPrice: 31000, stock: 15, warranty: '1 Year', warrantyMonths: 12, barcode: 'JBL-FLIP6-001' }
+];
+
+// ==========================================
+// CUSTOMER DATA (Varied types)
+// ==========================================
+
+const CUSTOMERS_DATA = [
+  // Regular customers
+  { name: 'Kamal Perera', email: 'kamal.perera@gmail.com', phone: '0771234567', address: 'No. 45, Galle Road, Colombo 03', nic: '901234567V', type: 'REGULAR' as CustomerType },
+  { name: 'Nimal Silva', email: 'nimal.silva@yahoo.com', phone: '0712345678', address: 'No. 123, Main Street, Kandy', nic: '851234568V', type: 'REGULAR' as CustomerType },
+  { name: 'Sunil Fernando', email: 'sunil.f@gmail.com', phone: '0761234567', address: 'No. 78, Beach Road, Galle', nic: '921234569V', type: 'REGULAR' as CustomerType },
+  { name: 'Priya Jayawardena', email: 'priya.j@outlook.com', phone: '0752345678', address: 'No. 56, Temple Road, Negombo', nic: '941234570V', type: 'REGULAR' as CustomerType },
+  { name: 'Ruwan Bandara', email: 'ruwan.b@gmail.com', phone: '0783456789', address: 'No. 89, High Level Road, Nugegoda', nic: '881234571V', type: 'REGULAR' as CustomerType },
+  
+  // Wholesale customers
+  { name: 'ABC Computers', email: 'info@abccomputers.lk', phone: '0114567890', address: 'No. 234, Duplication Road, Colombo 03', nic: null, type: 'WHOLESALE' as CustomerType },
+  { name: 'Tech Solutions Lanka', email: 'sales@techsolutions.lk', phone: '0115678901', address: 'No. 567, Baseline Road, Colombo 09', nic: null, type: 'WHOLESALE' as CustomerType },
+  
+  // Dealers
+  { name: 'CompuMart Dealers', email: 'orders@compumart.lk', phone: '0116789012', address: 'No. 890, Kandy Road, Kadawatha', nic: null, type: 'DEALER' as CustomerType },
+  { name: 'Digital Hub Trading', email: 'contact@digitalhub.lk', phone: '0117890123', address: 'No. 45, Negombo Road, Wattala', nic: null, type: 'DEALER' as CustomerType },
+  
+  // Corporate customers
+  { name: 'Lanka Insurance PLC', email: 'it@lankainsurance.lk', phone: '0118901234', address: 'No. 123, Union Place, Colombo 02', nic: null, type: 'CORPORATE' as CustomerType },
+  { name: 'ABC Holdings Ltd', email: 'procurement@abcholdings.lk', phone: '0119012345', address: 'No. 456, Galle Face, Colombo 01', nic: null, type: 'CORPORATE' as CustomerType },
+  { name: 'National School Polonnaruwa', email: 'office@nsp.edu.lk', phone: '0270123456', address: 'Main Street, Polonnaruwa', nic: null, type: 'CORPORATE' as CustomerType },
+  
+  // VIP customers
+  { name: 'Dr. Saman Wickramasinghe', email: 'dr.saman@gmail.com', phone: '0779876543', address: 'No. 12, Ward Place, Colombo 07', nic: '751234572V', type: 'VIP' as CustomerType },
+  { name: 'Eng. Malini Rajapaksa', email: 'malini.eng@yahoo.com', phone: '0718765432', address: 'No. 34, Flower Road, Colombo 07', nic: '801234573V', type: 'VIP' as CustomerType },
+  
+  // More regular customers with credit
+  { name: 'Chaminda Rathnayake', email: 'chaminda.r@gmail.com', phone: '0767654321', address: 'No. 67, Station Road, Moratuwa', nic: '911234574V', type: 'REGULAR' as CustomerType, credit: true },
+  { name: 'Sanduni Herath', email: 'sanduni.h@outlook.com', phone: '0756543210', address: 'No. 98, Main Street, Panadura', nic: '961234575V', type: 'REGULAR' as CustomerType, credit: true }
+];
+
+// ==========================================
+// SUPPLIER DATA
+// ==========================================
+
+const SUPPLIERS_DATA = [
+  { name: 'HP Sri Lanka', contact: 'Roshan Fernando', email: 'roshan@hpsrilanka.lk', phone: '0112345678', address: 'No. 45, Duplication Road, Colombo 03' },
+  { name: 'Dell Technologies Lanka', contact: 'Chamara Perera', email: 'chamara@dell.lk', phone: '0112456789', address: 'No. 89, Galle Road, Colombo 04' },
+  { name: 'Lenovo Authorized Distributor', contact: 'Nirmala Silva', email: 'nirmala@lenovolanka.com', phone: '0113456789', address: 'No. 123, Union Place, Colombo 02' },
+  { name: 'Samsung Electronics Lanka', contact: 'Dilshan Jayawardena', email: 'dilshan@samsung.lk', phone: '0114567890', address: 'No. 234, Baseline Road, Colombo 09' },
+  { name: 'Apple Premium Reseller', contact: 'Kavindi Rodrigo', email: 'kavindi@applereseller.lk', phone: '0115678901', address: 'No. 56, Ward Place, Colombo 07' },
+  { name: 'Redington Lanka', contact: 'Ajith Bandara', email: 'ajith@redington.lk', phone: '0116789012', address: 'No. 789, Nawala Road, Rajagiriya' },
+  { name: 'Softlogic Distribution', contact: 'Priyanka Herath', email: 'priyanka@softlogic.lk', phone: '0117890123', address: 'No. 321, High Level Road, Nugegoda' },
+  { name: 'Metropolitan Computer Wholesale', contact: 'Ranjith Fernando', email: 'ranjith@metro.lk', phone: '0118901234', address: 'No. 654, Negombo Road, Wattala' }
+];
+
+// ==========================================
+// MAIN SEED FUNCTION
+// ==========================================
 
 async function main() {
-  console.log('🌱 Starting seed...');
+  console.log('');
+  console.log('╔═══════════════════════════════════════════════════════════════╗');
+  console.log('║           🌱 ECOSYSTEM DATABASE SEEDING                       ║');
+  console.log('║              World-Class Sample Data                          ║');
+  console.log('╚═══════════════════════════════════════════════════════════════╝');
   console.log('');
 
   // ==========================================
-  // SHOP - Create EcoTech shop first
+  // STEP 1: SUPER ADMIN
   // ==========================================
-  const ecotechShop = await prisma.shop.upsert({
-    where: { slug: 'ecotech' },
+  console.log('📌 STEP 1: Creating Super Admin...');
+  
+  const superAdminPassword = await hashPassword(CONFIG.SUPER_ADMIN.password);
+  
+  const superAdmin = await prisma.user.upsert({
+    where: { email: CONFIG.SUPER_ADMIN.email },
+    update: {
+      name: CONFIG.SUPER_ADMIN.name,
+      password: superAdminPassword,
+      role: UserRole.SUPER_ADMIN,
+      isActive: true,
+    },
+    create: {
+      email: CONFIG.SUPER_ADMIN.email,
+      password: superAdminPassword,
+      name: CONFIG.SUPER_ADMIN.name,
+      role: UserRole.SUPER_ADMIN,
+      isActive: true,
+      lastLogin: new Date(),
+      shopId: null,
+    },
+  });
+  console.log(`   ✅ SUPER_ADMIN: ${superAdmin.email} / ${CONFIG.SUPER_ADMIN.password}`);
+  console.log('');
+
+  // ==========================================
+  // STEP 2: CREATE SHOPS
+  // ==========================================
+  console.log('📌 STEP 2: Creating Shops...');
+  
+  // Shop 1: Eco-User
+  const shop1 = await prisma.shop.upsert({
+    where: { slug: CONFIG.SHOP1.slug },
     update: {},
     create: {
-      name: 'EcoTech Computer Shop',
-      slug: 'ecotech',
-      description: 'Your trusted partner for computer hardware and accessories',
+      name: CONFIG.SHOP1.name,
+      slug: CONFIG.SHOP1.slug,
+      subName: CONFIG.SHOP1.subName,
+      tagline: CONFIG.SHOP1.tagline,
+      description: 'Your trusted partner for computer solutions',
       address: 'No. 123, Galle Road, Colombo 03, Sri Lanka',
       phone: '+94 11 234 5678',
-      email: 'info@ecotech.lk',
-      website: 'https://ecotech.lk',
+      email: 'info@ecouser.lk',
+      website: 'https://ecouser.lk',
       businessRegNo: 'PV00123456',
       taxId: 'TIN123456789',
       currency: 'LKR',
-      taxRate: 15, // 15% default tax
+      taxRate: 0,
       isActive: true,
+      reminderEnabled: true,
+      paymentReminderTemplate: 'Dear {customerName}, this is a friendly reminder that your invoice #{invoiceNumber} for Rs. {amount} is due on {dueDate}. Please make the payment at your earliest convenience. Thank you! - {shopName}',
+      overdueReminderTemplate: 'Dear {customerName}, your invoice #{invoiceNumber} for Rs. {amount} is now overdue by {daysPastDue} days. Please settle your account immediately to avoid service interruption. - {shopName}',
     },
   });
-  console.log(`🏪 Created shop: ${ecotechShop.name} (${ecotechShop.slug})`);
+  console.log(`   ✅ Shop 1: ${shop1.name} (${shop1.slug})`);
+
+  // Shop 2: Ecotec
+  const shop2 = await prisma.shop.upsert({
+    where: { slug: CONFIG.SHOP2.slug },
+    update: {},
+    create: {
+      name: CONFIG.SHOP2.name,
+      slug: CONFIG.SHOP2.slug,
+      subName: CONFIG.SHOP2.subName,
+      tagline: CONFIG.SHOP2.tagline,
+      description: 'Tech & Mobile Solutions for Modern Business',
+      address: 'No. 456, Kandy Road, Kadawatha, Sri Lanka',
+      phone: '+94 11 456 7890',
+      email: 'info@ecotec.lk',
+      website: 'https://ecotec.lk',
+      businessRegNo: 'PV00789012',
+      taxId: 'TIN987654321',
+      currency: 'LKR',
+      taxRate: 0,
+      isActive: true,
+      reminderEnabled: true,
+      paymentReminderTemplate: 'Dear {customerName}, this is a friendly reminder that your invoice #{invoiceNumber} for Rs. {amount} is due on {dueDate}. Please make the payment at your earliest convenience. Thank you! - {shopName}',
+      overdueReminderTemplate: 'Dear {customerName}, your invoice #{invoiceNumber} for Rs. {amount} is now overdue by {daysPastDue} days. Please settle your account immediately to avoid service interruption. - {shopName}',
+    },
+  });
+  console.log(`   ✅ Shop 2: ${shop2.name} (${shop2.slug})`);
+  console.log('');
 
   // ==========================================
-  // SUPER ADMIN - Platform-wide administrator
+  // STEP 3: CREATE SHOP USERS
   // ==========================================
-  const superAdminPassword = await bcrypt.hash('SuperAdmin@123', 10);
+  console.log('📌 STEP 3: Creating Shop Users...');
   
-  const superAdmin = await prisma.user.upsert({
-    where: { email: 'sdachathuranga@gmail.com' },
+  // Shop 1 Admin
+  const shop1AdminPassword = await hashPassword(CONFIG.SHOP1.admin.password);
+  const shop1Admin = await prisma.user.upsert({
+    where: { email: CONFIG.SHOP1.admin.email },
     update: {
-      name: 'Sachitha Chathuranga',
-      password: superAdminPassword,
-      role: UserRole.SUPER_ADMIN,
-      isActive: true,
-    },
-    create: {
-      email: 'sdachathuranga@gmail.com',
-      password: superAdminPassword,
-      name: 'Sachitha Chathuranga',
-      role: UserRole.SUPER_ADMIN,
-      isActive: true,
-      lastLogin: new Date(),
-      shopId: null, // Super admin is not tied to any shop
-    },
-  });
-  console.log(`🛡️  Created SUPER ADMIN: ${superAdmin.name} (${superAdmin.email})`);
-
-  // ==========================================
-  // USERS - Create shop admin and staff
-  // ==========================================
-  const hashedPassword = await bcrypt.hash('ecotech123', 10);
-  
-  const ecotechUser = await prisma.user.upsert({
-    where: { email: 'ecotech@ecotech.lk' },
-    update: { shopId: ecotechShop.id },
-    create: {
-      email: 'ecotech@ecotech.lk',
-      password: hashedPassword,
-      name: 'EcoTech Admin',
+      name: CONFIG.SHOP1.admin.name,
+      password: shop1AdminPassword,
       role: UserRole.ADMIN,
+      shopId: shop1.id,
+      isActive: true,
+    },
+    create: {
+      email: CONFIG.SHOP1.admin.email,
+      password: shop1AdminPassword,
+      name: CONFIG.SHOP1.admin.name,
+      role: UserRole.ADMIN,
+      shopId: shop1.id,
       isActive: true,
       lastLogin: new Date(),
-      shopId: ecotechShop.id,
     },
   });
-  console.log(`✅ Created user: ${ecotechUser.name} (${ecotechUser.email})`);
+  console.log(`   ✅ Shop 1 ADMIN: ${shop1Admin.email} / ${CONFIG.SHOP1.admin.password}`);
 
-  // Create additional sample users
-  const staffUser = await prisma.user.upsert({
-    where: { email: 'staff@ecotech.lk' },
-    update: { shopId: ecotechShop.id },
-    create: {
-      email: 'staff@ecotech.lk',
-      password: await bcrypt.hash('staff123', 10),
-      name: 'Kasun Silva',
-      role: UserRole.STAFF,
-      isActive: true,
-      shopId: ecotechShop.id,
-    },
-  });
-
-  const managerUser = await prisma.user.upsert({
-    where: { email: 'manager@ecotech.lk' },
-    update: { shopId: ecotechShop.id },
-    create: {
-      email: 'manager@ecotech.lk',
-      password: await bcrypt.hash('manager123', 10),
-      name: 'Nimali Perera',
+  // Shop 1 Manager
+  const managerPassword = await hashPassword('manager123');
+  const shop1Manager = await prisma.user.upsert({
+    where: { email: 'manager@ecotec.lk' },
+    update: {
+      name: 'Shop Manager',
+      password: managerPassword,
       role: UserRole.MANAGER,
+      shopId: shop1.id,
       isActive: true,
-      shopId: ecotechShop.id,
+    },
+    create: {
+      email: 'manager@ecotec.lk',
+      password: managerPassword,
+      name: 'Shop Manager',
+      role: UserRole.MANAGER,
+      shopId: shop1.id,
+      isActive: true,
+      lastLogin: new Date(),
     },
   });
-  console.log(`✅ Created 3 users (Admin, Manager, Staff) for ${ecotechShop.name}`);
+  console.log(`   ✅ Shop 1 MANAGER: ${shop1Manager.email} / manager123`);
+
+  // Shop 1 Staff
+  const staffPassword = await hashPassword('staff123');
+  const shop1Staff = await prisma.user.upsert({
+    where: { email: 'staff@ecotec.lk' },
+    update: {
+      name: 'Shop Staff',
+      password: staffPassword,
+      role: UserRole.STAFF,
+      shopId: shop1.id,
+      isActive: true,
+    },
+    create: {
+      email: 'staff@ecotec.lk',
+      password: staffPassword,
+      name: 'Shop Staff',
+      role: UserRole.STAFF,
+      shopId: shop1.id,
+      isActive: true,
+      lastLogin: new Date(),
+    },
+  });
+  console.log(`   ✅ Shop 1 STAFF: ${shop1Staff.email} / staff123`);
+
+  // Shop 2 Admin
+  const shop2AdminPassword = await hashPassword(CONFIG.SHOP2.admin.password);
+  const shop2Admin = await prisma.user.upsert({
+    where: { email: CONFIG.SHOP2.admin.email },
+    update: {
+      name: CONFIG.SHOP2.admin.name,
+      password: shop2AdminPassword,
+      role: UserRole.ADMIN,
+      shopId: shop2.id,
+      isActive: true,
+    },
+    create: {
+      email: CONFIG.SHOP2.admin.email,
+      password: shop2AdminPassword,
+      name: CONFIG.SHOP2.admin.name,
+      role: UserRole.ADMIN,
+      shopId: shop2.id,
+      isActive: true,
+      lastLogin: new Date(),
+    },
+  });
+  console.log(`   ✅ Shop 2 ADMIN: ${shop2Admin.email} / ${CONFIG.SHOP2.admin.password}`);
+
+  // Shop 2 Manager
+  const shop2Manager = await prisma.user.upsert({
+    where: { email: 'manager2@ecotec.lk' },
+    update: {
+      name: 'Shop 2 Manager',
+      password: managerPassword,
+      role: UserRole.MANAGER,
+      shopId: shop2.id,
+      isActive: true,
+    },
+    create: {
+      email: 'manager2@ecotec.lk',
+      password: managerPassword,
+      name: 'Shop 2 Manager',
+      role: UserRole.MANAGER,
+      shopId: shop2.id,
+      isActive: true,
+      lastLogin: new Date(),
+    },
+  });
+  console.log(`   ✅ Shop 2 MANAGER: ${shop2Manager.email} / manager123`);
+
+  // Shop 2 Staff
+  const shop2Staff = await prisma.user.upsert({
+    where: { email: 'staff2@ecotec.lk' },
+    update: {
+      name: 'Shop 2 Staff',
+      password: staffPassword,
+      role: UserRole.STAFF,
+      shopId: shop2.id,
+      isActive: true,
+    },
+    create: {
+      email: 'staff2@ecotec.lk',
+      password: staffPassword,
+      name: 'Shop 2 Staff',
+      role: UserRole.STAFF,
+      shopId: shop2.id,
+      isActive: true,
+      lastLogin: new Date(),
+    },
+  });
+  console.log(`   ✅ Shop 2 STAFF: ${shop2Staff.email} / staff123`);
+  console.log('');
 
   // ==========================================
-  // CATEGORIES - Linked to shop
+  // STEP 4: SEED DATA FOR BOTH SHOPS
   // ==========================================
-  const categoryData = [
-    { name: 'Processors', description: 'CPUs and processors' },
-    { name: 'Graphics Cards', description: 'GPUs and video cards' },
-    { name: 'Storage', description: 'SSDs, HDDs and storage devices' },
-    { name: 'Memory', description: 'RAM modules and memory' },
-    { name: 'Motherboards', description: 'Motherboards for desktops and laptops' },
-    { name: 'Power Supply', description: 'PSUs and power supplies' },
-    { name: 'Cooling', description: 'Coolers, fans and thermal solutions' },
-    { name: 'Cases', description: 'PC cases and enclosures' },
-    { name: 'Monitors', description: 'Display monitors' },
-    { name: 'Peripherals', description: 'Keyboards, mice, headsets etc.' },
-  ];
+  
+  // Seed for Shop 1
+  await seedShopData(shop1.id, 'Shop 1 (Eco-User)', shop1Admin.id);
+  
+  // Seed for Shop 2
+  await seedShopData(shop2.id, 'Shop 2 (Ecotec)', shop2Admin.id);
 
-  const categories: { [key: string]: { id: string } } = {};
-  for (const cat of categoryData) {
+  console.log('');
+  console.log('╔═══════════════════════════════════════════════════════════════╗');
+  console.log('║           ✅ DATABASE SEEDING COMPLETE!                       ║');
+  console.log('╚═══════════════════════════════════════════════════════════════╝');
+  console.log('');
+  console.log('📝 Login Credentials Summary:');
+  console.log('─────────────────────────────────────────────────────────────────');
+  console.log('');
+  console.log('🛡️  SUPER ADMIN:');
+  console.log(`   Email: ${CONFIG.SUPER_ADMIN.email}`);
+  console.log(`   Password: ${CONFIG.SUPER_ADMIN.password}`);
+  console.log('');
+  console.log(`🏪 SHOP 1 (${CONFIG.SHOP1.name}):`);
+  console.log(`   ADMIN:   ${CONFIG.SHOP1.admin.email} / ${CONFIG.SHOP1.admin.password}`);
+  console.log(`   MANAGER: manager@ecotec.lk / manager123`);
+  console.log(`   STAFF:   staff@ecotec.lk / staff123`);
+  console.log('');
+  console.log(`🏪 SHOP 2 (${CONFIG.SHOP2.name}):`);
+  console.log(`   ADMIN:   ${CONFIG.SHOP2.admin.email} / ${CONFIG.SHOP2.admin.password}`);
+  console.log(`   MANAGER: manager2@ecotec.lk / manager123`);
+  console.log(`   STAFF:   staff2@ecotec.lk / staff123`);
+  console.log('');
+}
+
+// ==========================================
+// SEED SHOP DATA FUNCTION
+// ==========================================
+
+async function seedShopData(shopId: string, shopName: string, adminId: string) {
+  console.log(`📌 Seeding ${shopName}...`);
+
+  // ==========================================
+  // CATEGORIES
+  // ==========================================
+  console.log('   📁 Creating Categories...');
+  const categoryMap = new Map<string, string>();
+  
+  for (const cat of CATEGORIES_DATA) {
     const category = await prisma.category.upsert({
-      where: { shopId_name: { shopId: ecotechShop.id, name: cat.name } },
+      where: { shopId_name: { shopId, name: cat.name } },
       update: {},
-      create: { ...cat, shopId: ecotechShop.id },
+      create: {
+        name: cat.name,
+        description: cat.description,
+        shopId,
+      },
     });
-    categories[cat.name] = category;
+    categoryMap.set(cat.name, category.id);
   }
-  console.log(`✅ Created ${Object.keys(categories).length} categories`);
+  console.log(`      ✅ Created ${CATEGORIES_DATA.length} categories`);
 
   // ==========================================
-  // BRANDS - Linked to shop
+  // BRANDS
   // ==========================================
-  const brandData = [
-    { name: 'AMD', description: 'Advanced Micro Devices' },
-    { name: 'Intel', description: 'Intel Corporation' },
-    { name: 'NVIDIA', description: 'NVIDIA Corporation' },
-    { name: 'Samsung', description: 'Samsung Electronics' },
-    { name: 'Western Digital', description: 'Western Digital Corporation' },
-    { name: 'Corsair', description: 'Corsair Gaming' },
-    { name: 'G.Skill', description: 'G.Skill International' },
-    { name: 'ASUS', description: 'ASUSTeK Computer' },
-    { name: 'MSI', description: 'Micro-Star International' },
-    { name: 'NZXT', description: 'NZXT Inc.' },
-    { name: 'Lian Li', description: 'Lian Li Industrial' },
-    { name: 'LG', description: 'LG Electronics' },
-    { name: 'Logitech', description: 'Logitech International' },
-    { name: 'Razer', description: 'Razer Inc.' },
-    { name: 'SteelSeries', description: 'SteelSeries ApS' },
-    { name: 'Seagate', description: 'Seagate Technology' },
-  ];
-
-  const brands: { [key: string]: { id: string } } = {};
-  for (const brand of brandData) {
+  console.log('   🏷️  Creating Brands...');
+  const brandMap = new Map<string, string>();
+  
+  for (const brand of BRANDS_DATA) {
     const b = await prisma.brand.upsert({
-      where: { shopId_name: { shopId: ecotechShop.id, name: brand.name } },
+      where: { shopId_name: { shopId, name: brand.name } },
       update: {},
-      create: { ...brand, shopId: ecotechShop.id },
-    });
-    brands[brand.name] = b;
-  }
-  console.log(`✅ Created ${Object.keys(brands).length} brands`);
-
-  // ==========================================
-  // CUSTOMERS - Linked to shop
-  // ==========================================
-  const customerData = [
-    { id: '1', name: 'Kasun Perera', email: 'kasun@gmail.com', phone: '078-3233760', address: 'No. 12, Galle Road, Colombo', totalSpent: 580000, totalOrders: 5, creditBalance: 0, creditLimit: 100000, creditStatus: CreditStatus.CLEAR },
-    { id: '2', name: 'Nimali Fernando', email: 'nimali@email.com', phone: '078-3233760', address: '12A, Kandy Rd, Kurunegala', totalSpent: 320000, totalOrders: 3, creditBalance: 103500, creditLimit: 200000, creditStatus: CreditStatus.ACTIVE },
-    { id: '3', name: 'Tech Solutions Ltd', email: 'info@techsol.lk', phone: '078-3233760', address: 'No. 45, Industrial Estate, Colombo 15', totalSpent: 2500000, totalOrders: 18, creditBalance: 488000, creditLimit: 1000000, creditStatus: CreditStatus.ACTIVE },
-    { id: '4', name: 'Dilshan Silva', email: 'dilshan.s@hotmail.com', phone: '078-3233760', address: '78/2, Hill Street, Kandy', totalSpent: 185000, totalOrders: 2, creditBalance: 72500, creditLimit: 100000, creditStatus: CreditStatus.ACTIVE },
-    { id: '5', name: 'GameZone Café', email: 'contact@gamezone.lk', phone: '078-3233760', address: 'Shop 5, Arcade Mall, Colombo', totalSpent: 3200000, totalOrders: 25, creditBalance: 1231250, creditLimit: 1500000, creditStatus: CreditStatus.ACTIVE },
-    { id: '6', name: 'Priya Jayawardena', email: 'priya.j@yahoo.com', phone: '078-3233760', address: 'No. 7, Lake Road, Galle', totalSpent: 95000, totalOrders: 1, creditBalance: 0, creditLimit: 50000, creditStatus: CreditStatus.CLEAR },
-    { id: '7', name: 'Creative Studios', email: 'studio@creative.lk', phone: '078-3233760', address: 'Studio 3, Art Lane, Colombo', totalSpent: 1850000, totalOrders: 12, creditBalance: 1322500, creditLimit: 1500000, creditStatus: CreditStatus.ACTIVE },
-    { id: '8', name: 'Sanjay Mendis', email: 'sanjay.m@gmail.com', phone: '078-3233760', address: 'No. 21, Thotalanga Road, Colombo', totalSpent: 420000, totalOrders: 4, creditBalance: 0, creditLimit: 100000, creditStatus: CreditStatus.CLEAR },
-  ];
-
-  for (const cust of customerData) {
-    await prisma.customer.upsert({
-      where: { id: cust.id },
-      update: { shopId: ecotechShop.id },
-      create: { ...cust, shopId: ecotechShop.id },
-    });
-  }
-  console.log(`✅ Created ${customerData.length} customers`);
-
-  // ==========================================
-  // PRODUCTS - Linked to shop
-  // ==========================================
-  const productData = [
-    { id: '1', name: 'AMD Ryzen 9 7950X', category: 'Processors', brand: 'AMD', price: 185000, costPrice: 155000, stock: 12, serialNumber: '70451234', barcode: '4938271650123', warranty: '3 years' },
-    { id: '2', name: 'Intel Core i9-14900K', category: 'Processors', brand: 'Intel', price: 195000, costPrice: 165000, stock: 8, serialNumber: '70452345', barcode: '4938271650124', warranty: '3 years' },
-    { id: '3', name: 'NVIDIA GeForce RTX 4090', category: 'Graphics Cards', brand: 'NVIDIA', price: 620000, costPrice: 520000, stock: 5, serialNumber: '70453456', barcode: '4938271650125', warranty: '3 years' },
-    { id: '4', name: 'NVIDIA GeForce RTX 4070 Ti', category: 'Graphics Cards', brand: 'NVIDIA', price: 280000, costPrice: 235000, stock: 15, serialNumber: '70454567', barcode: '4938271650126', warranty: '3 years' },
-    { id: '5', name: 'AMD Radeon RX 7900 XTX', category: 'Graphics Cards', brand: 'AMD', price: 350000, costPrice: 295000, stock: 7, serialNumber: '70455678', barcode: '4938271650127', warranty: '2 years' },
-    { id: '6', name: 'Samsung 990 Pro 2TB NVMe SSD', category: 'Storage', brand: 'Samsung', price: 75000, costPrice: 62000, stock: 30, serialNumber: '70456789', barcode: '4938271650128', warranty: '5 years' },
-    { id: '7', name: 'WD Black SN850X 1TB', category: 'Storage', brand: 'Western Digital', price: 42000, costPrice: 34000, stock: 45, serialNumber: '70457890', barcode: '4938271650129', warranty: '5 years' },
-    { id: '8', name: 'Corsair Vengeance DDR5 32GB (2x16GB)', category: 'Memory', brand: 'Corsair', price: 48000, costPrice: 40000, stock: 25, serialNumber: '70458901', barcode: '4938271650130', warranty: 'Lifetime' },
-    { id: '9', name: 'G.Skill Trident Z5 64GB DDR5', category: 'Memory', brand: 'G.Skill', price: 95000, costPrice: 78000, stock: 10, serialNumber: '70459012', barcode: '4938271650131', warranty: 'Lifetime' },
-    { id: '10', name: 'ASUS ROG Maximus Z790 Hero', category: 'Motherboards', brand: 'ASUS', price: 185000, costPrice: 155000, stock: 6, serialNumber: '70460123', barcode: '4938271650132', warranty: '3 years' },
-    { id: '11', name: 'MSI MEG Z790 ACE', category: 'Motherboards', brand: 'MSI', price: 165000, costPrice: 138000, stock: 8, serialNumber: '70461234', barcode: '4938271650133', warranty: '3 years' },
-    { id: '12', name: 'Corsair RM1000x 1000W PSU', category: 'Power Supply', brand: 'Corsair', price: 55000, costPrice: 45000, stock: 20, serialNumber: '70462345', barcode: '4938271650134', warranty: '10 years' },
-    { id: '13', name: 'NZXT Kraken X73 RGB', category: 'Cooling', brand: 'NZXT', price: 75000, costPrice: 62000, stock: 18, serialNumber: '70463456', barcode: '4938271650135', warranty: '6 years' },
-    { id: '14', name: 'Lian Li O11 Dynamic EVO', category: 'Cases', brand: 'Lian Li', price: 58000, costPrice: 48000, stock: 12, serialNumber: '70464567', barcode: '4938271650136', warranty: '2 years' },
-    { id: '15', name: 'LG UltraGear 27GP950-B 4K Monitor', category: 'Monitors', brand: 'LG', price: 195000, costPrice: 165000, stock: 6, serialNumber: '70465678', barcode: '4938271650137', warranty: '3 years' },
-    { id: '16', name: 'Samsung Odyssey G9 49" Monitor', category: 'Monitors', brand: 'Samsung', price: 380000, costPrice: 320000, stock: 3, serialNumber: '70466789', barcode: '4938271650138', warranty: '3 years' },
-    { id: '17', name: 'Logitech G Pro X Superlight 2', category: 'Peripherals', brand: 'Logitech', price: 52000, costPrice: 42000, stock: 35, serialNumber: '70467890', barcode: '4938271650139', warranty: '2 years' },
-    { id: '18', name: 'Razer Huntsman V3 Pro', category: 'Peripherals', brand: 'Razer', price: 68000, costPrice: 55000, stock: 20, serialNumber: '70468901', barcode: '4938271650140', warranty: '2 years' },
-    { id: '19', name: 'SteelSeries Arctis Nova Pro', category: 'Peripherals', brand: 'SteelSeries', price: 95000, costPrice: 78000, stock: 15, serialNumber: '70469012', barcode: '4938271650141', warranty: '1 year' },
-    { id: '20', name: 'Seagate Exos 18TB HDD', category: 'Storage', brand: 'Seagate', price: 125000, costPrice: 105000, stock: 8, serialNumber: '70470123', barcode: '4938271650142', warranty: '5 years' },
-  ];
-
-  for (const prod of productData) {
-    await prisma.product.upsert({
-      where: { id: prod.id },
-      update: { shopId: ecotechShop.id },
       create: {
-        id: prod.id,
-        name: prod.name,
-        price: prod.price,
-        costPrice: prod.costPrice,
-        stock: prod.stock,
-        serialNumber: prod.serialNumber,
-        barcode: prod.barcode,
-        warranty: prod.warranty,
-        categoryId: categories[prod.category].id,
-        brandId: brands[prod.brand].id,
-        shopId: ecotechShop.id,
+        name: brand.name,
+        description: brand.description,
+        website: brand.website,
+        shopId,
       },
     });
+    brandMap.set(brand.name, b.id);
   }
-  console.log(`✅ Created ${productData.length} products`);
+  console.log(`      ✅ Created ${BRANDS_DATA.length} brands`);
 
   // ==========================================
-  // INVOICES - Linked to shop
+  // PRODUCTS
   // ==========================================
-  const invoiceData: InvoiceData[] = [
-    {
-      id: '10260001',
-      invoiceNumber: 'INV-10260001',
-      customerId: '1',
-      customerName: 'Kasun Perera',
-      subtotal: 281000,
-      tax: 42150,
-      total: 323150,
-      paidAmount: 323150,
-      dueAmount: 0,
-      status: InvoiceStatus.FULLPAID,
-      date: new Date('2026-01-03'),
-      dueDate: new Date('2026-01-18'),
-      paymentMethod: PaymentMethod.CARD,
-      salesChannel: SalesChannel.ON_SITE,
-      items: [
-        { productId: '1', productName: 'AMD Ryzen 9 7950X', quantity: 1, unitPrice: 185000, total: 185000, warrantyDueDate: new Date('2029-01-03') },
-        { productId: '8', productName: 'Corsair Vengeance DDR5 32GB', quantity: 2, unitPrice: 48000, total: 96000 },
-      ],
-    },
-    {
-      id: '10260002',
-      invoiceNumber: 'INV-10260002',
-      customerId: '3',
-      customerName: 'Tech Solutions Ltd',
-      subtotal: 1720000,
-      tax: 258000,
-      total: 1978000,
-      paidAmount: 1978000,
-      dueAmount: 0,
-      status: InvoiceStatus.FULLPAID,
-      date: new Date('2026-01-05'),
-      dueDate: new Date('2026-01-20'),
-      paymentMethod: PaymentMethod.BANK_TRANSFER,
-      salesChannel: SalesChannel.ON_SITE,
-      items: [
-        { productId: '3', productName: 'NVIDIA GeForce RTX 4090', quantity: 2, unitPrice: 620000, total: 1240000, warrantyDueDate: new Date('2029-01-05') },
-        { productId: '10', productName: 'ASUS ROG Maximus Z790 Hero', quantity: 2, unitPrice: 185000, total: 370000, warrantyDueDate: new Date('2029-01-05') },
-        { productId: '12', productName: 'Corsair RM1000x 1000W PSU', quantity: 2, unitPrice: 55000, total: 110000, warrantyDueDate: new Date('2036-01-05') },
-      ],
-    },
-    {
-      id: '10260003',
-      invoiceNumber: 'INV-10260003',
-      customerId: '5',
-      customerName: 'GameZone Café',
-      subtotal: 2375000,
-      tax: 356250,
-      total: 2731250,
-      paidAmount: 1500000,
-      dueAmount: 1231250,
-      status: InvoiceStatus.HALFPAY,
-      date: new Date('2026-01-08'),
-      dueDate: new Date('2026-01-23'),
-      paymentMethod: PaymentMethod.CREDIT,
-      salesChannel: SalesChannel.ONLINE,
-      items: [
-        { productId: '4', productName: 'NVIDIA GeForce RTX 4070 Ti', quantity: 5, unitPrice: 280000, total: 1400000, warrantyDueDate: new Date('2029-01-08') },
-        { productId: '15', productName: 'LG UltraGear 27GP950-B 4K Monitor', quantity: 5, unitPrice: 195000, total: 975000, warrantyDueDate: new Date('2029-01-08') },
-      ],
-      payments: [
-        { amount: 500000, paymentMethod: PaymentMethod.CASH, paymentDate: new Date('2026-01-08T10:30:00'), notes: 'Initial deposit payment' },
-        { amount: 500000, paymentMethod: PaymentMethod.BANK_TRANSFER, paymentDate: new Date('2026-01-12T14:15:00'), notes: 'Second installment' },
-        { amount: 500000, paymentMethod: PaymentMethod.CARD, paymentDate: new Date('2026-01-16T11:00:00'), notes: 'Third payment via credit card' },
-      ],
-    },
-    {
-      id: '10260004',
-      invoiceNumber: 'INV-10260004',
-      customerId: '2',
-      customerName: 'Nimali Fernando',
-      subtotal: 120000,
-      tax: 18000,
-      total: 138000,
-      paidAmount: 138000,
-      dueAmount: 0,
-      status: InvoiceStatus.FULLPAID,
-      date: new Date('2026-01-02'),
-      dueDate: new Date('2026-01-17'),
-      paymentMethod: PaymentMethod.CASH,
-      salesChannel: SalesChannel.ON_SITE,
-      items: [
-        { productId: '17', productName: 'Logitech G Pro X Superlight 2', quantity: 1, unitPrice: 52000, total: 52000, warrantyDueDate: new Date('2028-01-02') },
-        { productId: '18', productName: 'Razer Huntsman V3 Pro', quantity: 1, unitPrice: 68000, total: 68000, warrantyDueDate: new Date('2028-01-02') },
-      ],
-    },
-    {
-      id: '10260005',
-      invoiceNumber: 'INV-10260005',
-      customerId: '7',
-      customerName: 'Creative Studios',
-      subtotal: 1150000,
-      tax: 172500,
-      total: 1322500,
-      paidAmount: 0,
-      dueAmount: 1322500,
-      status: InvoiceStatus.UNPAID,
-      date: new Date('2026-01-10'),
-      dueDate: new Date('2026-01-25'),
-      paymentMethod: PaymentMethod.CREDIT,
-      salesChannel: SalesChannel.ON_SITE,
-      items: [
-        { productId: '16', productName: 'Samsung Odyssey G9 49" Monitor', quantity: 2, unitPrice: 380000, total: 760000, warrantyDueDate: new Date('2029-01-10') },
-        { productId: '2', productName: 'Intel Core i9-14900K', quantity: 2, unitPrice: 195000, total: 390000, warrantyDueDate: new Date('2029-01-10') },
-      ],
-    },
-    {
-      id: '10260006',
-      invoiceNumber: 'INV-10260006',
-      customerId: '4',
-      customerName: 'Dilshan Silva',
-      subtotal: 150000,
-      tax: 22500,
-      total: 172500,
-      paidAmount: 100000,
-      dueAmount: 72500,
-      status: InvoiceStatus.HALFPAY,
-      date: new Date('2026-01-06'),
-      dueDate: new Date('2026-01-21'),
-      paymentMethod: PaymentMethod.CASH,
-      salesChannel: SalesChannel.ON_SITE,
-      items: [
-        { productId: '6', productName: 'Samsung 990 Pro 2TB NVMe SSD', quantity: 1, unitPrice: 75000, total: 75000, warrantyDueDate: new Date('2031-01-06') },
-        { productId: '13', productName: 'NZXT Kraken X73 RGB', quantity: 1, unitPrice: 75000, total: 75000, warrantyDueDate: new Date('2032-01-06') },
-      ],
-      payments: [
-        { amount: 50000, paymentMethod: PaymentMethod.CASH, paymentDate: new Date('2026-01-06T09:00:00'), notes: 'Down payment at purchase' },
-        { amount: 50000, paymentMethod: PaymentMethod.BANK_TRANSFER, paymentDate: new Date('2026-01-13T15:30:00'), notes: 'Bank transfer installment' },
-      ],
-    },
-    {
-      id: '10260007',
-      invoiceNumber: 'INV-10260007',
-      customerId: '1',
-      customerName: 'Kasun Perera',
-      subtotal: 95000,
-      tax: 14250,
-      total: 109250,
-      paidAmount: 109250,
-      dueAmount: 0,
-      status: InvoiceStatus.FULLPAID,
-      date: new Date('2026-01-11'),
-      dueDate: new Date('2026-01-26'),
-      paymentMethod: PaymentMethod.CARD,
-      salesChannel: SalesChannel.ON_SITE,
-      items: [
-        { productId: '19', productName: 'SteelSeries Arctis Nova Pro', quantity: 1, unitPrice: 95000, total: 95000, warrantyDueDate: new Date('2027-01-11') },
-      ],
-    },
-    {
-      id: '10260008',
-      invoiceNumber: 'INV-10260008',
-      customerId: '8',
-      customerName: 'Sanjay Mendis',
-      subtotal: 434000,
-      tax: 65100,
-      total: 499100,
-      paidAmount: 499100,
-      dueAmount: 0,
-      status: InvoiceStatus.FULLPAID,
-      date: new Date('2026-01-12'),
-      dueDate: new Date('2026-01-27'),
-      paymentMethod: PaymentMethod.BANK_TRANSFER,
-      salesChannel: SalesChannel.ONLINE,
-      items: [
-        { productId: '5', productName: 'AMD Radeon RX 7900 XTX', quantity: 1, unitPrice: 350000, total: 350000, warrantyDueDate: new Date('2028-01-12') },
-        { productId: '7', productName: 'WD Black SN850X 1TB', quantity: 2, unitPrice: 42000, total: 84000, warrantyDueDate: new Date('2031-01-12') },
-      ],
-    },
-    {
-      id: '10260009',
-      invoiceNumber: 'INV-10260009',
-      customerId: '6',
-      customerName: 'Priya Jayawardena',
-      subtotal: 153000,
-      tax: 22950,
-      total: 175950,
-      paidAmount: 175950,
-      dueAmount: 0,
-      status: InvoiceStatus.FULLPAID,
-      date: new Date('2026-01-14'),
-      dueDate: new Date('2026-01-29'),
-      paymentMethod: PaymentMethod.CASH,
-      salesChannel: SalesChannel.ON_SITE,
-      items: [
-        { productId: '14', productName: 'Lian Li O11 Dynamic EVO', quantity: 1, unitPrice: 58000, total: 58000, warrantyDueDate: new Date('2028-01-14') },
-        { productId: '9', productName: 'G.Skill Trident Z5 64GB DDR5', quantity: 1, unitPrice: 95000, total: 95000 },
-      ],
-    },
-    {
-      id: '10260010',
-      invoiceNumber: 'INV-10260010',
-      customerId: '3',
-      customerName: 'Tech Solutions Ltd',
-      subtotal: 1120000,
-      tax: 168000,
-      total: 1288000,
-      paidAmount: 800000,
-      dueAmount: 488000,
-      status: InvoiceStatus.HALFPAY,
-      date: new Date('2026-01-15'),
-      dueDate: new Date('2026-01-30'),
-      paymentMethod: PaymentMethod.CREDIT,
-      salesChannel: SalesChannel.ON_SITE,
-      items: [
-        { productId: '11', productName: 'MSI MEG Z790 ACE', quantity: 3, unitPrice: 165000, total: 495000, warrantyDueDate: new Date('2029-01-15') },
-        { productId: '20', productName: 'Seagate Exos 18TB HDD', quantity: 5, unitPrice: 125000, total: 625000, warrantyDueDate: new Date('2031-01-15') },
-      ],
-    },
-    {
-      id: '10260011',
-      invoiceNumber: 'INV-10260011',
-      customerId: '5',
-      customerName: 'GameZone Café',
-      subtotal: 1170000,
-      tax: 175500,
-      total: 1345500,
-      paidAmount: 1345500,
-      dueAmount: 0,
-      status: InvoiceStatus.FULLPAID,
-      date: new Date('2026-01-17'),
-      dueDate: new Date('2026-02-01'),
-      paymentMethod: PaymentMethod.BANK_TRANSFER,
-      salesChannel: SalesChannel.ONLINE,
-      items: [
-        { productId: '17', productName: 'Logitech G Pro X Superlight 2', quantity: 10, unitPrice: 52000, originalPrice: 55000, total: 520000, warrantyDueDate: new Date('2028-01-17') },
-        { productId: '18', productName: 'Razer Huntsman V3 Pro', quantity: 10, unitPrice: 65000, originalPrice: 68000, total: 650000, warrantyDueDate: new Date('2028-01-17') },
-      ],
-    },
-    {
-      id: '10260012',
-      invoiceNumber: 'INV-10260012',
-      customerId: '2',
-      customerName: 'Nimali Fernando',
-      subtotal: 90000,
-      tax: 13500,
-      total: 103500,
-      paidAmount: 0,
-      dueAmount: 103500,
-      status: InvoiceStatus.UNPAID,
-      date: new Date('2026-01-19'),
-      dueDate: new Date('2026-02-03'),
-      paymentMethod: PaymentMethod.CREDIT,
-      salesChannel: SalesChannel.ON_SITE,
-      items: [
-        { productId: '8', productName: 'Corsair Vengeance DDR5 32GB', quantity: 2, unitPrice: 45000, originalPrice: 48000, total: 90000 },
-      ],
-    },
-  ];
-
-  for (const inv of invoiceData) {
-    const { items, payments, ...invoiceFields } = inv;
-
-    // Create invoice with shop and user reference
-    const invoice = await prisma.invoice.upsert({
-      where: { id: inv.id },
-      update: { shopId: ecotechShop.id },
+  console.log('   📦 Creating Products...');
+  const productMap = new Map<string, string>();
+  
+  for (const product of PRODUCTS_DATA) {
+    // Generate unique barcode per shop
+    const uniqueBarcode = `${shopId.slice(0, 4)}-${product.barcode}`;
+    
+    const p = await prisma.product.upsert({
+      where: { shopId_barcode: { shopId, barcode: uniqueBarcode } },
+      update: {},
       create: {
-        ...invoiceFields,
-        shopId: ecotechShop.id,
-        createdById: ecotechUser.id, // Link to ecotech user
+        name: product.name,
+        description: `${product.brand} ${product.name} - Premium quality product`,
+        price: product.price,
+        costPrice: product.costPrice,
+        profitMargin: ((product.price - product.costPrice) / product.price) * 100,
+        stock: product.stock,
+        lowStockThreshold: Math.ceil(product.stock * 0.2),
+        warranty: product.warranty,
+        warrantyMonths: product.warrantyMonths,
+        barcode: uniqueBarcode,
+        categoryId: categoryMap.get(product.category),
+        brandId: brandMap.get(product.brand),
+        shopId,
+        totalPurchased: product.stock,
+        totalSold: 0,
       },
     });
+    productMap.set(product.name, p.id);
+  }
+  console.log(`      ✅ Created ${PRODUCTS_DATA.length} products`);
 
-    // Create invoice items
-    for (const item of items) {
-      await prisma.invoiceItem.create({
+  // ==========================================
+  // SUPPLIERS
+  // ==========================================
+  console.log('   🚚 Creating Suppliers...');
+  const supplierMap = new Map<string, string>();
+  
+  for (const supplier of SUPPLIERS_DATA) {
+    const s = await prisma.supplier.upsert({
+      where: { shopId_name: { shopId, name: supplier.name } },
+      update: {},
+      create: {
+        name: supplier.name,
+        contactPerson: supplier.contact,
+        email: supplier.email,
+        phone: supplier.phone,
+        address: supplier.address,
+        isActive: true,
+        shopId,
+      },
+    });
+    supplierMap.set(supplier.name, s.id);
+  }
+  console.log(`      ✅ Created ${SUPPLIERS_DATA.length} suppliers`);
+
+  // ==========================================
+  // CUSTOMERS
+  // ==========================================
+  console.log('   👥 Creating Customers...');
+  const customerMap = new Map<string, string>();
+  
+  for (const customer of CUSTOMERS_DATA) {
+    const hasCredit = 'credit' in customer && customer.credit;
+    
+    const c = await prisma.customer.create({
+      data: {
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        address: customer.address,
+        nic: customer.nic,
+        customerType: customer.type,
+        totalSpent: 0,
+        totalOrders: 0,
+        creditBalance: hasCredit ? Math.floor(Math.random() * 50000) + 10000 : 0,
+        creditLimit: hasCredit ? 100000 : 0,
+        creditStatus: hasCredit ? CreditStatus.ACTIVE : CreditStatus.CLEAR,
+        creditDueDate: hasCredit ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
+        shopId,
+      },
+    });
+    customerMap.set(customer.name, c.id);
+  }
+  console.log(`      ✅ Created ${CUSTOMERS_DATA.length} customers`);
+
+  // ==========================================
+  // GRNs (Sample GRNs)
+  // ==========================================
+  console.log('   📥 Creating GRNs...');
+  
+  // Get some products and suppliers for GRN creation
+  const products = await prisma.product.findMany({ where: { shopId }, take: 10 });
+  const suppliers = await prisma.supplier.findMany({ where: { shopId }, take: 3 });
+  
+  if (suppliers.length > 0 && products.length > 0) {
+    const grnStatuses: GRNStatus[] = [GRNStatus.COMPLETED, GRNStatus.COMPLETED, GRNStatus.PENDING, GRNStatus.DRAFT];
+    
+    for (let i = 0; i < 4; i++) {
+      const supplier = suppliers[i % suppliers.length];
+      const grnProducts = products.slice(i * 2, i * 2 + 3);
+      
+      if (grnProducts.length === 0) continue;
+      
+      const grnItems = grnProducts.map(p => ({
+        productId: p.id,
+        quantity: Math.floor(Math.random() * 20) + 5,
+        costPrice: p.costPrice || p.price * 0.8,
+        sellingPrice: p.price,
+        totalCost: (p.costPrice || p.price * 0.8) * (Math.floor(Math.random() * 20) + 5),
+      }));
+      
+      const subtotal = grnItems.reduce((sum, item) => sum + item.totalCost, 0);
+      
+      await prisma.gRN.create({
         data: {
-          invoiceId: invoice.id,
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          originalPrice: item.originalPrice,
-          total: item.total,
-          warrantyDueDate: item.warrantyDueDate,
+          grnNumber: generateGRNNumber(i + 1),
+          supplierId: supplier.id,
+          shopId,
+          referenceNo: `SUP-INV-${String(Math.floor(Math.random() * 100000)).padStart(6, '0')}`,
+          date: randomDate(new Date('2026-01-01'), new Date()),
+          subtotal,
+          tax: 0,
+          discount: 0,
+          totalAmount: subtotal,
+          paidAmount: grnStatuses[i] === GRNStatus.COMPLETED ? subtotal : 0,
+          status: grnStatuses[i],
+          paymentStatus: grnStatuses[i] === GRNStatus.COMPLETED ? PaymentStatus.PAID : PaymentStatus.UNPAID,
+          notes: `GRN from ${supplier.name}`,
+          createdById: adminId,
+          items: {
+            create: grnItems.map(item => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              costPrice: item.costPrice,
+              sellingPrice: item.sellingPrice,
+              totalCost: item.totalCost,
+            })),
+          },
         },
       });
     }
+    console.log(`      ✅ Created 4 sample GRNs`);
+  }
 
-    // Create payments if any (linked to ecotech user)
-    if (payments) {
-      for (const payment of payments) {
+  // ==========================================
+  // INVOICES (Various statuses)
+  // ==========================================
+  console.log('   🧾 Creating Invoices...');
+  
+  const customers = await prisma.customer.findMany({ where: { shopId }, take: 10 });
+  
+  if (customers.length > 0 && products.length > 0) {
+    const invoiceStatuses: InvoiceStatus[] = [
+      InvoiceStatus.FULLPAID, InvoiceStatus.FULLPAID, InvoiceStatus.FULLPAID, 
+      InvoiceStatus.HALFPAY, InvoiceStatus.HALFPAY, 
+      InvoiceStatus.UNPAID, InvoiceStatus.UNPAID, 
+      InvoiceStatus.CANCELLED
+    ];
+    const paymentMethods: PaymentMethod[] = [
+      PaymentMethod.CASH, PaymentMethod.CARD, PaymentMethod.BANK_TRANSFER, 
+      PaymentMethod.CREDIT, PaymentMethod.CHEQUE
+    ];
+    
+    for (let i = 0; i < 8; i++) {
+      const customer = customers[i % customers.length];
+      const invoiceProducts = products.slice((i * 2) % products.length, ((i * 2) % products.length) + 3);
+      
+      if (invoiceProducts.length === 0) continue;
+      
+      const invoiceItems = invoiceProducts.map(p => {
+        const qty = Math.floor(Math.random() * 3) + 1;
+        const unitPrice = p.price;
+        const discount = Math.random() > 0.7 ? Math.floor(unitPrice * 0.05) : 0;
+        return {
+          productId: p.id,
+          productName: p.name,
+          quantity: qty,
+          unitPrice,
+          originalPrice: unitPrice,
+          discount,
+          total: (unitPrice - discount) * qty,
+          warranty: p.warranty,
+          warrantyDueDate: p.warrantyMonths ? getWarrantyDueDate(p.warrantyMonths) : null,
+        };
+      });
+      
+      const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
+      const status = invoiceStatuses[i];
+      const paidAmount = status === InvoiceStatus.FULLPAID ? subtotal : 
+                         status === InvoiceStatus.HALFPAY ? Math.floor(subtotal / 2) : 
+                         status === InvoiceStatus.CANCELLED ? 0 : 0;
+      
+      const invoiceDate = randomDate(new Date('2026-01-01'), new Date());
+      const dueDate = new Date(invoiceDate);
+      dueDate.setDate(dueDate.getDate() + 30);
+      
+      const invoice = await prisma.invoice.create({
+        data: {
+          invoiceNumber: generateInvoiceNumber(i + 1),
+          shopId,
+          customerId: customer.id,
+          customerName: customer.name,
+          subtotal,
+          tax: 0,
+          discount: 0,
+          total: subtotal,
+          paidAmount,
+          dueAmount: subtotal - paidAmount,
+          status,
+          date: invoiceDate,
+          dueDate,
+          paymentMethod: status !== InvoiceStatus.UNPAID ? randomItem(paymentMethods) : null,
+          salesChannel: Math.random() > 0.2 ? SalesChannel.ON_SITE : SalesChannel.ONLINE,
+          notes: status === InvoiceStatus.CANCELLED ? 'Customer cancelled order' : null,
+          createdById: adminId,
+          items: {
+            create: invoiceItems,
+          },
+        },
+      });
+      
+      // Add payment records for paid/halfpaid invoices
+      if (paidAmount > 0 && status !== InvoiceStatus.CANCELLED) {
         await prisma.invoicePayment.create({
           data: {
             invoiceId: invoice.id,
-            amount: payment.amount,
-            paymentMethod: payment.paymentMethod,
-            paymentDate: payment.paymentDate,
-            notes: payment.notes,
-            recordedById: ecotechUser.id, // Link to ecotech user
+            amount: paidAmount,
+            paymentMethod: invoice.paymentMethod || PaymentMethod.CASH,
+            paymentDate: invoiceDate,
+            notes: 'Initial payment',
+            recordedById: adminId,
           },
         });
       }
+      
+      // Update customer stats
+      if (status !== InvoiceStatus.CANCELLED) {
+        await prisma.customer.update({
+          where: { id: customer.id },
+          data: {
+            totalSpent: { increment: paidAmount },
+            totalOrders: { increment: 1 },
+            lastPurchase: invoiceDate,
+          },
+        });
+      }
+      
+      // Create stock movements for completed invoices
+      if (status === InvoiceStatus.FULLPAID || status === InvoiceStatus.HALFPAY) {
+        for (const item of invoiceItems) {
+          if (item.productId) {
+            const product = invoiceProducts.find(p => p.id === item.productId);
+            if (product) {
+              const previousStock = product.stock;
+              const newStock = Math.max(0, previousStock - item.quantity);
+              
+              await prisma.stockMovement.create({
+                data: {
+                  productId: item.productId,
+                  type: StockMovementType.INVOICE_OUT,
+                  quantity: -item.quantity,
+                  previousStock,
+                  newStock,
+                  referenceId: invoice.id,
+                  referenceNumber: invoice.invoiceNumber,
+                  referenceType: 'invoice',
+                  unitPrice: item.unitPrice,
+                  createdBy: adminId,
+                  shopId,
+                },
+              });
+              
+              // Update product stock and totalSold
+              await prisma.product.update({
+                where: { id: item.productId },
+                data: {
+                  stock: newStock,
+                  totalSold: { increment: item.quantity },
+                },
+              });
+            }
+          }
+        }
+      }
+    }
+    console.log(`      ✅ Created 8 sample invoices`);
+  }
+
+  // ==========================================
+  // INVOICE REMINDERS (Sample)
+  // ==========================================
+  console.log('   📨 Creating Invoice Reminders...');
+  
+  const unpaidInvoices = await prisma.invoice.findMany({
+    where: { shopId, status: { in: [InvoiceStatus.UNPAID, InvoiceStatus.HALFPAY] } },
+    include: { customer: true },
+    take: 3,
+  });
+  
+  for (const invoice of unpaidInvoices) {
+    if (invoice.customer) {
+      await prisma.invoiceReminder.create({
+        data: {
+          invoiceId: invoice.id,
+          shopId,
+          type: invoice.dueDate < new Date() ? ReminderType.OVERDUE : ReminderType.PAYMENT,
+          channel: 'whatsapp',
+          message: `Dear ${invoice.customerName}, reminder for invoice ${invoice.invoiceNumber} - Amount due: Rs. ${invoice.dueAmount.toLocaleString()}`,
+          customerPhone: invoice.customer.phone,
+          customerName: invoice.customerName,
+        },
+      });
     }
   }
-  console.log(`✅ Created ${invoiceData.length} invoices with items and payments`);
+  console.log(`      ✅ Created ${unpaidInvoices.length} invoice reminders`);
 
+  // ==========================================
+  // INVOICE ITEM HISTORY (Sample modifications)
+  // ==========================================
+  console.log('   📜 Creating Invoice Item History...');
+  
+  const recentInvoice = await prisma.invoice.findFirst({
+    where: { shopId, status: InvoiceStatus.FULLPAID },
+    include: { items: true },
+  });
+  
+  if (recentInvoice && recentInvoice.items.length > 0) {
+    await prisma.invoiceItemHistory.create({
+      data: {
+        invoiceId: recentInvoice.id,
+        action: ItemHistoryAction.ADDED,
+        productId: recentInvoice.items[0].productId,
+        productName: recentInvoice.items[0].productName,
+        oldQuantity: null,
+        newQuantity: recentInvoice.items[0].quantity,
+        unitPrice: recentInvoice.items[0].unitPrice,
+        amountChange: recentInvoice.items[0].total,
+        changedById: adminId,
+        changedByName: 'Admin',
+        reason: 'Initial item added',
+        shopId,
+      },
+    });
+  }
+  console.log(`      ✅ Created sample invoice item history`);
+
+  console.log(`   ✅ ${shopName} seeding complete!`);
   console.log('');
-  console.log('🎉 Seed completed successfully!');
-  console.log('');
-  console.log('═══════════════════════════════════════════════════');
-  console.log('📊 SUMMARY');
-  console.log('═══════════════════════════════════════════════════');
-  console.log('');
-  console.log(`🏪 Shop: ${ecotechShop.name}`);
-  console.log(`   Slug: ${ecotechShop.slug}`);
-  console.log(`   Email: ${ecotechShop.email}`);
-  console.log('');
-  console.log('📈 Data Created:');
-  console.log(`   • Users: 3`);
-  console.log(`   • Categories: ${Object.keys(categories).length}`);
-  console.log(`   • Brands: ${Object.keys(brands).length}`);
-  console.log(`   • Customers: ${customerData.length}`);
-  console.log(`   • Products: ${productData.length}`);
-  console.log(`   • Invoices: ${invoiceData.length}`);
-  console.log('');
-  console.log('═══════════════════════════════════════════════════');
-  console.log('🔑 LOGIN CREDENTIALS');
-  console.log('═══════════════════════════════════════════════════');
-  console.log('');
-  console.log('   🛡️ SUPER ADMIN (Platform Access)');
-  console.log('   Email    : sdachathuranga@gmail.com');
-  console.log('   Password : SuperAdmin@123');
-  console.log('');
-  console.log('   📦 SHOP USERS (EcoTech)');
-  console.log('   Role      │ Email                │ Password');
-  console.log('   ──────────┼──────────────────────┼───────────');
-  console.log('   Admin     │ ecotech@ecotech.lk   │ ecotech123');
-  console.log('   Manager   │ manager@ecotech.lk   │ manager123');
-  console.log('   Staff     │ staff@ecotech.lk     │ staff123');
-  console.log('');
-  console.log('═══════════════════════════════════════════════════');
 }
 
+// ==========================================
+// EXECUTE SEED
+// ==========================================
+
 main()
-  .catch((e) => {
-    console.error('❌ Seed failed:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
+  .then(async () => {
     await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error('❌ Seeding failed:', e);
+    await prisma.$disconnect();
+    process.exit(1);
   });

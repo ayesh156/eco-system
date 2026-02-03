@@ -61,6 +61,8 @@ model Shop {
   products      Product[]
   invoices      Invoice[]
   invoiceReminders InvoiceReminder[]
+  suppliers     Supplier[]
+  grns          GRN[]
 
   @@map("shops")
 }
@@ -88,6 +90,7 @@ model User {
   invoicesCreated   Invoice[]  @relation("InvoiceCreatedBy")
   invoicesUpdated   Invoice[]  @relation("InvoiceUpdatedBy")
   paymentsRecorded  InvoicePayment[]
+  grnsCreated       GRN[]      @relation("GRNCreatedBy")
 
   @@index([shopId])
   @@map("users")
@@ -317,6 +320,7 @@ model Product {
   invoiceItems    InvoiceItem[]
   stockMovements  StockMovement[]
   priceHistory    PriceHistory[]
+  grnItems        GRNItem[]
 
   @@unique([shopId, barcode])  // Unique barcode per shop
   @@index([shopId])
@@ -645,3 +649,116 @@ enum ReminderType {
   PAYMENT
   OVERDUE
 }
+
+// ==========================================
+// SUPPLIER MANAGEMENT
+// ==========================================
+
+model Supplier {
+  id            String    @id @default(cuid())
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String
+  address       String?
+  
+  // Status
+  isActive      Boolean   @default(true)
+  
+  // Shop relation
+  shopId        String
+  shop          Shop      @relation(fields: [shopId], references: [id])
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  grns          GRN[]
+
+  @@unique([shopId, name])
+  @@index([shopId])
+  @@map("suppliers")
+}
+
+// ==========================================
+// GRN (Goods Received Note) MANAGEMENT
+// ==========================================
+
+model GRN {
+  id            String    @id @default(cuid())
+  grnNumber     String    // e.g. GRN-2024-001
+  
+  // Relations
+  supplierId    String
+  supplier      Supplier  @relation(fields: [supplierId], references: [id])
+  
+  shopId        String
+  shop          Shop      @relation(fields: [shopId], references: [id])
+  
+  // Details
+  referenceNo   String?   // Supplier's Invoice Number
+  date          DateTime  @default(now())
+  expectedDate  DateTime?
+  
+  // Amounts
+  subtotal      Float
+  tax           Float     @default(0)
+  discount      Float     @default(0)
+  totalAmount   Float
+  paidAmount    Float     @default(0) // If payment tracked directly on GRN
+    
+  // Status
+  status        GRNStatus @default(DRAFT)
+  paymentStatus PaymentStatus @default(UNPAID)
+  
+  notes         String?   @db.Text
+  
+  // Audit
+  createdById   String?
+  createdBy     User?     @relation("GRNCreatedBy", fields: [createdById], references: [id])
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  items         GRNItem[]
+
+  @@unique([shopId, grnNumber])
+  @@index([shopId])
+  @@index([supplierId])
+  @@map("grns")
+}
+
+model GRNItem {
+  id            String    @id @default(cuid())
+  
+  grnId         String
+  grn           GRN       @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  
+  // Snapshot data at time of GRN
+  quantity      Int
+  costPrice     Float     // Unit cost
+  sellingPrice  Float?    // Optional: New selling price set during GRN
+  totalCost     Float
+  
+  createdAt     DateTime  @default(now())
+
+  @@index([grnId])
+  @@index([productId])
+  @@map("grn_items")
+}
+
+enum GRNStatus {
+  DRAFT
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+

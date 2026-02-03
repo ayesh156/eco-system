@@ -36,16 +36,6 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
       });
     };
 
-    const formatDateTime = (dateString: string) => {
-      return new Date(dateString).toLocaleString('en-GB', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    };
-
     const formatCurrency = (amount: number) => {
       return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
     };
@@ -625,12 +615,6 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
                   <span className="info-label">Phone</span>
                   <span className="info-value">{jobNote.customerPhone}</span>
                 </div>
-                {jobNote.customerEmail && (
-                  <div className="info-row">
-                    <span className="info-label">Email</span>
-                    <span className="info-value">{jobNote.customerEmail}</span>
-                  </div>
-                )}
                 {jobNote.customerAddress && (
                   <div className="info-row">
                     <span className="info-label">Address</span>
@@ -695,17 +679,17 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
                   <div className="label">Reported Issue</div>
                   <div className="content">{jobNote.reportedIssue}</div>
                 </div>
-                {jobNote.diagnosisNotes && (
+                {jobNote.diagnosis && (
                   <div className="diagnosis-box">
                     <div className="label">Diagnosis</div>
-                    <div className="content">{jobNote.diagnosisNotes}</div>
+                    <div className="content">{jobNote.diagnosis}</div>
                   </div>
                 )}
-                {jobNote.serviceRequired && (
+                {jobNote.serviceName && (
                   <div style={{ marginTop: '8px' }}>
                     <div className="info-row">
-                      <span className="info-label">Service Req.</span>
-                      <span className="info-value">{jobNote.serviceRequired}</span>
+                      <span className="info-label">Service</span>
+                      <span className="info-value">{jobNote.serviceName}</span>
                     </div>
                   </div>
                 )}
@@ -724,20 +708,20 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
                       <td>Estimated Cost</td>
                       <td>{jobNote.estimatedCost ? formatCurrency(jobNote.estimatedCost) : '-'}</td>
                     </tr>
-                    {jobNote.actualCost && (
+                    {jobNote.finalCost && (
                       <tr>
-                        <td>Actual Cost</td>
-                        <td>{formatCurrency(jobNote.actualCost)}</td>
+                        <td>Final Cost</td>
+                        <td>{formatCurrency(jobNote.finalCost)}</td>
                       </tr>
                     )}
                     <tr>
                       <td>Advance Paid</td>
                       <td>{jobNote.advancePayment ? formatCurrency(jobNote.advancePayment) : 'None'}</td>
                     </tr>
-                    {(jobNote.estimatedCost || jobNote.actualCost) && (
+                    {(jobNote.estimatedCost || jobNote.finalCost) && (
                       <tr className="total-row">
                         <td>Balance Due</td>
-                        <td>{formatCurrency((jobNote.actualCost || jobNote.estimatedCost || 0) - (jobNote.advancePayment || 0))}</td>
+                        <td>{formatCurrency((jobNote.finalCost || jobNote.estimatedCost || 0) - (jobNote.advancePayment || 0))}</td>
                       </tr>
                     )}
                   </tbody>
@@ -746,7 +730,7 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
                   <div className="info-row">
                     <span className="info-label">Expected</span>
                     <span className="info-value">
-                      {jobNote.expectedCompletionDate ? formatDate(jobNote.expectedCompletionDate) : 'TBD'}
+                      {jobNote.estimatedCompletion ? formatDate(jobNote.estimatedCompletion) : 'TBD'}
                     </span>
                   </div>
                   {jobNote.assignedTechnician && (
@@ -760,29 +744,6 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
             </div>
           </div>
         </div>
-
-        {/* Status Timeline */}
-        {jobNote.statusHistory.length > 0 && (
-          <div className="section-box">
-            <div className="section-header">
-              Status Timeline
-            </div>
-            <div className="section-content">
-              <div className="timeline">
-                {jobNote.statusHistory.map((entry, idx) => (
-                  <div key={idx} className="timeline-item">
-                    <div className="timeline-dot"></div>
-                    <div className="timeline-content">
-                      <span className="timeline-status">{getStatusLabel(entry.status)}</span>
-                      <span className="timeline-date"> - {formatDateTime(entry.date)}</span>
-                      {entry.notes && <div className="timeline-notes">{entry.notes}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Signature Section */}
         <div className="signature-section">

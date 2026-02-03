@@ -40,6 +40,8 @@ import brandRoutes from './routes/brand.routes';
 import shopRoutes from './routes/shop.routes';
 import adminRoutes from './routes/admin.routes';
 import shopAdminRoutes from './routes/shopAdmin.routes';
+import supplierRoutes from './routes/supplier.routes';
+import grnRoutes from './routes/grn.routes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -397,6 +399,8 @@ app.use(`${API_PREFIX}/brands`, brandRoutes);
 app.use(`${API_PREFIX}/shops`, shopRoutes);
 app.use(`${API_PREFIX}/admin`, adminRoutes);
 app.use(`${API_PREFIX}/shop-admin`, shopAdminRoutes);
+app.use(`${API_PREFIX}/suppliers`, supplierRoutes);
+app.use(`${API_PREFIX}/grns`, grnRoutes);
 
 // Error handling
 app.use(notFound);

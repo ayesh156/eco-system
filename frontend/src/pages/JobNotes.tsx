@@ -12,7 +12,8 @@ import {
   Laptop, Monitor, Smartphone, Tablet, HardDrive, Clock, User,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X,
   Phone, Calendar, Wrench, CheckCircle2, SortAsc, SortDesc,
-  Timer, Package, FileText, Filter, RefreshCw, LayoutGrid, List
+  Timer, Package, FileText, Filter, RefreshCw, LayoutGrid, List,
+  Settings2
 } from 'lucide-react';
 
 type ViewMode = 'grid' | 'table';
@@ -142,7 +143,7 @@ export const JobNotes: React.FC = () => {
     const inProgress = jobNotes.filter(j => ['in-progress', 'testing'].includes(j.status)).length;
     const completed = jobNotes.filter(j => j.status === 'completed').length;
     const delivered = jobNotes.filter(j => j.status === 'delivered').length;
-    const totalRevenue = jobNotes.filter(j => j.status === 'delivered').reduce((sum, j) => sum + (j.actualCost || j.estimatedCost || 0), 0);
+    const totalRevenue = jobNotes.filter(j => j.status === 'delivered').reduce((sum, j) => sum + (j.finalCost || j.estimatedCost || 0), 0);
     return { pending, inProgress, completed, delivered, total: jobNotes.length, totalRevenue };
   }, [jobNotes]);
 
@@ -420,6 +421,13 @@ export const JobNotes: React.FC = () => {
                 </div>
               </div>
               <div className="mb-3"><p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{job.deviceBrand} {job.deviceModel}</p><p className={`text-sm line-clamp-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{job.reportedIssue}</p></div>
+              {/* Linked Service */}
+              {job.serviceName && (
+                <div className={`flex items-center gap-2 mb-3 text-xs ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                  <Settings2 className="w-3.5 h-3.5" />
+                  <span className={`px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>{job.serviceName}</span>
+                </div>
+              )}
               <div className={`flex items-center gap-2 mb-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}><User className="w-4 h-4" /><span>{job.customerName}</span><span className="text-slate-500">•</span><Phone className="w-3.5 h-3.5" /><span>{job.customerPhone}</span></div>
               <div className="flex items-center justify-between mb-3">{job.estimatedCost && <p className={`font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>{formatCurrency(job.estimatedCost)}</p>}{job.assignedTechnician && <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Tech: {job.assignedTechnician}</p>}</div>
               <div className={`flex items-center justify-between pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
@@ -439,12 +447,13 @@ export const JobNotes: React.FC = () => {
         <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>{['Job','Device','Customer','Status','Cost','Date','Actions'].map(h => <th key={h} className={`px-4 py-3 text-${h === 'Actions' ? 'right' : 'left'} text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{h}</th>)}</tr></thead>
+              <thead><tr className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>{['Job','Device','Service','Customer','Status','Cost','Date','Actions'].map(h => <th key={h} className={`px-4 py-3 text-${h === 'Actions' ? 'right' : 'left'} text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{h}</th>)}</tr></thead>
               <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}`}>
                 {paginatedJobs.map((job) => (
                   <tr key={job.id} className={theme === 'dark' ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}>
                     <td className="px-4 py-3"><p className={`font-mono font-bold text-sm ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>{job.jobNumber}</p></td>
                     <td className="px-4 py-3"><div className="flex items-center gap-2"><span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>{deviceIcons[job.deviceType]}</span><div><p className={`font-medium text-sm ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{job.deviceBrand} {job.deviceModel}</p><p className={`text-xs truncate max-w-[200px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{job.reportedIssue}</p></div></div></td>
+                    <td className="px-4 py-3">{job.serviceName ? <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-600 border border-blue-200'}`}><Settings2 className="w-3 h-3" />{job.serviceName}</span> : <span className={`text-xs ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>—</span>}</td>
                     <td className="px-4 py-3"><p className={`text-sm ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{job.customerName}</p><p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{job.customerPhone}</p></td>
                     <td className="px-4 py-3"><div className="flex flex-col gap-1"><span className={`px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1 w-fit ${statusConfig[job.status].bgColor} ${statusConfig[job.status].color}`}>{statusConfig[job.status].icon}{statusConfig[job.status].label}</span><span className={`px-2 py-0.5 rounded-full text-xs font-medium w-fit ${priorityConfig[job.priority].bgColor} ${priorityConfig[job.priority].color}`}>{priorityConfig[job.priority].label}</span></div></td>
                     <td className="px-4 py-3"><p className={`font-semibold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>{job.estimatedCost ? formatCurrency(job.estimatedCost) : '-'}</p></td>

@@ -929,23 +929,19 @@ For EXPENSE LIST:
       const services = data.services;
       const totalServices = services.length;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const activeServices = services.filter((s: any) => s.status === 'active');
+      const activeServices = services.filter((s: any) => s.isActive);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const totalServiceRevenue = services.reduce((sum: number, s: any) => sum + (s.totalRevenue || 0), 0);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const totalCompleted = services.reduce((sum: number, s: any) => sum + (s.totalCompleted || 0), 0);
+      const popularServices = services.filter((s: any) => s.isPopular);
 
-      // All service details - COMPLETE DATA
+      // All service details - SIMPLIFIED
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const serviceDetails = services.map((s: any) => 
-        `ID:${s.id}|Name:${s.name}|Category:${s.category}|Description:${s.description || 'N/A'}|BasePrice:Rs.${(s.basePrice || 0).toLocaleString()}|MinPrice:Rs.${(s.minPrice || 'N/A')}|MaxPrice:Rs.${(s.maxPrice || 'N/A')}|PriceType:${s.priceType || 'fixed'}|Duration:${s.estimatedDuration || 'N/A'}|Status:${s.status}|Popular:${s.isPopular ? 'Yes' : 'No'}|Warranty:${s.warranty || 'N/A'}|TotalCompleted:${s.totalCompleted || 0}|TotalRevenue:Rs.${(s.totalRevenue || 0).toLocaleString()}|LastPerformed:${s.lastPerformed || 'N/A'}`
+        `ID:${s.id}|Name:${s.name}|Category:${s.category}|Description:${s.description || 'N/A'}|BasePrice:Rs.${(s.basePrice || 0).toLocaleString()}|PriceType:${s.priceType || 'fixed'}|Duration:${s.estimatedDuration || 'N/A'}|Active:${s.isActive ? 'Yes' : 'No'}|Popular:${s.isPopular ? 'Yes' : 'No'}|Warranty:${s.warranty || 'N/A'}`
       ).join('\n  ');
 
       sections.push(`🔧 SERVICES (${totalServices}):
 - Active Services: ${activeServices.length}
-- Total Services Completed: ${totalCompleted}
-- Total Service Revenue: Rs. ${totalServiceRevenue.toLocaleString()}
-- Top Revenue Services: ${services.sort((a: { totalRevenue?: number }, b: { totalRevenue?: number }) => (b.totalRevenue || 0) - (a.totalRevenue || 0)).slice(0, 5).map((s: { name: string; totalRevenue?: number }) => `${s.name}(Rs.${(s.totalRevenue || 0).toLocaleString()})`).join(', ')}
+- Popular Services: ${popularServices.length}
 - ALL SERVICE DATA (search by ID, name, category):
   ${serviceDetails}`);
     }
@@ -961,7 +957,7 @@ For EXPENSE LIST:
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const totalEstimatedRevenue = jobNotes.reduce((sum: number, j: any) => sum + (j.estimatedCost || 0), 0);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const totalActualRevenue = jobNotes.reduce((sum: number, j: any) => sum + (j.actualCost || 0), 0);
+      const totalFinalRevenue = jobNotes.reduce((sum: number, j: any) => sum + (j.finalCost || 0), 0);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const totalAdvance = jobNotes.reduce((sum: number, j: any) => sum + (j.advancePayment || 0), 0);
 
@@ -975,7 +971,7 @@ For EXPENSE LIST:
       // All job note details - COMPLETE DATA
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const jobDetails = jobNotes.map((j: any) => 
-        `ID:${j.id}|JobNumber:${j.jobNumber}|Customer:${j.customerName}|Phone:${j.customerPhone || 'N/A'}|DeviceType:${j.deviceType}|Brand:${j.deviceBrand}|Model:${j.deviceModel}|SerialNo:${j.serialNumber || 'N/A'}|Accessories:${j.accessories?.join(', ') || 'None'}|Condition:${j.deviceCondition || 'N/A'}|Issue:${j.reportedIssue}|Diagnosis:${j.diagnosisNotes || 'N/A'}|ServiceRequired:${j.serviceRequired || 'N/A'}|EstimatedCost:Rs.${(j.estimatedCost || 0).toLocaleString()}|ActualCost:Rs.${(j.actualCost || 0).toLocaleString()}|AdvancePaid:Rs.${(j.advancePayment || 0).toLocaleString()}|Status:${j.status}|Priority:${j.priority}|ReceivedDate:${j.receivedDate}|ExpectedCompletion:${j.expectedCompletionDate || 'N/A'}|CompletedDate:${j.completedDate || 'N/A'}|Technician:${j.assignedTechnician || 'Unassigned'}`
+        `ID:${j.id}|JobNumber:${j.jobNumber}|Customer:${j.customerName}|Phone:${j.customerPhone || 'N/A'}|DeviceType:${j.deviceType}|Brand:${j.deviceBrand}|Model:${j.deviceModel}|SerialNo:${j.serialNumber || 'N/A'}|Accessories:${j.accessories?.join(', ') || 'None'}|Condition:${j.deviceCondition || 'N/A'}|Issue:${j.reportedIssue}|Diagnosis:${j.diagnosis || 'N/A'}|Service:${j.serviceName || 'N/A'}|EstimatedCost:Rs.${(j.estimatedCost || 0).toLocaleString()}|FinalCost:Rs.${(j.finalCost || 0).toLocaleString()}|AdvancePaid:Rs.${(j.advancePayment || 0).toLocaleString()}|Status:${j.status}|Priority:${j.priority}|ReceivedDate:${j.receivedDate}|ExpectedCompletion:${j.estimatedCompletion || 'N/A'}|CompletedDate:${j.completedDate || 'N/A'}|Technician:${j.assignedTechnician || 'Unassigned'}`
       ).join('\n  ');
 
       sections.push(`📋 JOB NOTES/REPAIRS (${totalJobs}):
@@ -983,7 +979,7 @@ For EXPENSE LIST:
 - Completed/Delivered: ${completedJobs.length}
 - Status Breakdown: ${Object.entries(byStatus).map(([s, c]) => `${s}(${c})`).join(', ')}
 - Total Estimated Revenue: Rs. ${totalEstimatedRevenue.toLocaleString()}
-- Total Actual Revenue: Rs. ${totalActualRevenue.toLocaleString()}
+- Total Final Revenue: Rs. ${totalFinalRevenue.toLocaleString()}
 - Total Advance Collected: Rs. ${totalAdvance.toLocaleString()}
 - ALL JOB DATA (search by ID, job number, customer, device, status):
   ${jobDetails}`);

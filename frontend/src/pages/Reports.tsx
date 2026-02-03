@@ -526,7 +526,7 @@ export const Reports: React.FC = () => {
   // ==========================================
   const jobNotesStats = useMemo(() => {
     const jobs = mockJobNotes || [];
-    const totalRevenue = jobs.reduce((sum, job) => sum + (job.actualCost || job.estimatedCost || 0), 0);
+    const totalRevenue = jobs.reduce((sum, job) => sum + (job.finalCost || job.estimatedCost || 0), 0);
     
     const statusCounts = jobs.reduce((acc, job) => {
       acc[job.status] = (acc[job.status] || 0) + 1;
@@ -600,16 +600,14 @@ export const Reports: React.FC = () => {
   // ==========================================
   const servicesStats = useMemo(() => {
     const services = mockServices || [];
-    const activeServices = services.filter(s => s.status === 'active');
-    const totalMinRevenue = activeServices.reduce((sum, s) => sum + (s.minPrice || 0), 0);
-    const totalMaxRevenue = activeServices.reduce((sum, s) => sum + (s.maxPrice || 0), 0);
+    const activeServices = services.filter(s => s.isActive);
+    const totalPrice = activeServices.reduce((sum, s) => sum + (s.basePrice || 0), 0);
     
     const categoryBreakdown = services.reduce((acc, s) => {
       const cat = s.category || 'Other';
       if (!acc[cat]) acc[cat] = { count: 0, avgPrice: 0, totalPrice: 0 };
       acc[cat].count += 1;
-      const avgPrice = ((s.minPrice || 0) + (s.maxPrice || 0)) / 2;
-      acc[cat].totalPrice += avgPrice;
+      acc[cat].totalPrice += s.basePrice || 0;
       return acc;
     }, {} as Record<string, { count: number; avgPrice: number; totalPrice: number }>);
     
@@ -620,10 +618,10 @@ export const Reports: React.FC = () => {
     return {
       total: services.length,
       active: activeServices.length,
-      inactive: services.filter(s => s.status === 'inactive').length,
-      discontinued: services.filter(s => s.status === 'discontinued').length,
+      inactive: services.filter(s => !s.isActive).length,
+      discontinued: 0,
       popular: services.filter(s => s.isPopular).length,
-      avgPriceRange: { min: totalMinRevenue / (activeServices.length || 1), max: totalMaxRevenue / (activeServices.length || 1) },
+      avgPriceRange: { min: totalPrice / (activeServices.length || 1), max: totalPrice / (activeServices.length || 1) },
       categories: Object.entries(categoryBreakdown).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.count - a.count)
     };
   }, []);

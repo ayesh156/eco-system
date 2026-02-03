@@ -3485,6 +3485,273 @@ Best regards,
       return res.status(200).json({ success: true, data: shop });
     }
 
+    // ==========================================
+    // SUPPLIER ROUTES
+    // ==========================================
+    if (path === '/api/v1/suppliers' && method === 'GET') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const suppliers = await prisma.supplier.findMany({
+        where: { shopId, isActive: true },
+        orderBy: { name: 'asc' },
+        include: { _count: { select: { grns: true } } }
+      });
+      return res.status(200).json({ success: true, data: suppliers });
+    }
+
+    if (path === '/api/v1/suppliers' && method === 'POST') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+      
+      const { name, contactPerson, email, phone, address } = body;
+      const existing = await prisma.supplier.findFirst({
+        where: { shopId, name: { equals: name, mode: 'insensitive' } }
+      });
+      if (existing) return res.status(400).json({ success: false, message: 'Supplier exists' });
+
+      const supplier = await prisma.supplier.create({
+        data: { shopId, name, contactPerson, email, phone, address }
+      });
+      return res.status(201).json({ success: true, data: supplier });
+    }
+
+    // Supplier GET by ID
+    const supplierIdMatch = path.match(/^\/api\/v1\/suppliers\/([^/]+)$/);
+    if (supplierIdMatch && method === 'GET') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const supplier = await prisma.supplier.findUnique({
+        where: { id: supplierIdMatch[1] },
+        include: { grns: { orderBy: { createdAt: 'desc' }, take: 5 } }
+      });
+      if (!supplier) return res.status(404).json({ success: false, message: 'Supplier not found' });
+      if (supplier.shopId !== shopId) return res.status(403).json({ success: false, message: 'Access denied' });
+      
+      return res.status(200).json({ success: true, data: supplier });
+    }
+
+    // Supplier UPDATE
+    if (supplierIdMatch && (method === 'PUT' || method === 'PATCH')) {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const existing = await prisma.supplier.findUnique({ where: { id: supplierIdMatch[1] } });
+      if (!existing) return res.status(404).json({ success: false, message: 'Supplier not found' });
+      if (existing.shopId !== shopId) return res.status(403).json({ success: false, message: 'Access denied' });
+
+      const { name, contactPerson, email, phone, address, isActive } = body;
+      const supplier = await prisma.supplier.update({
+        where: { id: supplierIdMatch[1] },
+        data: { name, contactPerson, email, phone, address, isActive }
+      });
+      return res.status(200).json({ success: true, data: supplier });
+    }
+
+    // Supplier DELETE
+    if (supplierIdMatch && method === 'DELETE') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const existing = await prisma.supplier.findUnique({
+        where: { id: supplierIdMatch[1] },
+        include: { _count: { select: { grns: true } } }
+      });
+      if (!existing) return res.status(404).json({ success: false, message: 'Supplier not found' });
+      if (existing.shopId !== shopId) return res.status(403).json({ success: false, message: 'Access denied' });
+
+      if (existing._count.grns > 0) {
+        await prisma.supplier.update({ where: { id: supplierIdMatch[1] }, data: { isActive: false } });
+        return res.status(200).json({ success: true, message: 'Supplier deactivated (has GRNs)' });
+      }
+
+      await prisma.supplier.delete({ where: { id: supplierIdMatch[1] } });
+      return res.status(200).json({ success: true, message: 'Supplier deleted' });
+    }
+
+    // ==========================================
+    // GRN ROUTES
+    // ==========================================
+    if (path === '/api/v1/grns' && method === 'GET') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+      
+      const { status, supplierId } = query;
+      const where: any = { shopId };
+      if (status) where.status = status;
+      if (supplierId) where.supplierId = supplierId;
+
+      const grns = await prisma.gRN.findMany({
+        where,
+        include: {
+          supplier: { select: { name: true } },
+          _count: { select: { items: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      return res.status(200).json({ success: true, data: grns });
+    }
+
+    if (path === '/api/v1/grns' && method === 'POST') {
+      const shopId = getEffectiveShopId(req, query);
+      const userId = getUserIdFromToken(req);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const { supplierId, referenceNo, date, expectedDate, items, discount = 0, tax = 0, notes, paymentStatus = 'UNPAID', paidAmount = 0 } = body;
+      
+      const subtotal = items.reduce((sum: number, item: any) => sum + (item.quantity * item.costPrice), 0);
+      const totalAmount = subtotal + tax - discount;
+      
+      const count = await prisma.gRN.count({ where: { shopId } });
+      const grnNumber = `GRN-${new Date().getFullYear()}-${(count + 1).toString().padStart(4, '0')}`;
+
+      // Transaction
+      const grn = await prisma.$transaction(async (tx) => {
+        const newGRN = await tx.gRN.create({
+          data: {
+            shopId, grnNumber, supplierId, referenceNo,
+            date: date ? new Date(date) : new Date(),
+            expectedDate: expectedDate ? new Date(expectedDate) : null,
+            subtotal, tax, discount, totalAmount, paidAmount,
+            status: 'COMPLETED', paymentStatus, notes, createdById: userId
+          }
+        });
+
+        for (const item of items) {
+          const product = await tx.product.findUnique({ where: { id: item.productId } });
+          if (!product || product.shopId !== shopId) throw new Error('Product error');
+
+          await tx.gRNItem.create({
+            data: {
+              grnId: newGRN.id, productId: item.productId, quantity: item.quantity,
+              costPrice: item.costPrice, sellingPrice: item.sellingPrice,
+              totalCost: item.quantity * item.costPrice
+            }
+          });
+
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: product.stock + item.quantity,
+              totalPurchased: product.totalPurchased + item.quantity,
+              costPrice: item.costPrice,
+              lastCostPrice: product.costPrice,
+              price: item.sellingPrice || product.price,
+              lastGRNId: newGRN.id,
+              lastGRNDate: new Date()
+            }
+          });
+
+          // Stock Movement
+          await tx.stockMovement.create({
+            data: {
+              shopId, productId: item.productId, type: 'GRN_IN',
+              quantity: item.quantity, previousStock: product.stock, newStock: product.stock + item.quantity,
+              referenceId: newGRN.id, referenceNumber: grnNumber, referenceType: 'grn',
+              unitPrice: item.costPrice, createdBy: userId, notes: 'GRN Received'
+            }
+          });
+        }
+        return newGRN;
+      });
+      return res.status(201).json({ success: true, data: grn });
+    }
+
+    // GRN GET by ID
+    const grnIdMatch = path.match(/^\/api\/v1\/grns\/([^/]+)$/);
+    if (grnIdMatch && method === 'GET') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const grn = await prisma.gRN.findUnique({
+        where: { id: grnIdMatch[1] },
+        include: {
+          supplier: true,
+          items: { include: { product: { select: { name: true, barcode: true, serialNumber: true } } } },
+          createdBy: { select: { name: true } }
+        }
+      });
+      if (!grn) return res.status(404).json({ success: false, message: 'GRN not found' });
+      if (grn.shopId !== shopId) return res.status(403).json({ success: false, message: 'Access denied' });
+
+      return res.status(200).json({ success: true, data: grn });
+    }
+
+    // GRN UPDATE
+    if (grnIdMatch && method === 'PUT') {
+      const shopId = getEffectiveShopId(req, query);
+      const userId = getUserIdFromToken(req);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const grn = await prisma.gRN.findUnique({ where: { id: grnIdMatch[1] } });
+      if (!grn) return res.status(404).json({ success: false, message: 'GRN not found' });
+      if (grn.shopId !== shopId) return res.status(403).json({ success: false, message: 'Access denied' });
+
+      const { notes, paymentStatus, paidAmount, status } = req.body;
+
+      const updated = await prisma.gRN.update({
+        where: { id: grnIdMatch[1] },
+        data: {
+          notes: notes !== undefined ? notes : grn.notes,
+          paymentStatus: paymentStatus || grn.paymentStatus,
+          paidAmount: paidAmount !== undefined ? paidAmount : grn.paidAmount,
+          status: status || grn.status
+        },
+        include: {
+          supplier: true,
+          items: { include: { product: { select: { name: true } } } }
+        }
+      });
+
+      return res.status(200).json({ success: true, data: updated });
+    }
+
+    // GRN DELETE with stock reversal
+    if (grnIdMatch && method === 'DELETE') {
+      const shopId = getEffectiveShopId(req, query);
+      const userId = getUserIdFromToken(req);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const grn = await prisma.gRN.findUnique({
+        where: { id: grnIdMatch[1] },
+        include: { items: true }
+      });
+      if (!grn) return res.status(404).json({ success: false, message: 'GRN not found' });
+      if (grn.shopId !== shopId) return res.status(403).json({ success: false, message: 'Access denied' });
+
+      // Reverse stock changes in a transaction
+      await prisma.$transaction(async (tx) => {
+        for (const item of grn.items) {
+          const product = await tx.product.findUnique({ where: { id: item.productId } });
+          if (product) {
+            const newStock = Math.max(0, product.stock - item.quantity);
+            const newTotalPurchased = Math.max(0, product.totalPurchased - item.quantity);
+
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: newStock, totalPurchased: newTotalPurchased }
+            });
+
+            // Create reversal stock movement
+            await tx.stockMovement.create({
+              data: {
+                shopId, productId: item.productId, type: 'ADJUSTMENT',
+                quantity: -item.quantity, previousStock: product.stock, newStock,
+                referenceId: grn.id, referenceNumber: grn.grnNumber, referenceType: 'grn_delete',
+                unitPrice: item.costPrice, createdBy: userId, notes: 'GRN Deleted - Stock Reversed'
+              }
+            });
+          }
+        }
+
+        await tx.gRNItem.deleteMany({ where: { grnId: grnIdMatch![1] } });
+        await tx.gRN.delete({ where: { id: grnIdMatch![1] } });
+      });
+
+      return res.status(200).json({ success: true, message: 'GRN deleted and stock reversed' });
+    }
+
     // 404
     console.error('❌ 404 Route not found:', { path, method });
     return res.status(404).json({ success: false, error: 'Route not found', path, method });

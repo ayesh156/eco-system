@@ -1,12 +1,21 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
-import { mockSuppliers, mockProducts, mockGRNs } from '../data/mockData';
+import { useAuth } from '../contexts/AuthContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import type { Supplier, Product, GoodsReceivedNote, GRNItem, GRNStatus } from '../data/mockData';
+import { productService, convertAPIProductToFrontend } from '../services/productService';
 import PrintableGRN from '../components/PrintableGRN';
+import { SupplierFormModal } from '../components/modals/SupplierFormModal';
+import { ProductFormModal } from '../components/modals/ProductFormModal';
+import * as grnService from '../services/grnService';
+import * as supplierService from '../services/supplierService';
+import type { FrontendGRN } from '../services/grnService';
+// FrontendSupplier type used indirectly through service
 import {
   ClipboardCheck, Truck, Package, CheckCircle, ChevronRight, ChevronLeft,
-  Search, Plus, Trash2, ArrowLeft, Calendar,
+  Search, Plus, Trash2, ArrowLeft, Calendar, UserPlus, PackagePlus, Loader2,
   Building2, Receipt, Printer, X, Minus, GripVertical, FileText, Hash,
   CreditCard, Banknote, Wallet, Tag
 } from 'lucide-react';
@@ -15,11 +24,18 @@ type Step = 1 | 2 | 3;
 
 export const CreateGRN: React.FC = () => {
   const { theme } = useTheme();
+  const { isViewingShop, viewingShop } = useAuth();
+  const { branding } = useShopBranding();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   
-  const [suppliers] = useState<Supplier[]>(mockSuppliers);
-  const [products] = useState<Product[]>(mockProducts);
+  // Get effective shopId for SUPER_ADMIN viewing a shop
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
+  
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [step, setStep] = useState<Step>(1);
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
@@ -64,6 +80,10 @@ export const CreateGRN: React.FC = () => {
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [createdGRN, setCreatedGRN] = useState<GoodsReceivedNote | null>(null);
 
+  // Modal states for inline add
+  const [showSupplierFormModal, setShowSupplierFormModal] = useState(false);
+  const [showProductFormModal, setShowProductFormModal] = useState(false);
+
   // Calendar popup state
   const [showOrderCalendar, setShowOrderCalendar] = useState(false);
   const [showReceivedCalendar, setShowReceivedCalendar] = useState(false);
@@ -72,6 +92,73 @@ export const CreateGRN: React.FC = () => {
   // Refs for focus management
   const supplierSearchRef = useRef<HTMLInputElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
+
+  // Load suppliers from API on mount
+  useEffect(() => {
+    const loadSuppliers = async () => {
+      setIsLoading(true);
+      try {
+        const result = await supplierService.getSuppliers(effectiveShopId);
+        if (result.success && result.data) {
+          // Convert API suppliers to Supplier format with apiId mapping
+          const apiSuppliers: Supplier[] = result.data.map(s => ({
+            id: s.apiId || s.id, // Use API ID for GRN creation
+            apiId: s.apiId || s.id,
+            name: s.name,
+            company: s.company,
+            email: s.email,
+            phone: s.phone,
+            address: s.address,
+            totalPurchases: s.totalPurchases || 0,
+            totalOrders: s.totalOrders || 0,
+            lastOrder: s.lastOrder,
+            creditBalance: s.creditBalance || 0,
+            creditLimit: s.creditLimit || 0,
+            creditDueDate: s.creditDueDate,
+            creditStatus: s.creditStatus || 'clear',
+            bankDetails: s.bankDetails,
+            notes: s.notes,
+            rating: s.rating || 5,
+            categories: s.categories || [],
+          }));
+          setSuppliers(apiSuppliers);
+        }
+      } catch (error) {
+        console.error('Error loading suppliers:', error);
+        toast.error('Failed to load suppliers', {
+          description: 'Please refresh the page to try again',
+          duration: 4000,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSuppliers();
+  }, [effectiveShopId]);
+
+  // Load products from API on mount
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const result = await productService.getAll({ 
+          shopId: effectiveShopId,
+          limit: 1000 // Load all products for selection
+        });
+        if (result.products && result.products.length > 0) {
+          // Convert API products to frontend Product format
+          const frontendProducts = result.products.map(p => convertAPIProductToFrontend(p));
+          setProducts(frontendProducts);
+        }
+      } catch (error) {
+        console.error('Error loading products:', error);
+        toast.error('Failed to load products', {
+          description: 'Please refresh the page to try again',
+          duration: 4000,
+        });
+      }
+    };
+    loadProducts();
+  }, [effectiveShopId]);
 
   // Generate 8-digit delivery note number
   const generateDeliveryNote = () => {
@@ -109,6 +196,45 @@ export const CreateGRN: React.FC = () => {
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
   const currentSupplier = suppliers.find((s) => s.id === selectedSupplier);
+
+  // Handle new supplier registration from modal
+  const handleNewSupplierSave = async (newSupplier: Supplier) => {
+    try {
+      // Save to API
+      const result = await supplierService.createSupplier(newSupplier);
+      if (result.success && result.data) {
+        const savedSupplier: Supplier = {
+          ...newSupplier,
+          id: result.data.apiId || result.data.id,
+          apiId: result.data.apiId,
+        };
+        // Add to local list
+        setSuppliers(prev => [savedSupplier, ...prev]);
+        // Auto-select the new supplier
+        setSelectedSupplier(savedSupplier.id);
+        setShowSupplierFormModal(false);
+      } else {
+        // Fallback: add locally
+        setSuppliers(prev => [newSupplier, ...prev]);
+        setSelectedSupplier(newSupplier.id);
+        setShowSupplierFormModal(false);
+      }
+    } catch (err) {
+      console.error('Error saving supplier:', err);
+      // Fallback: add locally
+      setSuppliers(prev => [newSupplier, ...prev]);
+      setSelectedSupplier(newSupplier.id);
+      setShowSupplierFormModal(false);
+    }
+  };
+
+  // Handle new product creation from modal  
+  // Note: ProductFormModal handles API saving internally, this just receives the saved product
+  const handleNewProductSave = (newProduct: Product) => {
+    // Add to GRN items with buying price
+    addItem(newProduct);
+    setShowProductFormModal(false);
+  };
 
   // Filter suppliers by search
   const filteredSuppliers = useMemo(() => {
@@ -261,9 +387,10 @@ export const CreateGRN: React.FC = () => {
     return `GRN-${year}-${random}`;
   };
 
-  const handleCreateGRN = () => {
+  const handleCreateGRN = async () => {
     if (!selectedSupplier || items.length === 0) return;
 
+    setIsSubmitting(true);
     const now = new Date().toISOString();
     
     // Determine status based on items
@@ -309,44 +436,39 @@ export const CreateGRN: React.FC = () => {
       updatedAt: now,
     };
 
-    // Add to mockGRNs
-    mockGRNs.unshift(grn);
-    
-    // Update product stock and cost prices based on accepted items
-    items.forEach(item => {
-      if (item.acceptedQuantity > 0) {
-        const productIndex = mockProducts.findIndex(p => p.id === item.productId);
-        if (productIndex !== -1) {
-          const product = mockProducts[productIndex];
-          
-          // Update stock
-          product.stock = (product.stock || 0) + item.acceptedQuantity;
-          
-          // Update cost price (use GRN unit price as new cost)
-          product.lastCostPrice = product.costPrice;
-          product.costPrice = item.unitPrice;
-          
-          // Update selling price if set in GRN
-          if (item.sellingPrice) {
-            product.sellingPrice = item.sellingPrice;
-            product.price = item.sellingPrice;
-          }
-          
-          // Update profit margin
-          const sellingPrice = item.sellingPrice || product.sellingPrice || product.price;
-          product.profitMargin = ((sellingPrice - item.unitPrice) / sellingPrice) * 100;
-          
-          // Update tracking fields
-          product.lastGRNId = grn.id;
-          product.lastGRNDate = receivedDate;
-          product.totalPurchased = (product.totalPurchased || 0) + item.acceptedQuantity;
-          product.updatedAt = now;
-        }
+    try {
+      // Try to create GRN via API (this also handles stock updates in backend)
+      const result = await grnService.createGRN(grn as unknown as FrontendGRN, effectiveShopId);
+      
+      if (result.success && result.data) {
+        // Use API-created GRN for print preview
+        setCreatedGRN(result.data as unknown as GoodsReceivedNote);
+        toast.success('GRN Created Successfully! 🎉', {
+          description: `GRN ${grnNumber} has been created with ${items.length} item(s)`,
+          duration: 4000,
+        });
+      } else {
+        // API returned error
+        toast.error('Failed to create GRN', {
+          description: result.error || 'Unknown error occurred',
+          duration: 5000,
+        });
+        setIsSubmitting(false);
+        return; // Don't proceed to print preview
       }
-    });
+    } catch (error) {
+      console.error('Error creating GRN:', error);
+      toast.error('Failed to create GRN', {
+        description: error instanceof Error ? error.message : 'Please try again',
+        duration: 5000,
+      });
+      setIsSubmitting(false);
+      return; // Don't proceed on error
+    } finally {
+      setIsSubmitting(false);
+    }
     
-    // Show print preview
-    setCreatedGRN(grn);
+    // Show print preview only on success
     setShowPrintPreview(true);
   };
 
@@ -566,7 +688,7 @@ export const CreateGRN: React.FC = () => {
           {/* Print Preview */}
           <div className="overflow-auto max-h-[calc(95vh-80px)] bg-gray-100 p-4">
             <div ref={printRef} className="print-area">
-              <PrintableGRN grn={createdGRN} supplier={printSupplier} />
+              <PrintableGRN grn={createdGRN} supplier={printSupplier} branding={branding} />
             </div>
           </div>
         </div>
@@ -658,11 +780,23 @@ export const CreateGRN: React.FC = () => {
           {/* Step 1: Supplier & Details */}
           {step === 1 && (
             <div className="flex-1 flex flex-col p-4 overflow-hidden">
-              <div className="flex items-center gap-2 mb-3">
-                <Truck className="w-5 h-5 text-emerald-500" />
-                <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                  Select Supplier
-                </span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-emerald-500" />
+                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    Select Supplier
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowSupplierFormModal(true)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                  }`}
+                  title="Register a new supplier"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Register
+                </button>
               </div>
 
               {/* Supplier Search */}
@@ -832,11 +966,23 @@ export const CreateGRN: React.FC = () => {
           {/* Step 2: Products Selection */}
           {step === 2 && (
             <div className="flex-1 flex flex-col p-4 overflow-hidden">
-              <div className="flex items-center gap-2 mb-3">
-                <Package className="w-5 h-5 text-teal-500" />
-                <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                  Add Products
-                </span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Package className="w-5 h-5 text-teal-500" />
+                  <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    Add Products
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowProductFormModal(true)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    theme === 'dark' ? 'bg-teal-500/20 text-teal-400 hover:bg-teal-500/30' : 'bg-teal-50 text-teal-600 hover:bg-teal-100'
+                  }`}
+                  title="Quick add a new product"
+                >
+                  <PackagePlus className="w-4 h-4" />
+                  Quick Add
+                </button>
               </div>
 
               {/* Product Search */}
@@ -856,6 +1002,7 @@ export const CreateGRN: React.FC = () => {
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                 {filteredProducts.map((product) => {
                   const isInCart = items.some(i => i.productId === product.id);
+                  const buyingPrice = product.costPrice || product.price;
                   return (
                     <button
                       key={product.id}
@@ -882,8 +1029,11 @@ export const CreateGRN: React.FC = () => {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className={`font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                          Rs.{product.price.toLocaleString()}
+                        <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                          Buying Price
+                        </p>
+                        <p className={`font-bold ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                          Rs.{buyingPrice.toLocaleString()}
                         </p>
                         {isInCart && (
                           <span className="text-xs text-emerald-500">In GRN</span>
@@ -1455,10 +1605,11 @@ export const CreateGRN: React.FC = () => {
                 <>
                   <button
                     onClick={() => setStep(2)}
+                    disabled={isSubmitting}
                     className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium ${
                       theme === 'dark'
-                        ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50'
                     }`}
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -1467,11 +1618,20 @@ export const CreateGRN: React.FC = () => {
                   
                   <button
                     onClick={handleCreateGRN}
-                    disabled={!canCreate}
+                    disabled={!canCreate || isSubmitting}
                     className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/25"
                   >
-                    <CheckCircle className="w-5 h-5" />
-                    Create GRN
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Creating GRN...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        Create GRN
+                      </>
+                    )}
                   </button>
                 </>
               )}
@@ -1479,6 +1639,19 @@ export const CreateGRN: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modals for Inline Add */}
+      <SupplierFormModal
+        isOpen={showSupplierFormModal}
+        onClose={() => setShowSupplierFormModal(false)}
+        onSave={handleNewSupplierSave}
+      />
+
+      <ProductFormModal
+        isOpen={showProductFormModal}
+        onClose={() => setShowProductFormModal(false)}
+        onSave={handleNewProductSave}
+      />
     </div>
   );
 };

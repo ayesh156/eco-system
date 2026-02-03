@@ -112,28 +112,43 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
           .grn-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 20px;
+            align-items: stretch;
+            margin-bottom: 8px;
             padding-bottom: 15px;
             border-bottom: 2px solid #000;
           }
 
           .company-section {
             display: flex;
-            align-items: flex-start;
+            align-items: stretch;
             gap: 12px;
           }
 
           .company-logo {
-            width: 50px;
-            height: 50px;
-            border: 2px solid #000;
-            border-radius: 50%;
+            width: auto;
+            height: auto;
+            max-width: 120px;
+            max-height: 80px;
+            align-self: center;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: white;
+            background: transparent;
             flex-shrink: 0;
+            overflow: visible;
+          }
+
+          .company-logo img {
+            width: auto;
+            height: auto;
+            max-width: 120px;
+            max-height: 80px;
+            object-fit: contain;
+          }
+
+          .company-logo svg {
+            width: 28px;
+            height: 28px;
           }
 
           .company-info h1 {
@@ -669,18 +684,18 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
           <div className="company-section">
             <div className="company-logo">
               {hasCustomLogo ? (
-                <img src={shopLogo} alt="Shop Logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+                <img src={shopLogo} alt="Shop Logo" />
               ) : (
                 <div style={{ 
-                  width: '40px', 
-                  height: '40px', 
+                  width: '70px', 
+                  height: '70px', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center',
                   background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)',
-                  borderRadius: '8px'
+                  borderRadius: '12px'
                 }}>
-                  <Building2 style={{ width: '24px', height: '24px', color: 'white', strokeWidth: 2 }} />
+                  <Building2 style={{ width: '40px', height: '40px', color: 'white', strokeWidth: 2 }} />
                 </div>
               )}
             </div>
@@ -710,7 +725,7 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
         <div className="grn-title-section">
           <div className="grn-title">
             <h2>GOODS RECEIVED NOTE</h2>
-            <div className="company-label">ECOTEC COMPUTER SOLUTIONS</div>
+            <div className="company-label">{shopName} {shopSubName}</div>
           </div>
           <div className="grn-status">
             <span className={`status-badge ${grn.status}`}>
