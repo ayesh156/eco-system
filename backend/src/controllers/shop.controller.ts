@@ -220,6 +220,8 @@ export const updateShop = async (req: Request, res: Response, next: NextFunction
       taxId,
       currency,
       taxRate,
+      hiddenSections,
+      adminHiddenSections,
     } = req.body;
 
     // Check if shop exists
@@ -234,10 +236,7 @@ export const updateShop = async (req: Request, res: Response, next: NextFunction
       });
     }
 
-    // Update shop
-    const updatedShop = await prisma.shop.update({
-      where: { id },
-      data: {
+    const updateData: any = {
         name: name ?? undefined,
         subName: subName ?? undefined,
         tagline: tagline ?? undefined,
@@ -251,7 +250,21 @@ export const updateShop = async (req: Request, res: Response, next: NextFunction
         taxId: taxId ?? undefined,
         currency: currency ?? undefined,
         taxRate: taxRate ?? undefined,
-      },
+    };
+
+    // Add hidden sections if provided and valid
+    if (hiddenSections !== undefined && Array.isArray(hiddenSections)) {
+       updateData.hiddenSections = hiddenSections;
+    }
+
+    if (adminHiddenSections !== undefined && Array.isArray(adminHiddenSections)) {
+       updateData.adminHiddenSections = adminHiddenSections;
+    }
+
+    // Update shop
+    const updatedShop = await prisma.shop.update({
+      where: { id },
+      data: updateData,
     });
 
     res.json({

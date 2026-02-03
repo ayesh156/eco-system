@@ -3474,7 +3474,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           phone: true,
           email: true,
           website: true,
+          hiddenSections: true,
+          adminHiddenSections: true,
           isActive: true,
+          currency: true,
+          taxRate: true,
+          businessRegNo: true,
         },
       });
 
@@ -3485,7 +3490,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ success: true, data: shop });
     }
 
-    // Update Shop (branding)
+    // Update Shop (branding and settings)
     if (shopByIdMatch && (method === 'PUT' || method === 'PATCH')) {
       const shopId = getShopIdFromToken(req);
       const shopIdParam = shopByIdMatch[1];
@@ -3496,11 +3501,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(403).json({ success: false, message: 'Unauthorized' });
       }
 
-      const { name, subName, tagline, logo, address, phone, email, website } = body;
+      const { name, subName, tagline, logo, address, phone, email, website, hiddenSections, adminHiddenSections } = body;
 
-      const updatedShop = await db.shop.update({
-        where: { id: shopIdParam },
-        data: {
+      const updateData: any = {
           ...(name && { name }),
           ...(subName !== undefined && { subName }),
           ...(tagline !== undefined && { tagline }),
@@ -3509,7 +3512,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ...(phone !== undefined && { phone }),
           ...(email !== undefined && { email }),
           ...(website !== undefined && { website }),
-        },
+      };
+
+      // SuperAdmin can update hiddenSections
+      if (userRole === 'SUPER_ADMIN' && hiddenSections !== undefined) {
+        if (Array.isArray(hiddenSections)) {
+          updateData.hiddenSections = hiddenSections;
+        }
+      }
+
+      // Shop ADMIN or SUPER_ADMIN can update adminHiddenSections
+      if ((userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && adminHiddenSections !== undefined) {
+        if (Array.isArray(adminHiddenSections)) {
+          updateData.adminHiddenSections = adminHiddenSections;
+        }
+      }
+
+      const updatedShop = await db.shop.update({
+        where: { id: shopIdParam },
+        data: updateData,
       });
 
       return res.status(200).json({ success: true, data: updatedShop });
