@@ -21,10 +21,11 @@ import { ReminderHistoryModal } from '../components/modals/ReminderHistoryModal'
 import { toast } from 'sonner';
 import { 
   Search, Plus, Edit, Trash2, Mail, Phone, AlertTriangle, CheckCircle, 
-  Clock, CreditCard, Calendar, MessageCircle, Package, FileText,
+  Clock, CreditCard, Calendar, MessageCircle, Package, FileText, Users,
   X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal,
-  List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc, Zap, Loader2, AlertCircle, CheckCircle2, History
+  List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc, Zap, Loader2, AlertCircle, CheckCircle2, History, Filter
 } from 'lucide-react';
+import { SearchableSelect } from '../components/ui/searchable-select';
 
 // Helper to convert API Customer to frontend Customer format
 const convertAPICustomerToFrontend = (apiCustomer: APICustomer): Customer => ({
@@ -1475,46 +1476,32 @@ export const Customers: React.FC = () => {
           </div>
         </div>
 
-        {/* Status Filter Buttons */}
-        <div className="flex flex-wrap gap-2 mt-4">
-          {[
-            { value: 'all', label: 'All', icon: Package, count: customers.length },
-            { value: 'overdue', label: 'Overdue', icon: AlertTriangle, count: customers.filter(c => c.creditStatus === 'overdue').length },
-            { value: 'active', label: 'Active', icon: Clock, count: customers.filter(c => c.creditStatus === 'active').length },
-            { value: 'clear', label: 'Clear', icon: CheckCircle, count: customers.filter(c => c.creditStatus === 'clear').length },
-          ].map(({ value, label, icon: Icon, count }) => (
-            <button
-              key={value}
-              onClick={() => setStatusFilter(value)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                statusFilter === value
-                  ? value === 'overdue' 
-                    ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg'
-                    : value === 'active'
-                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
-                      : value === 'clear'
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
-                        : 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-lg'
-                  : theme === 'dark' 
-                    ? 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50' 
-                    : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{label}</span>
-              <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                statusFilter === value ? 'bg-white/20' : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'
-              }`}>
-                {count}
-              </span>
-            </button>
-          ))}
-        </div>
+
 
         {/* Advanced Filters (Collapsible) */}
         {showFilters && (
           <div className={`pt-4 mt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
             <div className="flex flex-wrap items-center gap-4">
+              {/* Status Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <Filter className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Status:</span>
+                <SearchableSelect
+                  options={[
+                    { value: 'all', label: 'All Customers', icon: <Package className="w-4 h-4 text-violet-500" />, count: customers.length },
+                    { value: 'overdue', label: 'Overdue', icon: <AlertTriangle className="w-4 h-4 text-red-500" />, count: stats.overdueCount },
+                    { value: 'active', label: 'Active Credit', icon: <Clock className="w-4 h-4 text-blue-500" />, count: stats.activeCount },
+                    { value: 'clear', label: 'Clear', icon: <CheckCircle className="w-4 h-4 text-emerald-500" />, count: stats.clearCount },
+                  ]}
+                  value={statusFilter}
+                  onValueChange={setStatusFilter}
+                  placeholder="Select status..."
+                  searchPlaceholder="Search status..."
+                  theme={theme}
+                  triggerClassName="w-[180px]"
+                />
+              </div>
+
               {/* Credit Balance Range */}
               <div className="flex items-center gap-2">
                 <CreditCard className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
@@ -1608,8 +1595,43 @@ export const Customers: React.FC = () => {
         )}
       </div>
 
-      {/* Customers Display */}
-      {viewMode === 'list' ? (
+      {/* Empty State */}
+      {filteredCustomers.length === 0 ? (
+        <div className={`text-center py-16 rounded-2xl border ${
+          theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
+        }`}>
+          <Users className={`w-16 h-16 mx-auto mb-4 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
+          <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            No customers found
+          </h3>
+          <p className={`mb-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            {searchQuery || statusFilter !== 'all' || advancedFiltersCount > 0
+              ? 'Try adjusting your search or filters'
+              : 'Add your first customer to get started'}
+          </p>
+          {searchQuery || statusFilter !== 'all' || advancedFiltersCount > 0 ? (
+            <button 
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+                clearAdvancedFilters();
+              }}
+              className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+            >
+              Clear Filters
+            </button>
+          ) : (
+            <button 
+              onClick={handleAddCustomer}
+              className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+            >
+              Add Customer
+            </button>
+          )}
+        </div>
+      ) : (
+      /* Customers Display */
+      viewMode === 'list' ? (
         /* Table View */
         <div className={`rounded-2xl border overflow-hidden ${
           theme === 'dark' 
@@ -2288,7 +2310,7 @@ export const Customers: React.FC = () => {
           );
         })}
         </div>
-      )}
+      ))}
 
       {/* Pagination */}
       {filteredCustomers.length > 0 && (
