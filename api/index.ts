@@ -1,10 +1,14 @@
 // Vercel Serverless API Handler - Complete CRUD with all features
 // Optimized for Vercel Pro with caching and connection pooling
+// VERSION: 2026-02-03-v2 (with sections routes)
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient, InvoiceStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
+
+// API Version for debugging deployment issues
+const API_VERSION = '2026-02-03-v2';
 
 // Global Prisma instance to reuse across requests (prevents cold start issues)
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
@@ -519,6 +523,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const method = req.method || 'GET';
   const body = req.body || {};
   
+  // 🔴 DEBUG: Log EVERY request at the very start
+  console.log('🚀 API Request:', { path, method, timestamp: new Date().toISOString() });
+  
   // Merge Vercel's req.query with parsed query for compatibility
   // Vercel provides query params in req.query as string | string[] | undefined
   const query: Record<string, string> = { ...parsedQuery };
@@ -543,6 +550,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === '/health' || path === '/') {
       return res.status(200).json({ 
         status: 'ok', 
+        version: API_VERSION,
         timestamp: new Date().toISOString(),
         message: 'EcoSystem API running'
       });
@@ -556,12 +564,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({
         success: true,
         message: 'Debug route info',
+        apiVersion: API_VERSION,
+        deployedAt: new Date().toISOString(),
         testPath,
         regexPattern: sectionsRegex.toString(),
         matched: !!match,
         capturedGroup: match ? match[1] : null,
-        fileLines: 3548, // Approximate line count
-        sectionsRouteLineNumber: 3261,
+        fileLines: 3572,
+        sectionsRouteLineNumber: 3285,
       });
     }
 

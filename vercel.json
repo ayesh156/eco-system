@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm install && npm run build && cd .. && npm install && cp -r backend/prisma . && npx prisma generate",
+  "buildCommand": "cd frontend && npm install && npm run build && cd .. && npm install && cp -r backend/prisma . && npx prisma generate && echo 'Build v2026-02-03-v2'",
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/**/*.ts": {
