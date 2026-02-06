@@ -2,10 +2,10 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { mockGRNs, mockSuppliers } from '../data/mockData';
 import type { GoodsReceivedNote, GRNStatus } from '../data/mockData';
 import { GRNFormModal } from '../components/modals/GRNFormModal';
 import { GRNViewModal } from '../components/modals/GRNViewModal';
+import { GRNPaymentModal } from '../components/modals/GRNPaymentModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { SearchableSelect } from '../components/ui/searchable-select';
 import * as grnService from '../services/grnService';
@@ -95,8 +95,11 @@ export const GoodsReceived: React.FC = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedGRN, setSelectedGRN] = useState<GoodsReceivedNote | null>(null);
   const [grnToDelete, setGrnToDelete] = useState<GoodsReceivedNote | null>(null);
+  const [grnForPayment, setGrnForPayment] = useState<GoodsReceivedNote | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Load GRNs and Suppliers from API
   const loadData = useCallback(async () => {
@@ -117,22 +120,24 @@ export const GoodsReceived: React.FC = () => {
         } as unknown as GoodsReceivedNote));
         setGRNs(mappedGRNs);
       } else {
-        // Fallback to mock data
-        setGRNs(mockGRNs);
+        // No fallback - show empty state
+        setGRNs([]);
+        toast.error('Failed to load GRNs from server');
       }
       
       if (suppliersResult.success && suppliersResult.data) {
         setSuppliers(suppliersResult.data);
       } else {
-        // Fallback to mock data  
-        setSuppliers(mockSuppliers as unknown as FrontendSupplier[]);
+        // No fallback - show empty state
+        setSuppliers([]);
       }
     } catch (err) {
       console.error('Error loading data:', err);
       setError('Failed to load data');
-      // Fallback to mock data
-      setGRNs(mockGRNs);
-      setSuppliers(mockSuppliers as unknown as FrontendSupplier[]);
+      // No fallback - show empty state
+      setGRNs([]);
+      setSuppliers([]);
+      toast.error('Failed to connect to server');
     } finally {
       setIsLoading(false);
     }
@@ -339,29 +344,33 @@ export const GoodsReceived: React.FC = () => {
   const handleSaveGRN = async (grn: GoodsReceivedNote) => {
     setIsLoading(true);
     try {
-      if (selectedGRN && (selectedGRN as FrontendGRN).apiId) {
-        // Update existing GRN (API update not yet implemented)
-        setGRNs(prev => prev.map(g => g.id === grn.id ? grn : g));
-        toast.success('GRN Updated Successfully! ✅', {
-          description: `GRN ${grn.grnNumber} has been updated`,
-          duration: 3000,
-        });
+      const grnApiId = (selectedGRN as FrontendGRN)?.apiId || (grn as unknown as FrontendGRN).apiId;
+      
+      if (selectedGRN && grnApiId) {
+        // Update existing GRN via API
+        const result = await grnService.updateGRN(grnApiId, grn as unknown as FrontendGRN, effectiveShopId);
+        if (result.success && result.data) {
+          // Reload data to get fresh state from server
+          await loadData();
+          toast.success('GRN Updated Successfully! ✅', {
+            description: `GRN ${grn.grnNumber} has been updated`,
+            duration: 3000,
+          });
+        } else {
+          throw new Error(result.error || 'Failed to update GRN');
+        }
       } else {
         // Create new GRN via API
         const result = await grnService.createGRN(grn as unknown as FrontendGRN);
         if (result.success && result.data) {
-          setGRNs(prev => [...prev, result.data as unknown as GoodsReceivedNote]);
+          // Reload data to get fresh state from server
+          await loadData();
           toast.success('GRN Created Successfully! 🎉', {
             description: `GRN ${grn.grnNumber} has been created`,
             duration: 3000,
           });
         } else {
-          // Fallback to local add
-          setGRNs(prev => [...prev, grn]);
-          toast.success('GRN Created Successfully! 🎉', {
-            description: `GRN ${grn.grnNumber} (local mode)`,
-            duration: 3000,
-          });
+          throw new Error(result.error || 'Failed to create GRN');
         }
       }
     } catch (err) {
@@ -370,12 +379,6 @@ export const GoodsReceived: React.FC = () => {
         description: err instanceof Error ? err.message : 'Please try again',
         duration: 4000,
       });
-      // Fallback to local operation
-      if (selectedGRN) {
-        setGRNs(prev => prev.map(g => g.id === grn.id ? grn : g));
-      } else {
-        setGRNs(prev => [...prev, grn]);
-      }
     } finally {
       setIsLoading(false);
       setIsFormModalOpen(false);
@@ -391,29 +394,21 @@ export const GoodsReceived: React.FC = () => {
     if (grnToDelete) {
       setIsLoading(true);
       try {
-        if ((grnToDelete as FrontendGRN).apiId) {
-          const result = await grnService.deleteGRN((grnToDelete as FrontendGRN).apiId!, effectiveShopId);
+        const apiId = (grnToDelete as FrontendGRN).apiId;
+        if (apiId) {
+          const result = await grnService.deleteGRN(apiId, effectiveShopId);
           if (result.success) {
-            setGRNs(prev => prev.filter(g => g.id !== grnToDelete.id));
+            // Reload data from server
+            await loadData();
             toast.success('GRN Deleted Successfully! 🗑️', {
               description: `GRN ${grnToDelete.grnNumber} has been removed`,
               duration: 3000,
             });
           } else {
-            // Fallback to local delete
-            setGRNs(prev => prev.filter(g => g.id !== grnToDelete.id));
-            toast.success('GRN Deleted Successfully! 🗑️', {
-              description: `GRN ${grnToDelete.grnNumber} removed (local)`,
-              duration: 3000,
-            });
+            throw new Error(result.error || 'Failed to delete GRN');
           }
         } else {
-          // Local only GRN
-          setGRNs(prev => prev.filter(g => g.id !== grnToDelete.id));
-          toast.success('GRN Deleted Successfully! 🗑️', {
-            description: `GRN ${grnToDelete.grnNumber} removed`,
-            duration: 3000,
-          });
+          throw new Error('Cannot delete: GRN not saved to database');
         }
       } catch (err) {
         console.error('Error deleting GRN:', err);
@@ -421,13 +416,68 @@ export const GoodsReceived: React.FC = () => {
           description: err instanceof Error ? err.message : 'Please try again',
           duration: 4000,
         });
-        // Fallback to local delete
-        setGRNs(prev => prev.filter(g => g.id !== grnToDelete.id));
       } finally {
         setIsLoading(false);
         setIsDeleteModalOpen(false);
         setGrnToDelete(null);
       }
+    }
+  };
+
+  // Payment Handlers
+  const handlePayGRN = (grn: GoodsReceivedNote) => {
+    setGrnForPayment(grn);
+    setIsPaymentModalOpen(true);
+  };
+
+  const handleGRNPayment = async (grnId: string, amount: number, paymentMethod: string, notes?: string) => {
+    if (!grnForPayment) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      // Use the API ID for the request
+      const apiId = (grnForPayment as FrontendGRN).apiId || grnId;
+      
+      const result = await grnService.recordGRNPayment(apiId, {
+        amount,
+        paymentMethod,
+        notes
+      }, effectiveShopId);
+      
+      if (result.success && result.data) {
+        // Update local state with new payment info
+        setGRNs(prev => prev.map(grn => {
+          const thisApiId = (grn as FrontendGRN).apiId;
+          if (thisApiId === apiId || grn.id === grnId || grn.grnNumber === grnId) {
+            return {
+              ...grn,
+              paidAmount: result.data!.paidAmount || (grn.paidAmount || 0) + amount,
+              paymentStatus: result.data!.paymentStatus as 'paid' | 'partial' | 'unpaid' || grn.paymentStatus,
+              paymentMethod: (result.data!.paymentMethod || paymentMethod) as 'cash' | 'bank' | 'card' | 'cheque' | 'credit',
+              notes: result.data!.notes || grn.notes,
+            };
+          }
+          return grn;
+        }));
+        
+        toast.success('Payment Recorded! 💰', {
+          description: `Rs. ${amount.toLocaleString()} paid for ${grnForPayment.grnNumber}`,
+          duration: 3000,
+        });
+        
+        setIsPaymentModalOpen(false);
+        setGrnForPayment(null);
+      } else {
+        throw new Error(result.error || 'Failed to record payment');
+      }
+    } catch (err) {
+      console.error('Error recording GRN payment:', err);
+      toast.error('Failed to record payment', {
+        description: err instanceof Error ? err.message : 'Please try again',
+        duration: 4000,
+      });
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -1001,8 +1051,8 @@ export const GoodsReceived: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {paginatedGRNs.map(grn => {
             const StatusIcon = grnStatusConfig[grn.status].icon;
-            const acceptanceRate = grn.totalReceivedQuantity > 0 
-              ? ((grn.totalAcceptedQuantity / grn.totalReceivedQuantity) * 100).toFixed(0)
+            const paymentPercentage = grn.totalAmount > 0 
+              ? (((grn.paidAmount || 0) / grn.totalAmount) * 100).toFixed(0)
               : 0;
             
             return (
@@ -1055,16 +1105,22 @@ export const GoodsReceived: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Progress Bar */}
+                {/* Payment Progress Bar */}
                 <div className="mb-4">
                   <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Acceptance Rate</span>
-                    <span className="font-semibold text-emerald-500">{acceptanceRate}%</span>
+                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Payment Progress</span>
+                    <span className={`font-semibold ${
+                      Number(paymentPercentage) >= 100 ? 'text-emerald-500' :
+                      Number(paymentPercentage) >= 50 ? 'text-amber-500' : 'text-red-500'
+                    }`}>{paymentPercentage}%</span>
                   </div>
                   <div className={`h-2 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
                     <div 
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500"
-                      style={{ width: `${acceptanceRate}%` }}
+                      className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${
+                        Number(paymentPercentage) >= 100 ? 'from-emerald-500 to-teal-500' :
+                        Number(paymentPercentage) >= 50 ? 'from-amber-500 to-orange-500' : 'from-red-500 to-rose-500'
+                      }`}
+                      style={{ width: `${Math.min(Number(paymentPercentage), 100)}%` }}
                     />
                   </div>
                 </div>
@@ -1133,6 +1189,23 @@ export const GoodsReceived: React.FC = () => {
                     <Eye className="w-4 h-4" />
                     View
                   </button>
+                  {/* Pay Button - Show when not fully paid */}
+                  {grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePayGRN(grn);
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        theme === 'dark' 
+                          ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400'
+                          : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                      }`}
+                    >
+                      <DollarSign className="w-4 h-4" />
+                      Pay
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1281,9 +1354,25 @@ export const GoodsReceived: React.FC = () => {
                             className={`p-2 rounded-lg transition-colors ${
                               theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                             }`}
+                            title="View GRN"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+                          {/* Pay Button - Table View */}
+                          {grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePayGRN(grn);
+                              }}
+                              className={`p-2 rounded-lg transition-colors ${
+                                theme === 'dark' ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-100 text-blue-600'
+                              }`}
+                              title="Record Payment"
+                            >
+                              <DollarSign className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1292,6 +1381,7 @@ export const GoodsReceived: React.FC = () => {
                             className={`p-2 rounded-lg transition-colors ${
                               theme === 'dark' ? 'hover:bg-emerald-500/20 text-emerald-400' : 'hover:bg-emerald-100 text-emerald-600'
                             }`}
+                            title="Edit GRN"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
@@ -1479,6 +1569,8 @@ export const GoodsReceived: React.FC = () => {
         onClose={() => setIsFormModalOpen(false)}
         onSave={handleSaveGRN}
         isLoading={isLoading}
+        isLoadingSuppliers={isLoading && suppliers.length === 0}
+        isLoadingProducts={false}
       />
 
       <GRNViewModal
@@ -1488,6 +1580,10 @@ export const GoodsReceived: React.FC = () => {
         onEdit={(grn) => {
           setIsViewModalOpen(false);
           handleEditGRN(grn);
+        }}
+        onPay={(grn) => {
+          setIsViewModalOpen(false);
+          handlePayGRN(grn);
         }}
       />
 
@@ -1502,6 +1598,17 @@ export const GoodsReceived: React.FC = () => {
           setGrnToDelete(null);
         }}
         isLoading={isLoading}
+      />
+
+      <GRNPaymentModal
+        isOpen={isPaymentModalOpen}
+        grn={grnForPayment}
+        onClose={() => {
+          setIsPaymentModalOpen(false);
+          setGrnForPayment(null);
+        }}
+        onPayment={handleGRNPayment}
+        isProcessing={isProcessingPayment}
       />
     </div>
   );

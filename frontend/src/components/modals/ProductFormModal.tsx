@@ -23,6 +23,7 @@ interface ProductFormModalProps {
   onClose: () => void;
   onSave: (product: Product) => void;
   autoAddToInvoice?: boolean; // If true, the product will be auto-added to invoice items
+  autoAddToGRN?: boolean; // If true, shows "Add to GRN" button instead
   shopId?: string; // For SuperAdmin viewing other shops
 }
 
@@ -61,6 +62,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onClose,
   onSave,
   autoAddToInvoice = true,
+  autoAddToGRN = false,
   shopId,
 }) => {
   const { theme, aiAutoFillEnabled } = useTheme();
@@ -1076,7 +1078,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  {product ? 'Update Product' : autoAddToInvoice ? 'Add to Invoice' : 'Save Product'}
+                  {product ? 'Update Product' : autoAddToGRN ? 'Add to GRN' : autoAddToInvoice ? 'Add to Invoice' : 'Save Product'}
                 </>
               )}
             </button>

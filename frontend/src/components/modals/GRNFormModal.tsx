@@ -35,7 +35,14 @@ interface GRNFormModalProps {
   onClose: () => void;
   onSave: (grn: GoodsReceivedNote) => void;
   isLoading?: boolean;
+  isLoadingSuppliers?: boolean;
+  isLoadingProducts?: boolean;
 }
+
+// Skeleton Loader Component
+const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div className={`animate-pulse bg-slate-700/50 rounded ${className}`} />
+);
 
 // Modern Date Picker Component
 interface DatePickerProps {
@@ -232,6 +239,8 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
   onClose,
   onSave,
   isLoading = false,
+  isLoadingSuppliers = false,
+  isLoadingProducts = false,
 }) => {
   const { theme } = useTheme();
   const isEditing = !!grn;
@@ -534,13 +543,26 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                     <Truck className="w-4 h-4 inline mr-2" />
                     Supplier *
                   </label>
-                  <SearchableSelect
-                    value={formData.supplierId || ''}
-                    onValueChange={(val: string) => handleSupplierChange(val)}
-                    options={supplierOptions}
-                    placeholder="Select Supplier"
-                    theme={theme}
-                  />
+                  {isLoadingSuppliers ? (
+                    <div className={`w-full h-12 rounded-xl flex items-center gap-3 px-4 ${
+                      theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-slate-50 border border-slate-200'
+                    }`}>
+                      <Skeleton className="w-6 h-6 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-3 w-3/4" />
+                        <Skeleton className="h-2 w-1/2" />
+                      </div>
+                      <Loader2 className={`w-4 h-4 animate-spin ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                    </div>
+                  ) : (
+                    <SearchableSelect
+                      value={formData.supplierId || ''}
+                      onValueChange={(val: string) => handleSupplierChange(val)}
+                      options={supplierOptions}
+                      placeholder="Select Supplier"
+                      theme={theme}
+                    />
+                  )}
                 </div>
 
                 {/* GRN Status */}
@@ -715,13 +737,26 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             Product
                           </label>
-                          <SearchableSelect
-                            value={item.productId}
-                            onValueChange={(val: string) => updateItem(index, 'productId', val)}
-                            options={productOptions}
-                            placeholder="Select Product"
-                            theme={theme}
-                          />
+                          {isLoadingProducts ? (
+                            <div className={`w-full h-10 rounded-lg flex items-center gap-2 px-3 ${
+                              theme === 'dark' ? 'bg-slate-800 border border-slate-600' : 'bg-white border border-slate-200'
+                            }`}>
+                              <Skeleton className="w-5 h-5 rounded" />
+                              <div className="flex-1 space-y-1">
+                                <Skeleton className="h-2.5 w-2/3" />
+                                <Skeleton className="h-2 w-1/3" />
+                              </div>
+                              <Loader2 className={`w-3.5 h-3.5 animate-spin ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                            </div>
+                          ) : (
+                            <SearchableSelect
+                              value={item.productId}
+                              onValueChange={(val: string) => updateItem(index, 'productId', val)}
+                              options={productOptions}
+                              placeholder="Select Product"
+                              theme={theme}
+                            />
+                          )}
                         </div>
 
                         {/* Ordered Qty */}

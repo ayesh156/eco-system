@@ -26,6 +26,10 @@ export interface APISupplier {
   _count?: {
     grns?: number;
   };
+  // Calculated fields from backend
+  totalPurchases?: number;
+  totalOrders?: number;
+  lastOrder?: string;
 }
 
 export interface CreateSupplierDTO {
@@ -88,8 +92,9 @@ export const convertAPISupplierToFrontend = (apiSupplier: APISupplier): Frontend
     email: apiSupplier.email || '',
     phone: apiSupplier.phone,
     address: apiSupplier.address,
-    totalPurchases: 0, // Calculate from GRNs
-    totalOrders: apiSupplier._count?.grns || 0,
+    totalPurchases: apiSupplier.totalPurchases || 0, // From backend calculation
+    totalOrders: apiSupplier.totalOrders || apiSupplier._count?.grns || 0,
+    lastOrder: apiSupplier.lastOrder,
     creditBalance: 0, // Not tracked in API yet
     creditLimit: 0,
     creditStatus: 'clear',

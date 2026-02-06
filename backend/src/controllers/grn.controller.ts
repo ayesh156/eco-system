@@ -197,6 +197,11 @@ export const getGRNs = async (req: AuthRequest, res: Response, next: NextFunctio
         supplier: {
           select: { name: true }
         },
+        items: {
+          select: {
+            quantity: true
+          }
+        },
         _count: {
           select: { items: true }
         }
@@ -204,7 +209,19 @@ export const getGRNs = async (req: AuthRequest, res: Response, next: NextFunctio
       orderBy: { createdAt: 'desc' }
     });
 
-    res.json({ success: true, data: grns });
+    // Calculate totals for each GRN from items
+    const grnsWithTotals = grns.map(grn => {
+      const totalQuantity = grn.items.reduce((sum, item) => sum + item.quantity, 0);
+      return {
+        ...grn,
+        totalOrderedQuantity: totalQuantity,
+        totalAcceptedQuantity: totalQuantity, // All accepted for now
+        totalRejectedQuantity: 0, // No rejection tracking yet
+        items: undefined // Remove items from response to keep it light
+      };
+    });
+
+    res.json({ success: true, data: grnsWithTotals });
   } catch (error) {
     next(error);
   }
@@ -330,7 +347,7 @@ export const deleteGRN = async (req: AuthRequest, res: Response, next: NextFunct
   }
 };
 
-// Update GRN (limited fields - not items)
+// Update GRN (full update including items)
 export const updateGRN = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const shopId = getEffectiveShopId(req);
@@ -340,38 +357,126 @@ export const updateGRN = async (req: AuthRequest, res: Response, next: NextFunct
       return res.status(403).json({ success: false, message: 'Shop access required' });
     }
 
-    const grn = await prisma.gRN.findUnique({
-      where: { id }
+    const existingGRN = await prisma.gRN.findUnique({
+      where: { id },
+      include: { items: true }
     });
 
-    if (!grn) {
+    if (!existingGRN) {
       return res.status(404).json({ success: false, message: 'GRN not found' });
     }
 
-    if (grn.shopId !== shopId) {
+    if (existingGRN.shopId !== shopId) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const { notes, paymentStatus, paidAmount, status } = req.body;
+    const { 
+      notes, paymentStatus, paidAmount, status, 
+      supplierId, referenceNo, date, expectedDate, 
+      discount, tax, items 
+    } = req.body;
 
-    const updated = await prisma.gRN.update({
-      where: { id },
-      data: {
-        notes: notes !== undefined ? notes : grn.notes,
-        paymentStatus: paymentStatus ? paymentStatus as PaymentStatus : grn.paymentStatus,
-        paidAmount: paidAmount !== undefined ? paidAmount : grn.paidAmount,
-        status: status ? status as GRNStatus : grn.status
-      },
-      include: {
-        supplier: true,
-        items: {
-          include: {
-            product: {
-              select: { name: true }
+    // Calculate totals if items are provided
+    let subtotal = existingGRN.subtotal;
+    let totalAmount = existingGRN.totalAmount;
+    
+    if (items && Array.isArray(items) && items.length > 0) {
+      subtotal = items.reduce((sum: number, item: { quantity: number; costPrice: number }) => 
+        sum + (item.quantity * item.costPrice), 0);
+      const discountAmount = discount || existingGRN.discount || 0;
+      const taxAmount = tax || existingGRN.tax || 0;
+      totalAmount = subtotal - discountAmount + taxAmount;
+    }
+
+    // Use transaction for atomic update
+    const updated = await prisma.$transaction(async (tx) => {
+      // If updating items, first reverse the old stock quantities
+      if (items && Array.isArray(items) && items.length > 0) {
+        // Reverse old item stock
+        for (const oldItem of existingGRN.items) {
+          if (oldItem.productId) {
+            await tx.product.update({
+              where: { id: oldItem.productId },
+              data: {
+                stock: { decrement: oldItem.quantity },
+              }
+            });
+          }
+        }
+        
+        // Delete existing items
+        await tx.gRNItem.deleteMany({
+          where: { grnId: id }
+        });
+      }
+
+      // Update the GRN
+      const updatedGRN = await tx.gRN.update({
+        where: { id },
+        data: {
+          supplierId: supplierId || existingGRN.supplierId,
+          referenceNo: referenceNo !== undefined ? referenceNo : existingGRN.referenceNo,
+          date: date ? new Date(date) : existingGRN.date,
+          expectedDate: expectedDate ? new Date(expectedDate) : existingGRN.expectedDate,
+          notes: notes !== undefined ? notes : existingGRN.notes,
+          paymentStatus: paymentStatus ? paymentStatus as PaymentStatus : existingGRN.paymentStatus,
+          paidAmount: paidAmount !== undefined ? paidAmount : existingGRN.paidAmount,
+          status: status ? status as GRNStatus : existingGRN.status,
+          discount: discount !== undefined ? discount : existingGRN.discount,
+          tax: tax !== undefined ? tax : existingGRN.tax,
+          subtotal,
+          totalAmount,
+        }
+      });
+
+      // Create new items if provided and update stock
+      if (items && Array.isArray(items) && items.length > 0) {
+        for (const item of items) {
+          await tx.gRNItem.create({
+            data: {
+              grnId: id,
+              productId: item.productId,
+              quantity: item.quantity,
+              costPrice: item.costPrice,
+              sellingPrice: item.sellingPrice || 0,
+              totalCost: item.quantity * item.costPrice,
+            }
+          });
+          
+          // Update product stock and cost price
+          if (item.productId) {
+            const product = await tx.product.findUnique({
+              where: { id: item.productId }
+            });
+            
+            if (product) {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: {
+                  stock: { increment: item.quantity },
+                  costPrice: item.costPrice,
+                  ...(item.sellingPrice && { price: item.sellingPrice }),
+                }
+              });
             }
           }
         }
       }
+
+      // Return updated GRN with relations
+      return await tx.gRN.findUnique({
+        where: { id },
+        include: {
+          supplier: true,
+          items: {
+            include: {
+              product: {
+                select: { name: true }
+              }
+            }
+          }
+        }
+      });
     });
 
     res.json({ success: true, data: updated });

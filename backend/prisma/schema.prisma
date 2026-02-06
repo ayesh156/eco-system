@@ -63,6 +63,7 @@ model Shop {
   invoiceReminders InvoiceReminder[]
   suppliers     Supplier[]
   grns          GRN[]
+  grnPayments   GRNPayment[]
 
   @@map("shops")
 }
@@ -91,6 +92,7 @@ model User {
   invoicesUpdated   Invoice[]  @relation("InvoiceUpdatedBy")
   paymentsRecorded  InvoicePayment[]
   grnsCreated       GRN[]      @relation("GRNCreatedBy")
+  grnPaymentsRecorded GRNPayment[]
 
   @@index([shopId])
   @@map("users")
@@ -720,11 +722,44 @@ model GRN {
   updatedAt     DateTime  @updatedAt
 
   items         GRNItem[]
+  payments      GRNPayment[]
 
   @@unique([shopId, grnNumber])
   @@index([shopId])
   @@index([supplierId])
   @@map("grns")
+}
+
+// GRN Payment Records - Track supplier payments
+model GRNPayment {
+  id            String        @id @default(cuid())
+  
+  // GRN relation
+  grnId         String
+  grn           GRN           @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  
+  // Shop relation
+  shopId        String
+  shop          Shop          @relation(fields: [shopId], references: [id])
+  
+  // Payment details
+  amount        Float
+  paymentMethod PaymentMethod
+  sentAt        DateTime      @default(now())
+  
+  // Notes and metadata
+  notes         String?
+  message       String?       // Same as notes, for API compatibility
+  
+  // Recorded by
+  recordedById  String?
+  recordedBy    User?         @relation(fields: [recordedById], references: [id])
+  
+  createdAt     DateTime      @default(now())
+
+  @@index([grnId])
+  @@index([shopId])
+  @@map("grn_payments")
 }
 
 model GRNItem {

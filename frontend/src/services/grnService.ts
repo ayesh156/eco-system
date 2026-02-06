@@ -58,6 +58,10 @@ export interface APIGRN {
   _count?: {
     items?: number;
   };
+  // Calculated totals from backend
+  totalOrderedQuantity?: number;
+  totalAcceptedQuantity?: number;
+  totalRejectedQuantity?: number;
 }
 
 export interface CreateGRNItemDTO {
@@ -194,7 +198,11 @@ export const convertAPIGRNToFrontend = (apiGRN: APIGRN): FrontendGRN => {
     status: 'accepted' as const,
   }));
 
-  const totalQuantity = items.reduce((sum, item) => sum + item.acceptedQuantity, 0);
+  // Use pre-calculated totals from backend if available, otherwise calculate from items
+  const calculatedTotalQuantity = items.reduce((sum, item) => sum + item.acceptedQuantity, 0);
+  const totalOrderedQuantity = apiGRN.totalOrderedQuantity ?? calculatedTotalQuantity;
+  const totalAcceptedQuantity = apiGRN.totalAcceptedQuantity ?? calculatedTotalQuantity;
+  const totalRejectedQuantity = apiGRN.totalRejectedQuantity ?? 0;
 
   return {
     id: apiGRN.grnNumber, // Use grnNumber as display ID
@@ -206,10 +214,10 @@ export const convertAPIGRNToFrontend = (apiGRN: APIGRN): FrontendGRN => {
     expectedDeliveryDate: apiGRN.expectedDate?.split('T')[0] || '',
     receivedDate: apiGRN.date?.split('T')[0] || '',
     items,
-    totalOrderedQuantity: totalQuantity,
-    totalReceivedQuantity: totalQuantity,
-    totalAcceptedQuantity: totalQuantity,
-    totalRejectedQuantity: 0,
+    totalOrderedQuantity,
+    totalReceivedQuantity: totalOrderedQuantity,
+    totalAcceptedQuantity,
+    totalRejectedQuantity,
     subtotal: apiGRN.subtotal,
     discountAmount: apiGRN.discount,
     taxAmount: apiGRN.tax,
@@ -460,6 +468,47 @@ export const updateGRN = async (id: string, grnData: Partial<FrontendGRN>, shopI
   }
 };
 
+/**
+ * Record a payment for a GRN
+ * Updates paidAmount and paymentStatus
+ */
+export const recordGRNPayment = async (
+  id: string, 
+  paymentData: { 
+    amount: number; 
+    paymentMethod: string; 
+    notes?: string 
+  }, 
+  shopId?: string
+): Promise<{ success: boolean; data?: FrontendGRN; error?: string }> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (shopId) queryParams.append('shopId', shopId);
+    const url = `${API_BASE_URL}/grns/${id}/payment${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(paymentData),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to record payment');
+    }
+
+    return { success: true, data: convertAPIGRNToFrontend(result.data) };
+  } catch (error) {
+    console.error('Error recording GRN payment:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to record payment' 
+    };
+  }
+};
+
 export default {
   getGRNs,
   getGRNById,
@@ -467,4 +516,5 @@ export default {
   getGRNStats,
   deleteGRN,
   updateGRN,
+  recordGRNPayment,
 };

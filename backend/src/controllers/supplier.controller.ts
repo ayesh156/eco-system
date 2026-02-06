@@ -67,13 +67,40 @@ export const getSuppliers = async (req: AuthRequest, res: Response, next: NextFu
       where: { shopId, isActive: true },
       orderBy: { name: 'asc' },
       include: {
+        grns: {
+          where: {
+            status: { in: ['COMPLETED', 'PENDING'] } // Only count completed/pending GRNs
+          },
+          select: {
+            totalAmount: true,
+            createdAt: true
+          }
+        },
         _count: {
           select: { grns: true }
         }
       }
     });
 
-    res.json({ success: true, data: suppliers });
+    // Calculate total purchases and add to response
+    const suppliersWithTotals = suppliers.map(supplier => {
+      const totalPurchases = supplier.grns.reduce((sum, grn) => sum + (grn.totalAmount || 0), 0);
+      const lastOrder = supplier.grns.length > 0 
+        ? supplier.grns.reduce((latest, grn) => 
+            new Date(grn.createdAt) > new Date(latest.createdAt) ? grn : latest
+          ).createdAt
+        : null;
+      
+      return {
+        ...supplier,
+        totalPurchases,
+        totalOrders: supplier._count.grns,
+        lastOrder,
+        grns: undefined // Remove grns array from response to keep it light
+      };
+    });
+
+    res.json({ success: true, data: suppliersWithTotals });
   } catch (error) {
     next(error);
   }

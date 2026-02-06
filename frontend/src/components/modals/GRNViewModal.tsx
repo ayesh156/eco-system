@@ -24,6 +24,7 @@ import {
   Tag,
   Percent,
   BadgePercent,
+  DollarSign,
 } from 'lucide-react';
 
 interface GRNViewModalProps {
@@ -31,6 +32,7 @@ interface GRNViewModalProps {
   grn: GoodsReceivedNote | null;
   onClose: () => void;
   onEdit?: (grn: GoodsReceivedNote) => void;
+  onPay?: (grn: GoodsReceivedNote) => void;
 }
 
 const statusConfig: Record<GRNStatus, { label: string; color: string; bgColor: string; borderColor: string; icon: React.ElementType }> = {
@@ -69,6 +71,7 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
   grn,
   onClose,
   onEdit,
+  onPay,
 }) => {
   const { theme } = useTheme();
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -163,6 +166,23 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Pay Button - Show when not fully paid with animation highlight */}
+            {onPay && grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
+              <button
+                onClick={() => onPay(grn)}
+                className={`relative flex items-center gap-1.5 px-4 py-2 rounded-xl font-medium shadow-lg transition-all transform hover:scale-105 ${
+                  theme === 'dark' 
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-amber-500/30' 
+                    : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-amber-500/30'
+                }`}
+                title="Record Payment"
+              >
+                {/* Pulse animation */}
+                <span className="absolute inset-0 rounded-xl bg-white/20 animate-ping opacity-75" />
+                <DollarSign className="w-4 h-4 relative" />
+                <span className="text-sm font-semibold relative">Pay Now</span>
+              </button>
+            )}
             {onEdit && (
               <button
                 onClick={() => onEdit(grn)}

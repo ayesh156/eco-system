@@ -3495,9 +3495,33 @@ Best regards,
       const suppliers = await prisma.supplier.findMany({
         where: { shopId, isActive: true },
         orderBy: { name: 'asc' },
-        include: { _count: { select: { grns: true } } }
+        include: { 
+          grns: {
+            where: { status: { in: ['COMPLETED', 'PENDING'] } },
+            select: { totalAmount: true, createdAt: true }
+          },
+          _count: { select: { grns: true } } 
+        }
       });
-      return res.status(200).json({ success: true, data: suppliers });
+      
+      // Calculate total purchases for each supplier
+      const suppliersWithTotals = suppliers.map(supplier => {
+        const totalPurchases = supplier.grns.reduce((sum, grn) => sum + (grn.totalAmount || 0), 0);
+        const lastOrder = supplier.grns.length > 0 
+          ? supplier.grns.reduce((latest, grn) => 
+              new Date(grn.createdAt) > new Date(latest.createdAt) ? grn : latest
+            ).createdAt
+          : null;
+        return {
+          ...supplier,
+          totalPurchases,
+          totalOrders: supplier._count.grns,
+          lastOrder,
+          grns: undefined
+        };
+      });
+      
+      return res.status(200).json({ success: true, data: suppliersWithTotals });
     }
 
     if (path === '/api/v1/suppliers' && method === 'POST') {
@@ -3586,11 +3610,25 @@ Best regards,
         where,
         include: {
           supplier: { select: { name: true } },
+          items: { select: { quantity: true } },
           _count: { select: { items: true } }
         },
         orderBy: { createdAt: 'desc' }
       });
-      return res.status(200).json({ success: true, data: grns });
+      
+      // Calculate totals for each GRN from items
+      const grnsWithTotals = grns.map(grn => {
+        const totalQuantity = grn.items.reduce((sum, item) => sum + item.quantity, 0);
+        return {
+          ...grn,
+          totalOrderedQuantity: totalQuantity,
+          totalAcceptedQuantity: totalQuantity,
+          totalRejectedQuantity: 0,
+          items: undefined
+        };
+      });
+      
+      return res.status(200).json({ success: true, data: grnsWithTotals });
     }
 
     if (path === '/api/v1/grns' && method === 'POST') {
@@ -3750,6 +3788,163 @@ Best regards,
       });
 
       return res.status(200).json({ success: true, message: 'GRN deleted and stock reversed' });
+    }
+
+    // GRN PAYMENTS - List payments for a GRN
+    const grnPaymentsMatch = path.match(/^\/api\/v1\/grns\/([^/]+)\/payments$/);
+    if (grnPaymentsMatch && method === 'GET') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const grnIdOrNumber = grnPaymentsMatch[1];
+      
+      // Find GRN by ID or GRN number
+      const grn = await prisma.gRN.findFirst({
+        where: {
+          OR: [
+            { id: grnIdOrNumber },
+            { grnNumber: grnIdOrNumber },
+            { grnNumber: grnIdOrNumber.replace('GRN-', '') }
+          ],
+          shopId
+        }
+      });
+      
+      if (!grn) return res.status(404).json({ success: false, message: 'GRN not found' });
+
+      const payments = await prisma.gRNPayment.findMany({
+        where: { grnId: grn.id },
+        orderBy: { sentAt: 'desc' },
+        include: {
+          recordedBy: { select: { id: true, name: true } }
+        }
+      });
+
+      return res.status(200).json({ success: true, data: payments });
+    }
+
+    // GRN PAYMENTS - Record a new payment for GRN
+    if (grnPaymentsMatch && method === 'POST') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const grnIdOrNumber = grnPaymentsMatch[1];
+      const { amount, paymentMethod, notes, message } = req.body;
+      
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ success: false, message: 'Payment amount is required and must be positive' });
+      }
+
+      // Find GRN by ID or GRN number
+      const grn = await prisma.gRN.findFirst({
+        where: {
+          OR: [
+            { id: grnIdOrNumber },
+            { grnNumber: grnIdOrNumber },
+            { grnNumber: grnIdOrNumber.replace('GRN-', '') }
+          ],
+          shopId
+        }
+      });
+      
+      if (!grn) return res.status(404).json({ success: false, message: 'GRN not found' });
+
+      // Map payment method
+      const validPaymentMethods: Record<string, string> = {
+        'cash': 'CASH',
+        'card': 'CARD',
+        'bank': 'BANK_TRANSFER',
+        'bank_transfer': 'BANK_TRANSFER',
+        'credit': 'CREDIT',
+        'cheque': 'CHEQUE'
+      };
+      const mappedPaymentMethod = validPaymentMethods[paymentMethod?.toLowerCase()] || 'CASH';
+
+      const newPaidAmount = (grn.paidAmount || 0) + amount;
+      const remaining = grn.totalAmount - newPaidAmount;
+      const newPaymentStatus = remaining <= 0 ? 'PAID' : newPaidAmount > 0 ? 'PARTIAL' : 'UNPAID';
+
+      // Create payment record and update GRN
+      const [payment, updated] = await prisma.$transaction([
+        prisma.gRNPayment.create({
+          data: {
+            grnId: grn.id,
+            shopId,
+            amount,
+            paymentMethod: mappedPaymentMethod as any,
+            notes: notes || message,
+            message: message || notes,
+          }
+        }),
+        prisma.gRN.update({
+          where: { id: grn.id },
+          data: {
+            paidAmount: newPaidAmount,
+            paymentStatus: newPaymentStatus as any,
+          }
+        })
+      ]);
+
+      return res.status(201).json({ success: true, data: payment, grn: updated });
+    }
+
+    // GRN PAYMENT (legacy) - Record a payment for GRN
+    const grnPaymentMatch = path.match(/^\/api\/v1\/grns\/([^/]+)\/payment$/);
+    if (grnPaymentMatch && method === 'POST') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const grnId = grnPaymentMatch[1];
+      const grn = await prisma.gRN.findUnique({ where: { id: grnId } });
+      if (!grn) return res.status(404).json({ success: false, message: 'GRN not found' });
+      if (grn.shopId !== shopId) return res.status(403).json({ success: false, message: 'Access denied' });
+
+      const { amount, paymentMethod, notes } = req.body;
+      
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ success: false, message: 'Payment amount is required and must be positive' });
+      }
+
+      // Map payment method
+      const validPaymentMethods: Record<string, string> = {
+        'cash': 'CASH',
+        'card': 'CARD',
+        'bank': 'BANK_TRANSFER',
+        'bank_transfer': 'BANK_TRANSFER',
+        'credit': 'CREDIT',
+        'cheque': 'CHEQUE'
+      };
+      const mappedPaymentMethod = validPaymentMethods[paymentMethod?.toLowerCase()] || 'CASH';
+
+      const newPaidAmount = (grn.paidAmount || 0) + amount;
+      const remaining = grn.totalAmount - newPaidAmount;
+      const newPaymentStatus = remaining <= 0 ? 'PAID' : newPaidAmount > 0 ? 'PARTIAL' : 'UNPAID';
+
+      // Create payment record and update GRN
+      const [payment, updated] = await prisma.$transaction([
+        prisma.gRNPayment.create({
+          data: {
+            grnId: grn.id,
+            shopId,
+            amount,
+            paymentMethod: mappedPaymentMethod as any,
+            notes,
+          }
+        }),
+        prisma.gRN.update({
+          where: { id: grnId },
+          data: {
+            paidAmount: newPaidAmount,
+            paymentStatus: newPaymentStatus as any,
+          },
+          include: {
+            supplier: true,
+            items: { include: { product: { select: { name: true } } } }
+          }
+        })
+      ]);
+
+      return res.status(200).json({ success: true, data: updated, message: 'Payment recorded successfully' });
     }
 
     // 404

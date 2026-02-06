@@ -231,6 +231,8 @@ export const CreateGRN: React.FC = () => {
   // Handle new product creation from modal  
   // Note: ProductFormModal handles API saving internally, this just receives the saved product
   const handleNewProductSave = (newProduct: Product) => {
+    // Add to products list so it appears in the product grid
+    setProducts(prev => [newProduct, ...prev]);
     // Add to GRN items with buying price
     addItem(newProduct);
     setShowProductFormModal(false);
@@ -312,12 +314,33 @@ export const CreateGRN: React.FC = () => {
     
     setItems(items.map(item => {
       if (item.productId === productId) {
-        const updated = { ...item, [field]: newQuantity };
+        const oldValue = item[field];
+        const isIncreasing = newQuantity > oldValue;
+        
+        let updated = { ...item, [field]: newQuantity };
+        
+        // Auto-increment logic: when increasing a quantity, auto-increase the ones below it
+        // ordered → received → accepted (cascading down)
+        // Only decreasing is manual per field
+        if (isIncreasing) {
+          if (field === 'orderedQuantity') {
+            // When ordered increases, also increase received and accepted
+            updated.receivedQuantity = Math.max(updated.receivedQuantity, newQuantity);
+            updated.acceptedQuantity = Math.max(updated.acceptedQuantity, newQuantity);
+          } else if (field === 'receivedQuantity') {
+            // When received increases, also increase accepted
+            updated.acceptedQuantity = Math.max(updated.acceptedQuantity, newQuantity);
+          }
+          // acceptedQuantity increase doesn't affect others
+        }
+        
+        // Validation: ensure constraints are maintained
+        // accepted cannot exceed received, received cannot exceed ordered
+        updated.receivedQuantity = Math.min(updated.receivedQuantity, updated.orderedQuantity);
+        updated.acceptedQuantity = Math.min(updated.acceptedQuantity, updated.receivedQuantity);
         
         // Update rejected based on received - accepted
-        if (field === 'acceptedQuantity' || field === 'receivedQuantity') {
-          updated.rejectedQuantity = Math.max(0, updated.receivedQuantity - updated.acceptedQuantity);
-        }
+        updated.rejectedQuantity = Math.max(0, updated.receivedQuantity - updated.acceptedQuantity);
         
         // Update total amount
         updated.totalAmount = updated.acceptedQuantity * updated.unitPrice;
@@ -1651,6 +1674,8 @@ export const CreateGRN: React.FC = () => {
         isOpen={showProductFormModal}
         onClose={() => setShowProductFormModal(false)}
         onSave={handleNewProductSave}
+        autoAddToGRN={true}
+        autoAddToInvoice={false}
       />
     </div>
   );

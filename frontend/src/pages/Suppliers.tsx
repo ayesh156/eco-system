@@ -1,24 +1,27 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { mockSuppliers, mockWhatsAppSettings, mockSupplierPurchases } from '../data/mockData';
-import type { Supplier, SupplierPurchase } from '../data/mockData';
+import { mockWhatsAppSettings, mockSupplierPurchases } from '../data/mockData';
+import type { Supplier, SupplierPurchase, GoodsReceivedNote } from '../data/mockData';
 import { SupplierFormModal } from '../components/modals/SupplierFormModal';
 import { CreditPaymentModal } from '../components/modals/CreditPaymentModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
 import { SupplierDetailModal } from '../components/modals/SupplierDetailModal';
 import { PurchasePaymentModal } from '../components/modals/PurchasePaymentModal';
 import { SupplierPaymentHistoryModal } from '../components/modals/SupplierPaymentHistoryModal';
+import { GRNPaymentModal } from '../components/modals/GRNPaymentModal';
 import { SearchableSelect } from '../components/ui/searchable-select';
+import { toast } from 'sonner';
 import { 
   Search, Plus, Edit, Mail, Phone, Trash2,
   AlertTriangle, CheckCircle, Clock, CreditCard,
   Calendar, MessageCircle, Package, DollarSign, Zap, Eye,
-  ShoppingCart, History,
+  ShoppingCart,
   X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal,
   List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc, Loader2, Filter
 } from 'lucide-react';
 import * as supplierService from '../services/supplierService';
+import * as grnService from '../services/grnService';
 import type { FrontendSupplier } from '../services/supplierService';
 
 export const Suppliers: React.FC = () => {
@@ -89,14 +92,16 @@ export const Suppliers: React.FC = () => {
         }));
         setSuppliers(suppliersData);
       } else {
-        // Fallback to mock data if API fails
-        console.warn('Using mock data:', result.error);
-        setSuppliers(mockSuppliers);
+        // No fallback - show empty state
+        console.warn('Failed to load suppliers:', result.error);
+        setSuppliers([]);
+        toast.error('Failed to load suppliers');
       }
     } catch (err) {
       console.error('Error loading suppliers:', err);
-      setSuppliers(mockSuppliers);
+      setSuppliers([]);
       setError('Failed to load suppliers from server');
+      toast.error('Failed to connect to server');
     } finally {
       setIsLoading(false);
     }
@@ -113,6 +118,7 @@ export const Suppliers: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isPurchasePaymentModalOpen, setIsPurchasePaymentModalOpen] = useState(false);
+  const [isGRNPaymentModalOpen, setIsGRNPaymentModalOpen] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [isPaymentHistoryModalOpen, setIsPaymentHistoryModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | undefined>(undefined);
@@ -120,8 +126,10 @@ export const Suppliers: React.FC = () => {
   const [supplierForPayment, setSupplierForPayment] = useState<Supplier | null>(null);
   const [supplierForDetail, setSupplierForDetail] = useState<Supplier | null>(null);
   const [purchaseForPayment, setPurchaseForPayment] = useState<SupplierPurchase | null>(null);
+  const [grnForPayment, setGrnForPayment] = useState<GoodsReceivedNote | null>(null);
   const [supplierForOrder, setSupplierForOrder] = useState<Supplier | null>(null);
   const [supplierForPaymentHistory, setSupplierForPaymentHistory] = useState<Supplier | null>(null);
+  const [isProcessingGRNPayment, setIsProcessingGRNPayment] = useState(false);
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -420,32 +428,31 @@ export const Suppliers: React.FC = () => {
     setIsLoading(true);
     try {
       if (selectedSupplier && selectedSupplier.apiId) {
-        // Update existing supplier
+        // Update existing supplier via API
         const result = await supplierService.updateSupplier(selectedSupplier.apiId, supplier as FrontendSupplier, effectiveShopId);
         if (result.success && result.data) {
-          setSuppliers(prev => prev.map(s => s.id === supplier.id ? result.data! : s));
+          // Reload data from server
+          await loadSuppliers();
+          toast.success('Supplier Updated Successfully! ✅');
         } else {
-          // Fallback to local update
-          setSuppliers(prev => prev.map(s => s.id === supplier.id ? supplier : s));
+          throw new Error(result.error || 'Failed to update supplier');
         }
       } else {
-        // Create new supplier
+        // Create new supplier via API
         const result = await supplierService.createSupplier(supplier as FrontendSupplier, effectiveShopId);
         if (result.success && result.data) {
-          setSuppliers(prev => [...prev, result.data!]);
+          // Reload data from server
+          await loadSuppliers();
+          toast.success('Supplier Created Successfully! 🎉');
         } else {
-          // Fallback to local add
-          setSuppliers(prev => [...prev, supplier]);
+          throw new Error(result.error || 'Failed to create supplier');
         }
       }
     } catch (err) {
       console.error('Error saving supplier:', err);
-      // Fallback to local operation
-      if (selectedSupplier) {
-        setSuppliers(prev => prev.map(s => s.id === supplier.id ? supplier : s));
-      } else {
-        setSuppliers(prev => [...prev, supplier]);
-      }
+      toast.error('Failed to save supplier', {
+        description: err instanceof Error ? err.message : 'Please try again',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -458,19 +465,20 @@ export const Suppliers: React.FC = () => {
         if (supplierToDelete.apiId) {
           const result = await supplierService.deleteSupplier(supplierToDelete.apiId, effectiveShopId);
           if (result.success) {
-            setSuppliers(prev => prev.filter(s => s.id !== supplierToDelete.id));
+            // Reload data from server
+            await loadSuppliers();
+            toast.success('Supplier Deleted Successfully! 🗑️');
           } else {
-            // Fallback to local delete
-            setSuppliers(prev => prev.filter(s => s.id !== supplierToDelete.id));
+            throw new Error(result.error || 'Failed to delete supplier');
           }
         } else {
-          // Local only supplier
-          setSuppliers(prev => prev.filter(s => s.id !== supplierToDelete.id));
+          throw new Error('Cannot delete: Supplier not saved to database');
         }
       } catch (err) {
         console.error('Error deleting supplier:', err);
-        // Fallback to local delete
-        setSuppliers(prev => prev.filter(s => s.id !== supplierToDelete.id));
+        toast.error('Failed to delete supplier', {
+          description: err instanceof Error ? err.message : 'Please try again',
+        });
       } finally {
         setIsLoading(false);
         setIsDeleteModalOpen(false);
@@ -505,16 +513,59 @@ export const Suppliers: React.FC = () => {
     setIsOrderModalOpen(true);
   };
 
-  // View payment history for a supplier
-  const handlePaymentHistory = (supplier: Supplier) => {
-    setSupplierForPaymentHistory(supplier);
-    setIsPaymentHistoryModalOpen(true);
+  // Make payment for a specific purchase or GRN
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleMakePurchasePayment = (item: any) => {
+    // Check if it's a GRN (has grnNumber) or legacy purchase
+    if (item.grnNumber) {
+      // It's a GRN
+      setGrnForPayment(item as GoodsReceivedNote);
+      setIsGRNPaymentModalOpen(true);
+    } else {
+      // It's a legacy purchase
+      setPurchaseForPayment(item as SupplierPurchase);
+      setIsPurchasePaymentModalOpen(true);
+    }
   };
 
-  // Make payment for a specific purchase
-  const handleMakePurchasePayment = (purchase: SupplierPurchase) => {
-    setPurchaseForPayment(purchase);
-    setIsPurchasePaymentModalOpen(true);
+  // Handle GRN payment via API
+  const handleGRNPayment = async (grnId: string, amount: number, paymentMethod: string, notes?: string) => {
+    if (!grnForPayment) return;
+    
+    setIsProcessingGRNPayment(true);
+    try {
+      // Get the API ID for the GRN
+      const apiId = (grnForPayment as unknown as { apiId?: string }).apiId || grnId;
+      
+      const result = await grnService.recordGRNPayment(apiId, {
+        amount,
+        paymentMethod,
+        notes
+      }, effectiveShopId);
+      
+      if (result.success) {
+        toast.success('Payment Recorded! 💰', {
+          description: `Rs. ${amount.toLocaleString()} paid for ${grnForPayment.grnNumber}`,
+          duration: 3000,
+        });
+        
+        setIsGRNPaymentModalOpen(false);
+        setGrnForPayment(null);
+        
+        // Refresh supplier detail modal if open
+        // The modal will re-fetch GRNs on next open
+      } else {
+        throw new Error(result.error || 'Failed to record payment');
+      }
+    } catch (err) {
+      console.error('Error recording GRN payment:', err);
+      toast.error('Failed to record payment', {
+        description: err instanceof Error ? err.message : 'Please try again',
+        duration: 4000,
+      });
+    } finally {
+      setIsProcessingGRNPayment(false);
+    }
   };
 
   // Handle purchase payment
@@ -1230,15 +1281,6 @@ ECOTEC Computer Solutions`;
                             <Eye className="w-4 h-4" />
                           </button>
                           <button 
-                            onClick={() => handlePaymentHistory(supplier)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              theme === 'dark' ? 'hover:bg-purple-500/10 text-purple-400' : 'hover:bg-purple-50 text-purple-600'
-                            }`}
-                            title="Payment History"
-                          >
-                            <History className="w-4 h-4" />
-                          </button>
-                          <button 
                             onClick={() => handleOrderFromSupplier(supplier)}
                             className={`p-1.5 rounded-lg transition-colors ${
                               theme === 'dark' ? 'hover:bg-emerald-500/10 text-emerald-400' : 'hover:bg-emerald-50 text-emerald-600'
@@ -1348,15 +1390,6 @@ ECOTEC Computer Solutions`;
                             }`}
                           >
                             <Eye className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handlePaymentHistory(supplier)}
-                            className={`p-2 rounded-lg transition-colors ${
-                              theme === 'dark' ? 'hover:bg-purple-500/10 text-purple-400' : 'hover:bg-purple-50 text-purple-600'
-                            }`}
-                            title="Payment History"
-                          >
-                            <History className="w-4 h-4" />
                           </button>
                           <button 
                             onClick={() => handleOrderFromSupplier(supplier)}
@@ -1638,14 +1671,6 @@ ECOTEC Computer Solutions`;
                     <Eye className="w-4 h-4" /> View
                   </button>
                   <button 
-                    onClick={() => handlePaymentHistory(supplier)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                      theme === 'dark' ? 'bg-purple-500/10 text-purple-400 hover:bg-purple-500/20' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
-                    }`}
-                  >
-                    <History className="w-4 h-4" /> History
-                  </button>
-                  <button 
                     onClick={() => handleOrderFromSupplier(supplier)}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                       theme === 'dark' ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
@@ -1864,6 +1889,17 @@ ECOTEC Computer Solutions`;
         purchase={purchaseForPayment}
         onClose={() => setIsPurchasePaymentModalOpen(false)}
         onPayment={handlePurchasePayment}
+      />
+
+      <GRNPaymentModal
+        isOpen={isGRNPaymentModalOpen}
+        grn={grnForPayment}
+        onClose={() => {
+          setIsGRNPaymentModalOpen(false);
+          setGrnForPayment(null);
+        }}
+        onPayment={handleGRNPayment}
+        isProcessing={isProcessingGRNPayment}
       />
 
       <SupplierPaymentHistoryModal
