@@ -130,6 +130,7 @@ export const Suppliers: React.FC = () => {
   const [supplierForOrder, setSupplierForOrder] = useState<Supplier | null>(null);
   const [supplierForPaymentHistory, setSupplierForPaymentHistory] = useState<Supplier | null>(null);
   const [isProcessingGRNPayment, setIsProcessingGRNPayment] = useState(false);
+  const [supplierDetailRefreshTrigger, setSupplierDetailRefreshTrigger] = useState(0);
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -553,7 +554,7 @@ export const Suppliers: React.FC = () => {
         setGrnForPayment(null);
         
         // Refresh supplier detail modal if open
-        // The modal will re-fetch GRNs on next open
+        setSupplierDetailRefreshTrigger(prev => prev + 1);
       } else {
         throw new Error(result.error || 'Failed to record payment');
       }
@@ -1882,6 +1883,7 @@ ECOTEC Computer Solutions`;
         purchases={purchases}
         onClose={() => setIsDetailModalOpen(false)}
         onMakePayment={handleMakePurchasePayment}
+        refreshTrigger={supplierDetailRefreshTrigger}
       />
 
       <PurchasePaymentModal

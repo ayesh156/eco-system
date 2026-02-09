@@ -1,8 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import type { GoodsReceivedNote, GRNStatus, GRNItemStatus } from '../../data/mockData';
+import { useShopBranding } from '../../contexts/ShopBrandingContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useWhatsAppSettings } from '../../contexts/WhatsAppSettingsContext';
+import type { GoodsReceivedNote, GRNStatus, GRNItemStatus, Supplier } from '../../data/mockData';
 import { mockSuppliers } from '../../data/mockData';
 import PrintableGRN from '../PrintableGRN';
+import { downloadPDFFromElement, openWhatsAppWithMessage, generatePDFAsDataURL } from '../../services/clientPdfService';
+import grnService from '../../services/grnService';
+import { grnReminderService } from '../../services/reminderService';
 import {
   X,
   Package,
@@ -25,7 +31,14 @@ import {
   Percent,
   BadgePercent,
   DollarSign,
+  MoreVertical,
+  Download,
+  MessageCircle,
+  Copy,
+  Mail,
+  Bell,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface GRNViewModalProps {
   isOpen: boolean;
@@ -74,16 +87,77 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
   onPay,
 }) => {
   const { theme } = useTheme();
+  const { branding } = useShopBranding();
+  const { getAccessToken, isViewingShop, viewingShop } = useAuth();
+  const { settings: whatsAppSettings } = useWhatsAppSettings();
+  const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [showActions, setShowActions] = useState(false);
+  const [supplier, setSupplier] = useState<Supplier | null>(null);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [reminderCount, setReminderCount] = useState(0);
   const printRef = useRef<HTMLDivElement>(null);
+  const hiddenPrintRef = useRef<HTMLDivElement>(null); // Hidden ref for direct PDF generation
+  
+  // Find supplier for print when modal opens
+  useEffect(() => {
+    if (isOpen && grn) {
+      // Set reminder count from GRN
+      setReminderCount(grn.reminderCount || 0);
+      
+      // Try to find supplier from mock data first
+      const found = mockSuppliers.find(s => s.id === grn.supplierId);
+      if (found) {
+        // Even if found in mock, override email/phone with GRN data if available
+        setSupplier({
+          ...found,
+          email: grn.supplierEmail || found.email || '',
+          phone: grn.supplierPhone || found.phone || '',
+          company: grn.supplierCompany || found.company || grn.supplierName,
+        });
+      } else {
+        // Create a supplier object from GRN data (includes email/phone from API)
+        setSupplier({
+          id: grn.supplierId,
+          company: grn.supplierCompany || grn.supplierName,
+          name: grn.supplierName,
+          email: grn.supplierEmail || '',
+          phone: grn.supplierPhone || '',
+          address: '',
+          status: 'active',
+          totalOrders: 0,
+          totalPurchases: 0,
+          lastOrder: '',
+        } as Supplier);
+      }
+    }
+  }, [isOpen, grn]);
+
+  // Close actions menu on outside click
+  useEffect(() => {
+    if (!showActions) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Get the actions menu container
+      const actionsMenu = document.querySelector('[data-grn-actions-menu]');
+      if (actionsMenu && !actionsMenu.contains(target)) {
+        setShowActions(false);
+      }
+    };
+    
+    setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+    }, 0);
+    
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showActions]);
 
   if (!isOpen || !grn) return null;
 
   const statusInfo = statusConfig[grn.status];
   const StatusIcon = statusInfo.icon;
-
-  // Get supplier for print
-  const supplier = mockSuppliers.find(s => s.id === grn.supplierId);
 
   const handlePrint = () => {
     setShowPrintPreview(true);
@@ -121,6 +195,277 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
     }, 250);
   };
 
+  // Download PDF using html2canvas (client-side generation)
+  const handleDownloadPDF = async () => {
+    // Ensure print preview is shown first for the content to render
+    if (!showPrintPreview) {
+      setShowPrintPreview(true);
+      // Wait for render then retry
+      setTimeout(async () => {
+        const content = printRef.current;
+        if (content) {
+          await downloadPDFActual(content);
+        }
+      }, 300);
+      return;
+    }
+    
+    const printContent = printRef.current;
+    if (!printContent) {
+      toast.error('Cannot generate PDF', {
+        description: 'Print area not found',
+      });
+      return;
+    }
+    await downloadPDFActual(printContent);
+  };
+
+  const downloadPDFActual = async (content: HTMLDivElement) => {
+    try {
+      toast.loading('Generating PDF...', { id: 'grn-pdf-download' });
+      await downloadPDFFromElement(content, `GRN-${grn.grnNumber}.pdf`);
+      toast.success('PDF Downloaded!', {
+        id: 'grn-pdf-download',
+        description: `GRN ${grn.grnNumber} saved successfully`,
+      });
+      setShowActions(false);
+    } catch (error) {
+      console.error('Failed to download PDF:', error);
+      toast.error('Failed to download PDF', {
+        id: 'grn-pdf-download',
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+    }
+  };
+
+  // Send PDF via WhatsApp - Direct download without print preview
+  const handleWhatsAppPDF = async () => {
+    // Check for supplier phone
+    const supplierPhone = supplier?.phone?.replace(/[^0-9]/g, '') || '';
+    if (!supplierPhone) {
+      toast.error('Supplier phone number not found!', {
+        description: 'Please add a phone number to the supplier profile.',
+      });
+      return; // Don't proceed if no phone number
+    }
+
+    // Use hidden print ref for direct PDF generation (no preview needed)
+    const printElement = hiddenPrintRef.current;
+    if (!printElement) {
+      toast.error('Cannot generate PDF', {
+        description: 'Print area not found',
+      });
+      return;
+    }
+
+    try {
+      // Step 1: Download the PDF first (client-side generation)
+      toast.loading('Generating PDF...', { id: 'grn-whatsapp-pdf' });
+      await downloadPDFFromElement(printElement, `GRN-${grn.grnNumber}.pdf`);
+
+      // Step 2: Build WhatsApp message
+      const balanceDue = grn.totalAmount - (grn.paidAmount || 0);
+      const paymentStatusText = grn.paymentStatus === 'paid' ? '✅ PAID' :
+                                grn.paymentStatus === 'partial' ? '⚠️ PARTIALLY PAID' :
+                                '❌ UNPAID';
+
+      const shopName = branding?.shopName || 'Our Shop';
+      const shopAddress = branding?.address || '';
+      const shopPhone = branding?.phone || '';
+
+      const message = `📦 *GRN #${grn.grnNumber}*
+
+🏪 *${shopName}*
+${shopAddress ? `📍 ${shopAddress}` : ''}
+${shopPhone ? `📞 ${shopPhone}` : ''}
+
+🏭 *Supplier:* ${grn.supplierName}
+📅 *Date:* ${formatDate(grn.receivedDate || grn.orderDate)}
+💵 *Total:* Rs.${grn.totalAmount.toLocaleString()}
+${balanceDue > 0 ? `⚠️ *Balance Due:* Rs.${balanceDue.toLocaleString()}` : ''}
+📋 *Status:* ${paymentStatusText}
+
+📎 *Please find the GRN PDF attached.*
+
+Thank you for your service! 🙏`;
+
+      // Step 3: Open WhatsApp Web with message
+      openWhatsAppWithMessage(supplierPhone, message);
+
+      toast.success('PDF Downloaded! WhatsApp opened.', {
+        id: 'grn-whatsapp-pdf',
+        description: 'Please attach the downloaded PDF in WhatsApp',
+        duration: 5000,
+      });
+      setShowActions(false);
+    } catch (error) {
+      console.error('❌ Failed to send via WhatsApp:', error);
+      toast.error('Failed to prepare WhatsApp', {
+        id: 'grn-whatsapp-pdf',
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
+    }
+  };
+
+  // Send GRN via email to supplier - Direct send without print preview
+  const handleSendEmail = async () => {
+    // Check for supplier email
+    const supplierEmail = supplier?.email;
+    if (!supplierEmail) {
+      toast.error('Supplier email not found!', {
+        description: 'Please add an email address to the supplier profile.',
+      });
+      return;
+    }
+
+    // Use hidden print ref for direct PDF generation (no preview needed)
+    const printElement = hiddenPrintRef.current;
+    if (!printElement) {
+      toast.error('Cannot generate PDF', {
+        description: 'Print area not found',
+      });
+      return;
+    }
+
+    setIsSendingEmail(true);
+
+    try {
+      // Step 1: Generate PDF client-side as base64
+      toast.loading('Generating PDF...', { id: 'grn-email-pdf' });
+      let pdfBase64: string | undefined;
+
+      try {
+        pdfBase64 = await generatePDFAsDataURL(printElement, {
+          quality: 0.8,
+          scale: 1.5,
+          margin: 5,
+        });
+        console.log('📧 GRN PDF generated, size:', pdfBase64?.length || 0, 'bytes');
+      } catch (pdfError) {
+        console.warn('⚠️ PDF generation failed, will send email without PDF:', pdfError);
+        pdfBase64 = undefined;
+      }
+
+      toast.loading('Sending email...', { id: 'grn-email-pdf' });
+
+      // Step 2: Send email via backend with fresh token (use apiId - the database UUID)
+      const grnId = grn.apiId || grn.id;
+      console.log('📧 Sending GRN email, grnId:', grnId, 'apiId:', grn.apiId, 'id:', grn.id);
+      const token = getAccessToken();
+      const result = await grnService.sendEmailWithPDF(grnId, pdfBase64, token, effectiveShopId);
+
+      const successMessage = result.hasPdfAttachment
+        ? 'GRN sent with PDF attachment!'
+        : 'GRN sent (PDF available to download)';
+
+      toast.success(successMessage, {
+        id: 'grn-email-pdf',
+        description: `GRN #${grn.grnNumber} emailed to ${result.sentTo}`,
+      });
+      setShowActions(false);
+    } catch (error) {
+      console.error('❌ Failed to send GRN email:', error);
+      toast.error('Failed to send email', {
+        id: 'grn-email-pdf',
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // Send payment reminder via WhatsApp
+  const handleSendReminder = async (type: 'PAYMENT' | 'OVERDUE') => {
+    // Check if GRN reminders are enabled
+    if (!whatsAppSettings?.grnReminderEnabled) {
+      toast.error('GRN reminders not enabled', {
+        description: 'Please enable GRN reminders in Settings',
+      });
+      return;
+    }
+
+    // Check for supplier phone
+    const supplierPhone = supplier?.phone?.replace(/[^0-9]/g, '') || '';
+    if (!supplierPhone) {
+      toast.error('Supplier phone number not found!', {
+        description: 'Please add a phone number to the supplier profile.',
+      });
+      return;
+    }
+
+    // Get the appropriate template
+    const template = type === 'PAYMENT' 
+      ? whatsAppSettings.grnPaymentReminderTemplate 
+      : whatsAppSettings.grnOverdueReminderTemplate;
+
+    if (!template) {
+      toast.error('Reminder template not found', {
+        description: 'Please configure reminder templates in Settings',
+      });
+      return;
+    }
+
+    setIsSendingReminder(true);
+
+    try {
+      // Build message from template
+      const dueDateStr = grn.dueDate ? new Date(grn.dueDate).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }) : 'N/A';
+
+      const message = template
+        .replace(/\{\{grnNumber\}\}/g, grn.grnNumber)
+        .replace(/\{\{supplierName\}\}/g, grn.supplierName)
+        .replace(/\{\{totalAmount\}\}/g, `Rs. ${grn.totalAmount.toLocaleString()}`)
+        .replace(/\{\{balanceDue\}\}/g, `Rs. ${balanceDue.toLocaleString()}`)
+        .replace(/\{\{paidAmount\}\}/g, `Rs. ${(grn.paidAmount || 0).toLocaleString()}`)
+        .replace(/\{\{dueDate\}\}/g, dueDateStr)
+        .replace(/\{\{grnDate\}\}/g, formatDate(grn.receivedDate || grn.orderDate))
+        .replace(/\{\{receivedDate\}\}/g, formatDate(grn.receivedDate || grn.orderDate))
+        .replace(/\{\{shopName\}\}/g, branding?.shopName || 'Our Shop')
+        .replace(/\{\{shopPhone\}\}/g, branding?.phone || '')
+        .replace(/\{\{shopAddress\}\}/g, branding?.address || '');
+
+      // Open WhatsApp with message
+      openWhatsAppWithMessage(supplierPhone, message);
+
+      // Save reminder to database
+      const grnId = grn.apiId || grn.id;
+      const token = getAccessToken();
+      await grnReminderService.create(grnId, {
+        type,
+        channel: 'whatsapp',
+        message,
+        supplierPhone,
+        supplierName: grn.supplierName,
+      }, token, effectiveShopId);
+
+      // Update local count
+      setReminderCount(prev => prev + 1);
+
+      toast.success(`${type === 'PAYMENT' ? 'Payment' : 'Overdue'} reminder sent!`, {
+        description: `WhatsApp opened for ${grn.supplierName}`,
+      });
+      setShowActions(false);
+    } catch (error) {
+      console.error('❌ Failed to send reminder:', error);
+      toast.error('Failed to send reminder', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+    } finally {
+      setIsSendingReminder(false);
+    }
+  };
+
+  // Copy GRN number
+  const handleCopyGRNNumber = () => {
+    navigator.clipboard.writeText(grn.grnNumber);
+    toast.success('GRN number copied!');
+    setShowActions(false);
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -129,6 +474,9 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
       year: 'numeric',
     });
   };
+
+  // Calculate balance due
+  const balanceDue = grn.totalAmount - (grn.paidAmount || 0);
 
   // Calculate acceptance rate
   const acceptanceRate = grn.totalReceivedQuantity > 0 
@@ -164,6 +512,17 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
               <StatusIcon className="w-4 h-4" />
               {statusInfo.label}
             </span>
+            {/* Reminder Count Badge */}
+            {reminderCount > 0 && (
+              <span className={`ml-2 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 ${
+                theme === 'dark'
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                  : 'bg-amber-100 text-amber-700 border border-amber-300'
+              }`}>
+                <Bell className="w-3.5 h-3.5" />
+                {reminderCount} {reminderCount === 1 ? 'reminder' : 'reminders'}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {/* Pay Button - Show when not fully paid with animation highlight */}
@@ -177,10 +536,10 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
                 }`}
                 title="Record Payment"
               >
-                {/* Pulse animation */}
-                <span className="absolute inset-0 rounded-xl bg-white/20 animate-ping opacity-75" />
-                <DollarSign className="w-4 h-4 relative" />
-                <span className="text-sm font-semibold relative">Pay Now</span>
+                {/* Pulse animation - pointer-events-none to prevent blocking clicks */}
+                <span className="absolute inset-0 rounded-xl bg-white/20 animate-ping opacity-75 pointer-events-none" />
+                <DollarSign className="w-4 h-4 relative z-10" />
+                <span className="text-sm font-semibold relative z-10">Pay Now</span>
               </button>
             )}
             {onEdit && (
@@ -203,6 +562,83 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
             >
               <Printer className="w-5 h-5" />
             </button>
+            
+            {/* More Actions - 3-dot menu */}
+            <div className="relative" data-grn-actions-menu>
+              <button
+                onClick={() => setShowActions(!showActions)}
+                className={`p-2 rounded-lg transition-colors ${
+                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+                }`}
+                title="More Actions"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+              {showActions && (
+                <div className={`absolute right-0 mt-2 w-56 rounded-xl border shadow-xl z-20 overflow-hidden ${
+                  theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                }`}>
+                  {/* Download PDF */}
+                  <button 
+                    onClick={() => {
+                      handleDownloadPDF();
+                      setShowActions(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                      theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <Download className="w-4 h-4 text-blue-500" />
+                    <span>Download PDF</span>
+                  </button>
+
+                  {/* Send PDF via WhatsApp */}
+                  <button 
+                    onClick={() => {
+                      handleWhatsAppPDF();
+                      setShowActions(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                      theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <MessageCircle className="w-4 h-4 text-green-500" />
+                    <span>Send PDF via WhatsApp</span>
+                  </button>
+
+                  {/* Email PDF to Supplier */}
+                  <button 
+                    onClick={() => {
+                      handleSendEmail();
+                    }}
+                    disabled={isSendingEmail}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                      isSendingEmail ? 'opacity-50 cursor-not-allowed' : ''
+                    } ${
+                      theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <Mail className="w-4 h-4 text-purple-500" />
+                    <span>{isSendingEmail ? 'Sending...' : 'Email PDF to Supplier'}</span>
+                  </button>
+
+                  {/* Divider */}
+                  <div className={`border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`} />
+
+                  {/* Copy GRN Number */}
+                  <button 
+                    onClick={handleCopyGRNNumber}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                      theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <Copy className="w-4 h-4 text-slate-500" />
+                    <span>Copy GRN Number</span>
+                  </button>
+                </div>
+              )}
+            </div>
+            
             <button
               onClick={onClose}
               className={`p-2 rounded-lg transition-colors ${
@@ -519,7 +955,7 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
           )}
         </div>
 
-        {/* Footer - Total */}
+        {/* Footer - Total & Balance */}
         <div className={`px-6 py-4 border-t ${
           theme === 'dark' 
             ? 'bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border-slate-700' 
@@ -530,7 +966,7 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
               Created: {formatDate(grn.createdAt)}
               {grn.updatedAt !== grn.createdAt && ` • Updated: ${formatDate(grn.updatedAt)}`}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               {grn.discountAmount > 0 && (
                 <div className="text-right">
                   <span className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Discount:</span>
@@ -540,11 +976,42 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
                 </div>
               )}
               <div className="text-right">
-                <span className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Total Value:</span>
-                <span className={`ml-2 text-2xl font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                <span className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Total:</span>
+                <span className={`ml-2 font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                   Rs.{grn.totalAmount.toLocaleString()}
                 </span>
               </div>
+              {(grn.paidAmount || 0) > 0 && (
+                <div className="text-right">
+                  <span className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Paid:</span>
+                  <span className={`ml-2 font-semibold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                    Rs.{(grn.paidAmount || 0).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {balanceDue > 0 && (
+                <div className={`text-right px-4 py-2 rounded-xl ${
+                  theme === 'dark' 
+                    ? 'bg-red-500/10 border border-red-500/30' 
+                    : 'bg-red-50 border border-red-200'
+                }`}>
+                  <span className={`text-sm font-medium ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Balance Due:</span>
+                  <span className={`ml-2 text-xl font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
+                    Rs.{balanceDue.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {balanceDue === 0 && grn.totalAmount > 0 && (
+                <div className={`text-right px-4 py-2 rounded-xl ${
+                  theme === 'dark' 
+                    ? 'bg-emerald-500/10 border border-emerald-500/30' 
+                    : 'bg-emerald-50 border border-emerald-200'
+                }`}>
+                  <span className={`text-sm font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                    ✓ FULLY PAID
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -585,12 +1052,17 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
             {/* Print Content */}
             <div className="flex-1 overflow-auto p-6 bg-slate-600">
               <div className="mx-auto shadow-2xl">
-                <PrintableGRN ref={printRef} grn={grn} supplier={supplier} />
+                <PrintableGRN ref={printRef} grn={grn} supplier={supplier} branding={branding} />
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Hidden PrintableGRN for direct PDF generation (WhatsApp/Email) - always in DOM */}
+      <div className="fixed -left-[9999px] top-0 opacity-0 pointer-events-none">
+        <PrintableGRN ref={hiddenPrintRef} grn={grn} supplier={supplier} branding={branding} />
+      </div>
     </div>
   );
 };

@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import type { AuthRequest } from '../types/express';
 import { StockMovementType, GRNStatus, PaymentStatus, PriceChangeType } from '@prisma/client';
+import { sendGRNWithPDF, GRNEmailData } from '../services/emailService';
 
 // Helper function to get effective shopId for SuperAdmin shop viewing
 const getEffectiveShopId = (req: AuthRequest): string | null => {
@@ -40,6 +41,10 @@ export const createGRN = async (req: AuthRequest, res: Response, next: NextFunct
       referenceNo,
       date,
       expectedDate,
+      deliveryNote,
+      vehicleNumber,
+      receivedBy,
+      receivedDate,
       items, // Array of { productId, quantity, costPrice, sellingPrice? }
       discount = 0,
       tax = 0,
@@ -69,6 +74,10 @@ export const createGRN = async (req: AuthRequest, res: Response, next: NextFunct
           referenceNo,
           date: date ? new Date(date) : new Date(),
           expectedDate: expectedDate ? new Date(expectedDate) : null,
+          deliveryNote,
+          vehicleNumber,
+          receivedBy,
+          receivedDate: receivedDate ? new Date(receivedDate) : null,
           subtotal,
           tax,
           discount,
@@ -203,7 +212,7 @@ export const getGRNs = async (req: AuthRequest, res: Response, next: NextFunctio
           }
         },
         _count: {
-          select: { items: true }
+          select: { items: true, reminders: true }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -217,6 +226,7 @@ export const getGRNs = async (req: AuthRequest, res: Response, next: NextFunctio
         totalOrderedQuantity: totalQuantity,
         totalAcceptedQuantity: totalQuantity, // All accepted for now
         totalRejectedQuantity: 0, // No rejection tracking yet
+        reminderCount: grn._count.reminders, // Include reminder count
         items: undefined // Remove items from response to keep it light
       };
     });
@@ -246,6 +256,9 @@ export const getGRNById = async (req: AuthRequest, res: Response, next: NextFunc
         },
         createdBy: {
           select: { name: true }
+        },
+        _count: {
+          select: { reminders: true }
         }
       }
     });
@@ -258,7 +271,13 @@ export const getGRNById = async (req: AuthRequest, res: Response, next: NextFunc
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    res.json({ success: true, data: grn });
+    // Add reminderCount to response
+    const grnWithReminders = {
+      ...grn,
+      reminderCount: grn._count.reminders
+    };
+
+    res.json({ success: true, data: grnWithReminders });
   } catch (error) {
     next(error);
   }
@@ -372,7 +391,8 @@ export const updateGRN = async (req: AuthRequest, res: Response, next: NextFunct
 
     const { 
       notes, paymentStatus, paidAmount, status, 
-      supplierId, referenceNo, date, expectedDate, 
+      supplierId, referenceNo, date, expectedDate,
+      deliveryNote, vehicleNumber, receivedBy, receivedDate,
       discount, tax, items 
     } = req.body;
 
@@ -418,6 +438,10 @@ export const updateGRN = async (req: AuthRequest, res: Response, next: NextFunct
           referenceNo: referenceNo !== undefined ? referenceNo : existingGRN.referenceNo,
           date: date ? new Date(date) : existingGRN.date,
           expectedDate: expectedDate ? new Date(expectedDate) : existingGRN.expectedDate,
+          deliveryNote: deliveryNote !== undefined ? deliveryNote : existingGRN.deliveryNote,
+          vehicleNumber: vehicleNumber !== undefined ? vehicleNumber : existingGRN.vehicleNumber,
+          receivedBy: receivedBy !== undefined ? receivedBy : existingGRN.receivedBy,
+          receivedDate: receivedDate ? new Date(receivedDate) : existingGRN.receivedDate,
           notes: notes !== undefined ? notes : existingGRN.notes,
           paymentStatus: paymentStatus ? paymentStatus as PaymentStatus : existingGRN.paymentStatus,
           paidAmount: paidAmount !== undefined ? paidAmount : existingGRN.paidAmount,
@@ -480,6 +504,117 @@ export const updateGRN = async (req: AuthRequest, res: Response, next: NextFunct
     });
 
     res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Send GRN Email to Supplier with PDF attachment
+ * POST /api/v1/grns/:id/send-email
+ */
+export const sendGRNEmail = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { pdfBase64, includeAttachment } = req.body;
+    const shopId = getEffectiveShopId(req);
+
+    if (!shopId) {
+      return res.status(403).json({ success: false, message: 'Shop access required' });
+    }
+
+    // Find GRN with all related data
+    const grn = await prisma.gRN.findFirst({
+      where: {
+        OR: [
+          { id },
+          { grnNumber: id },
+          { grnNumber: id.replace(/^GRN-/, '') },
+        ],
+        shopId,
+      },
+      include: {
+        supplier: true,
+        shop: true,
+        items: {
+          include: {
+            product: {
+              select: { name: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!grn) {
+      return res.status(404).json({ success: false, message: 'GRN not found' });
+    }
+
+    // Check if supplier exists and has email
+    if (!grn.supplier) {
+      return res.status(400).json({ success: false, message: 'GRN has no registered supplier' });
+    }
+
+    if (!grn.supplier.email) {
+      return res.status(400).json({ success: false, message: 'Supplier does not have an email address' });
+    }
+
+    // Prepare email data
+    const emailData: GRNEmailData = {
+      email: grn.supplier.email,
+      supplierName: grn.supplier.company || grn.supplier.name,
+      grnNumber: grn.grnNumber,
+      date: grn.date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }),
+      items: grn.items.map(item => ({
+        productName: item.product?.name || 'Unknown Product',
+        quantity: item.quantity,
+        costPrice: Number(item.costPrice),
+        total: Number(item.totalCost)
+      })),
+      subtotal: Number(grn.subtotal),
+      tax: Number(grn.tax),
+      discount: Number(grn.discount),
+      totalAmount: Number(grn.totalAmount),
+      paidAmount: Number(grn.paidAmount),
+      balanceDue: Number(grn.totalAmount) - Number(grn.paidAmount),
+      paymentStatus: grn.paymentStatus,
+      shopName: grn.shop?.name || 'Shop',
+      shopSubName: grn.shop?.subName || undefined,
+      shopAddress: grn.shop?.address || undefined,
+      shopPhone: grn.shop?.phone || undefined,
+      shopEmail: grn.shop?.email || undefined,
+      shopWebsite: grn.shop?.website || undefined,
+      shopLogo: grn.shop?.logo || undefined,
+      notes: grn.notes || undefined,
+    };
+
+    // Send the email with optional PDF attachment
+    const result = await sendGRNWithPDF(
+      emailData,
+      includeAttachment ? pdfBase64 : undefined
+    );
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        success: false, 
+        message: result.error || 'Failed to send GRN email' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'GRN email sent successfully',
+      data: {
+        messageId: result.messageId,
+        sentTo: grn.supplier.email,
+        grnNumber: grn.grnNumber,
+        hasPdfAttachment: result.hasPdfAttachment || false,
+      },
+    });
   } catch (error) {
     next(error);
   }

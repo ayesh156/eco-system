@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import type { GoodsReceivedNote, GRNStatus } from '../data/mockData';
 import { GRNFormModal } from '../components/modals/GRNFormModal';
 import { GRNViewModal } from '../components/modals/GRNViewModal';
@@ -10,6 +12,8 @@ import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmation
 import { SearchableSelect } from '../components/ui/searchable-select';
 import * as grnService from '../services/grnService';
 import * as supplierService from '../services/supplierService';
+import { grnReminderService } from '../services/reminderService';
+import { openWhatsAppWithMessage } from '../services/clientPdfService';
 import type { FrontendGRN } from '../services/grnService';
 import type { FrontendSupplier } from '../services/supplierService';
 import { toast } from 'sonner';
@@ -20,7 +24,8 @@ import {
   FileText, Truck, Filter, RefreshCw, List, LayoutGrid,
   SortAsc, SortDesc, Building2, DollarSign,
   BarChart3, TrendingUp, Trash2,
-  CreditCard, Banknote, Wallet, Receipt, BadgePercent
+  CreditCard, Banknote, Wallet, Receipt, BadgePercent,
+  MessageCircle, Loader2
 } from 'lucide-react';
 
 // GRN Status config for badges (removed 'inspecting')
@@ -52,7 +57,9 @@ type ViewMode = 'grid' | 'table';
 
 export const GoodsReceived: React.FC = () => {
   const { theme } = useTheme();
-  const { isViewingShop, viewingShop } = useAuth();
+  const { isViewingShop, viewingShop, getAccessToken } = useAuth();
+  const { settings: whatsAppSettings } = useWhatsAppSettings();
+  const { branding } = useShopBranding();
   const navigate = useNavigate();
   
   // Get effective shopId for SUPER_ADMIN viewing a shop
@@ -66,6 +73,7 @@ export const GoodsReceived: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   
   // Date range filter states
   const [startDate, setStartDate] = useState('');
@@ -478,6 +486,99 @@ export const GoodsReceived: React.FC = () => {
       });
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  // Send WhatsApp reminder for GRN payment
+  const sendWhatsAppReminder = async (grn: GoodsReceivedNote) => {
+    // Check if GRN reminders are enabled
+    if (!whatsAppSettings?.grnReminderEnabled) {
+      toast.error('GRN reminders not enabled', {
+        description: 'Please enable GRN reminders in Settings',
+      });
+      return;
+    }
+
+    // Find supplier to get phone number
+    const supplier = suppliers.find(s => s.id === grn.supplierId);
+    const supplierPhone = grn.supplierPhone?.replace(/[^0-9]/g, '') || supplier?.phone?.replace(/[^0-9]/g, '') || '';
+    
+    if (!supplierPhone) {
+      toast.error('Supplier phone number not found!', {
+        description: 'Please add a phone number to the supplier profile.',
+      });
+      return;
+    }
+
+    const grnIdentifier = (grn as FrontendGRN).apiId || grn.id;
+    setSendingReminderId(grnIdentifier);
+
+    try {
+      // Get template based on payment status
+      const balanceDue = grn.totalAmount - (grn.paidAmount || 0);
+      const template = whatsAppSettings.grnPaymentReminderTemplate || '';
+
+      // Format date
+      const grnDate = new Date(grn.receivedDate || grn.orderDate).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      // Replace placeholders in template
+      const message = template
+        .replace(/\{\{grnNumber\}\}/g, grn.grnNumber)
+        .replace(/\{\{supplierName\}\}/g, grn.supplierName)
+        .replace(/\{\{totalAmount\}\}/g, `Rs. ${grn.totalAmount.toLocaleString()}`)
+        .replace(/\{\{balanceDue\}\}/g, `Rs. ${balanceDue.toLocaleString()}`)
+        .replace(/\{\{paidAmount\}\}/g, `Rs. ${(grn.paidAmount || 0).toLocaleString()}`)
+        .replace(/\{\{grnDate\}\}/g, grnDate)
+        .replace(/\{\{shopName\}\}/g, branding?.shopName || 'Our Shop')
+        .replace(/\{\{shopPhone\}\}/g, branding?.phone || '')
+        .replace(/\{\{shopAddress\}\}/g, branding?.address || '');
+
+      // Open WhatsApp with the message
+      openWhatsAppWithMessage(supplierPhone, message);
+
+      // Save reminder to database
+      let reminderCount = (grn.reminderCount || 0) + 1;
+      const token = getAccessToken();
+      
+      try {
+        const result = await grnReminderService.create(grnIdentifier, {
+          type: 'PAYMENT',
+          channel: 'whatsapp',
+          message,
+          supplierPhone,
+          supplierName: grn.supplierName,
+        }, token, effectiveShopId);
+        
+        if (result.reminderCount) {
+          reminderCount = result.reminderCount;
+        }
+      } catch (saveError) {
+        console.warn('Could not save reminder to database:', saveError);
+      }
+
+      // Update local GRN state with new reminder count
+      setGRNs(prev => prev.map(g => {
+        if ((g as FrontendGRN).apiId === grnIdentifier || g.id === grnIdentifier) {
+          return { ...g, reminderCount };
+        }
+        return g;
+      }));
+
+      toast.success('Reminder sent! 💬', {
+        description: `Reminder #${reminderCount} sent via WhatsApp`,
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Failed to send reminder:', error);
+      toast.error('Failed to send reminder', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+    } finally {
+      setSendingReminderId(null);
     }
   };
 
@@ -1150,15 +1251,27 @@ export const GoodsReceived: React.FC = () => {
                         )}
                       </div>
                     )}
-                    {/* Discount Badge */}
-                    {((grn.totalDiscount || 0) + (grn.discountAmount || 0)) > 0 && (
-                      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${theme === 'dark' ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
-                        <BadgePercent className="w-3.5 h-3.5 text-orange-500" />
-                        <span className="text-xs font-medium text-orange-500">
-                          -{formatCurrency((grn.totalDiscount || 0) + (grn.discountAmount || 0))}
-                        </span>
-                      </div>
-                    )}
+                    {/* Discount Badge - Always Show */}
+                    {(() => {
+                      const totalDiscount = (grn.totalDiscount || 0) + (grn.discountAmount || 0);
+                      const hasDiscount = totalDiscount > 0;
+                      return (
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${
+                          hasDiscount 
+                            ? (theme === 'dark' ? 'bg-orange-500/10' : 'bg-orange-50')
+                            : (theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-100')
+                        }`}>
+                          <BadgePercent className={`w-3.5 h-3.5 ${
+                            hasDiscount ? 'text-orange-500' : (theme === 'dark' ? 'text-slate-500' : 'text-slate-400')
+                          }`} />
+                          <span className={`text-xs font-medium ${
+                            hasDiscount ? 'text-orange-500' : (theme === 'dark' ? 'text-slate-500' : 'text-slate-400')
+                          }`}>
+                            {hasDiscount ? `-${formatCurrency(totalDiscount)}` : 'Rs. 0'}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -1204,6 +1317,38 @@ export const GoodsReceived: React.FC = () => {
                     >
                       <DollarSign className="w-4 h-4" />
                       Pay
+                    </button>
+                  )}
+                  {/* Send Reminder Button - Show when GRN reminders enabled and not fully paid */}
+                  {whatsAppSettings?.grnReminderEnabled && grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sendWhatsAppReminder(grn);
+                      }}
+                      disabled={sendingReminderId === ((grn as FrontendGRN).apiId || grn.id)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors relative ${
+                        sendingReminderId === ((grn as FrontendGRN).apiId || grn.id)
+                          ? 'opacity-70 cursor-wait'
+                          : ''
+                      } ${
+                        theme === 'dark' 
+                          ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                          : 'bg-green-100 hover:bg-green-200 text-green-700'
+                      }`}
+                    >
+                      {sendingReminderId === ((grn as FrontendGRN).apiId || grn.id) ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <MessageCircle className="w-4 h-4" />
+                      )}
+                      {sendingReminderId === ((grn as FrontendGRN).apiId || grn.id) ? '...' : '💬'}
+                      {/* Reminder count badge */}
+                      {grn.reminderCount !== undefined && grn.reminderCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-green-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                          {grn.reminderCount}
+                        </span>
+                      )}
                     </button>
                   )}
                   <button
@@ -1324,16 +1469,26 @@ export const GoodsReceived: React.FC = () => {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {((grn.totalDiscount || 0) + (grn.discountAmount || 0)) > 0 ? (
-                          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg ${theme === 'dark' ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
-                            <BadgePercent className="w-3.5 h-3.5 text-orange-500" />
-                            <span className="text-xs font-medium text-orange-500">
-                              {formatCurrency((grn.totalDiscount || 0) + (grn.discountAmount || 0))}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>-</span>
-                        )}
+                        {(() => {
+                          const totalDiscount = (grn.totalDiscount || 0) + (grn.discountAmount || 0);
+                          const hasDiscount = totalDiscount > 0;
+                          return (
+                            <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg ${
+                              hasDiscount 
+                                ? (theme === 'dark' ? 'bg-orange-500/10' : 'bg-orange-50')
+                                : (theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-100')
+                            }`}>
+                              <BadgePercent className={`w-3.5 h-3.5 ${
+                                hasDiscount ? 'text-orange-500' : (theme === 'dark' ? 'text-slate-500' : 'text-slate-400')
+                              }`} />
+                              <span className={`text-xs font-medium ${
+                                hasDiscount ? 'text-orange-500' : (theme === 'dark' ? 'text-slate-500' : 'text-slate-400')
+                              }`}>
+                                {hasDiscount ? formatCurrency(totalDiscount) : 'Rs. 0'}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${grnStatusConfig[grn.status].bgColor} ${grnStatusConfig[grn.status].color}`}>

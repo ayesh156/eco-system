@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { 
   Bell, Palette, MessageCircle, Info, Copy, Check, 
   Moon, Sun, Sparkles,
-  Mail, Building2, Save,
+  Mail, Building2, Save, Package,
   RefreshCw, Eye, EyeOff, CheckCircle2, AlertCircle, Clock,
   Smartphone, Laptop, SendHorizontal, Settings2, FileText, RotateCcw,
   Users, Layers, Search, Edit, Key, UserPlus, UserCog,
@@ -51,7 +51,7 @@ type RoleFilter = 'all' | 'MANAGER' | 'STAFF';
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, isViewingShop, viewingShop, getAccessToken } = useAuth();
-  const { settings: whatsAppSettings, shopDetails, updateSettings, saveSettings, resetToDefaults, isSaving: whatsAppSaving } = useWhatsAppSettings();
+  const { settings: whatsAppSettings, shopDetails, updateSettings, saveSettings, resetToDefaults, resetGrnToDefaults, isSaving: whatsAppSaving } = useWhatsAppSettings();
   const { branding, saveBranding, hasUnsavedChanges: brandingHasUnsavedChanges } = useShopBranding();
   const { settings: taxSettings, updateSettings: updateTaxSettings, saveSettings: saveTaxSettings } = useTaxSettings();
   const { 
@@ -77,9 +77,10 @@ export const Settings: React.FC = () => {
   const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
   
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'invoice' | 'sections' | 'branding' | 'users'>('appearance');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'grn' | 'invoice' | 'sections' | 'branding' | 'users'>('appearance');
   const [showPreview, setShowPreview] = useState(false);
   const [previewType, setPreviewType] = useState<'payment' | 'overdue'>('payment');
+  const [grnPreviewType, setGrnPreviewType] = useState<'payment' | 'overdue'>('payment');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -1048,7 +1049,8 @@ export const Settings: React.FC = () => {
   const generalTabs = [
     { id: 'appearance' as const, label: 'Appearance', icon: Palette, color: 'emerald' },
     { id: 'profile' as const, label: 'Business Profile', icon: Building2, color: 'purple', businessOnly: true },
-    { id: 'notifications' as const, label: 'Notifications', icon: Bell, color: 'amber', businessOnly: true },
+    { id: 'notifications' as const, label: 'WhatsApp Reminders', icon: MessageCircle, color: 'green', businessOnly: true },
+    { id: 'grn' as const, label: 'GRN Settings', icon: Package, color: 'teal', businessOnly: true },
     { id: 'invoice' as const, label: 'Invoice Settings', icon: FileText, color: 'blue', businessOnly: true },
   ];
 
@@ -1988,6 +1990,198 @@ export const Settings: React.FC = () => {
                   </h3>
                   <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     Enable WhatsApp reminders to customize message templates and send payment reminders to customers.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========== GRN SETTINGS TAB ========== */}
+        {activeTab === 'grn' && canViewBusinessSettings && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* ========== GRN REMINDER TEMPLATES ========== */}
+            <div className={`rounded-3xl border overflow-hidden ${
+              theme === 'dark' 
+                ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
+                : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
+            }`}>
+              <div className="relative h-24 bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600">
+                <div className="absolute inset-0 flex items-center px-6">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
+                      <Package className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">GRN Reminder Templates</h2>
+                      <p className="text-emerald-100 text-sm">Send WhatsApp payment reminders to suppliers for GRNs</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateSettings({ grnReminderEnabled: !whatsAppSettings.grnReminderEnabled })}
+                    className={`relative w-20 h-10 rounded-full transition-all duration-300 ${
+                      whatsAppSettings.grnReminderEnabled 
+                        ? 'bg-white/30' 
+                        : 'bg-black/20'
+                    }`}
+                  >
+                    <div className={`absolute top-1 w-8 h-8 rounded-full transition-all duration-300 flex items-center justify-center ${
+                      whatsAppSettings.grnReminderEnabled 
+                        ? 'translate-x-11 bg-white' 
+                        : 'translate-x-1 bg-white/60'
+                    }`}>
+                      {whatsAppSettings.grnReminderEnabled ? (
+                        <Check className="w-5 h-5 text-emerald-600" />
+                      ) : (
+                        <span className="w-5 h-5" />
+                      )}
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {whatsAppSettings.grnReminderEnabled && (
+                <div className="p-6 space-y-6">
+                  {/* GRN Placeholders */}
+                  <div className={`rounded-2xl p-4 ${
+                    theme === 'dark' ? 'bg-slate-800/50' : 'bg-gradient-to-r from-teal-50 to-emerald-50'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Info className="w-5 h-5 text-emerald-500" />
+                      <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                        GRN Template Placeholders
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: '{{grnNumber}}', desc: 'GRN reference number' },
+                        { key: '{{supplierName}}', desc: 'Supplier name' },
+                        { key: '{{totalAmount}}', desc: 'Total GRN amount' },
+                        { key: '{{paidAmount}}', desc: 'Amount paid' },
+                        { key: '{{balanceDue}}', desc: 'Remaining balance' },
+                        { key: '{{grnDate}}', desc: 'GRN date' },
+                        { key: '{{shopName}}', desc: 'Your shop name' },
+                        { key: '{{shopPhone}}', desc: 'Shop phone' },
+                        { key: '{{shopAddress}}', desc: 'Shop address' },
+                      ].map(({ key }) => (
+                        <button
+                          key={key}
+                          onClick={() => copyPlaceholder(key)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all ${
+                            copiedPlaceholder === key
+                              ? 'bg-emerald-500 text-white'
+                              : theme === 'dark' 
+                                ? 'bg-slate-700/50 text-emerald-400 hover:bg-slate-700' 
+                                : 'bg-white text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
+                          }`}
+                        >
+                          {copiedPlaceholder === key ? '✓ Copied!' : key}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Template Tabs */}
+                  <div className="flex gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/50">
+                    <button
+                      onClick={() => setGrnPreviewType('payment')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium transition-all ${
+                        grnPreviewType === 'payment'
+                          ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-400'
+                          : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      💳 Payment Reminder
+                    </button>
+                    <button
+                      onClick={() => setGrnPreviewType('overdue')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-medium transition-all ${
+                        grnPreviewType === 'overdue'
+                          ? 'bg-white dark:bg-slate-700 shadow-sm text-amber-600 dark:text-amber-400'
+                          : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      📋 Balance Reminder
+                    </button>
+                  </div>
+
+                  {/* Template Editor */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                        {grnPreviewType === 'payment' ? '💳 GRN Payment Reminder' : '📋 GRN Balance Reminder'}
+                      </label>
+                      <button
+                        onClick={() => {
+                          if (confirm('Reset GRN templates to defaults?')) {
+                            resetGrnToDefaults();
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all ${
+                          theme === 'dark' ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                        }`}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Reset
+                      </button>
+                    </div>
+                    <textarea
+                      value={grnPreviewType === 'payment' ? whatsAppSettings.grnPaymentReminderTemplate : whatsAppSettings.grnOverdueReminderTemplate}
+                      onChange={(e) => updateSettings(grnPreviewType === 'payment' ? { grnPaymentReminderTemplate: e.target.value } : { grnOverdueReminderTemplate: e.target.value })}
+                      rows={12}
+                      className={`w-full px-4 py-3 rounded-xl border font-mono text-sm leading-relaxed transition-all resize-none whitespace-pre-wrap ${
+                        theme === 'dark' 
+                          ? 'bg-slate-800/50 border-slate-700 text-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20' 
+                          : 'bg-white border-slate-200 text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
+                      }`}
+                      placeholder="Enter your GRN reminder message template..."
+                    />
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end pt-4">
+                    <button
+                      onClick={handleWhatsAppSave}
+                      disabled={whatsAppSaving}
+                      className={`relative px-8 py-3 rounded-xl font-semibold text-white transition-all overflow-hidden ${
+                        saveSuccess 
+                          ? 'bg-green-500' 
+                          : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 hover:shadow-lg hover:shadow-emerald-500/30'
+                      }`}
+                    >
+                      {whatsAppSaving ? (
+                        <span className="flex items-center gap-2">
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                          Saving...
+                        </span>
+                      ) : saveSuccess ? (
+                        <span className="flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5" />
+                          Saved!
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Save className="w-5 h-5" />
+                          Save GRN Templates
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!whatsAppSettings.grnReminderEnabled && (
+                <div className="p-8 text-center">
+                  <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+                    theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
+                  }`}>
+                    <Package className={`w-10 h-10 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`} />
+                  </div>
+                  <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    GRN Reminders Disabled
+                  </h3>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Enable GRN reminders to send payment reminders and balance notifications to suppliers.
                   </p>
                 </div>
               )}

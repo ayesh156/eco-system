@@ -39,9 +39,86 @@ interface GRNFormModalProps {
   isLoadingProducts?: boolean;
 }
 
-// Skeleton Loader Component
-const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <div className={`animate-pulse bg-slate-700/50 rounded ${className}`} />
+// Modern Skeleton Loader Component with shimmer effect
+const Skeleton: React.FC<{ className?: string; dark?: boolean }> = ({ className = '', dark = true }) => (
+  <div className={`relative overflow-hidden rounded animate-pulse ${dark ? 'bg-slate-700/50' : 'bg-slate-200/70'} ${className}`}>
+    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+  </div>
+);
+
+// Supplier Skeleton List Component
+const SupplierSkeletonList: React.FC<{ theme: string; count?: number }> = ({ theme, count = 4 }) => (
+  <div className={`absolute z-10 w-full mt-1 rounded-xl border shadow-xl overflow-hidden ${
+    theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+  }`}>
+    <div className="p-2 space-y-1">
+      {Array.from({ length: count }).map((_, i) => (
+        <div 
+          key={i} 
+          className={`flex items-center gap-3 p-3 rounded-lg ${
+            theme === 'dark' ? 'bg-slate-700/30' : 'bg-slate-50'
+          }`}
+        >
+          <Skeleton className="w-8 h-8 rounded-full" dark={theme === 'dark'} />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-3/4" dark={theme === 'dark'} />
+            <Skeleton className="h-2.5 w-1/2" dark={theme === 'dark'} />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Product Skeleton List Component
+const ProductSkeletonList: React.FC<{ theme: string; count?: number }> = ({ theme, count = 3 }) => (
+  <div className="space-y-3">
+    {Array.from({ length: count }).map((_, i) => (
+      <div 
+        key={i}
+        className={`p-4 rounded-xl border ${
+          theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'
+        }`}
+      >
+        <div className="grid grid-cols-12 gap-4 mb-4">
+          <div className="col-span-12 md:col-span-5">
+            <Skeleton className="h-2.5 w-16 mb-2" dark={theme === 'dark'} />
+            <div className={`flex items-center gap-2 p-3 rounded-lg ${
+              theme === 'dark' ? 'bg-slate-800 border border-slate-600' : 'bg-white border border-slate-200'
+            }`}>
+              <Skeleton className="w-5 h-5 rounded" dark={theme === 'dark'} />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3 w-2/3" dark={theme === 'dark'} />
+                <Skeleton className="h-2 w-1/3" dark={theme === 'dark'} />
+              </div>
+            </div>
+          </div>
+          <div className="col-span-4 md:col-span-2">
+            <Skeleton className="h-2.5 w-12 mb-2" dark={theme === 'dark'} />
+            <Skeleton className="h-10 w-full rounded-lg" dark={theme === 'dark'} />
+          </div>
+          <div className="col-span-4 md:col-span-2">
+            <Skeleton className="h-2.5 w-14 mb-2" dark={theme === 'dark'} />
+            <Skeleton className="h-10 w-full rounded-lg" dark={theme === 'dark'} />
+          </div>
+          <div className="col-span-4 md:col-span-2">
+            <Skeleton className="h-2.5 w-14 mb-2" dark={theme === 'dark'} />
+            <Skeleton className="h-10 w-full rounded-lg" dark={theme === 'dark'} />
+          </div>
+        </div>
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-6 md:col-span-3">
+            <Skeleton className="h-2.5 w-16 mb-2" dark={theme === 'dark'} />
+            <Skeleton className="h-10 w-full rounded-lg" dark={theme === 'dark'} />
+          </div>
+          <div className="col-span-6 md:col-span-3">
+            <Skeleton className="h-2.5 w-10 mb-2" dark={theme === 'dark'} />
+            <Skeleton className="h-10 w-full rounded-lg" dark={theme === 'dark'} />
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
 );
 
 // Modern Date Picker Component
@@ -538,22 +615,26 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
               {/* Supplier & Dates Row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Supplier Selection */}
-                <div>
+                <div className="relative">
                   <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                     <Truck className="w-4 h-4 inline mr-2" />
                     Supplier *
                   </label>
                   {isLoadingSuppliers ? (
-                    <div className={`w-full h-12 rounded-xl flex items-center gap-3 px-4 ${
-                      theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-slate-50 border border-slate-200'
-                    }`}>
-                      <Skeleton className="w-6 h-6 rounded-full" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-3 w-3/4" />
-                        <Skeleton className="h-2 w-1/2" />
+                    <>
+                      <div className={`w-full h-12 rounded-xl flex items-center gap-3 px-4 border ${
+                        theme === 'dark' 
+                          ? 'bg-slate-800/50 border-emerald-500/50' 
+                          : 'bg-slate-50 border-emerald-500/50'
+                      }`}>
+                        <Search className={`w-5 h-5 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                        <span className={`flex-1 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                          Loading suppliers...
+                        </span>
+                        <Loader2 className={`w-5 h-5 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
                       </div>
-                      <Loader2 className={`w-4 h-4 animate-spin ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
-                    </div>
+                      <SupplierSkeletonList theme={theme} count={4} />
+                    </>
                   ) : (
                     <SearchableSelect
                       value={formData.supplierId || ''}
@@ -713,7 +794,17 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
               </div>
 
               {/* Items List */}
-              {items.length === 0 ? (
+              {isLoadingProducts && items.length === 0 ? (
+                <div className="space-y-4">
+                  <div className={`flex items-center gap-3 p-4 rounded-xl border ${
+                    theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <Loader2 className={`w-5 h-5 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Loading products...</span>
+                  </div>
+                  <ProductSkeletonList theme={theme} count={2} />
+                </div>
+              ) : items.length === 0 ? (
                 <div className={`text-center py-12 rounded-xl border-2 border-dashed ${
                   theme === 'dark' ? 'border-slate-700 text-slate-500' : 'border-slate-200 text-slate-400'
                 }`}>

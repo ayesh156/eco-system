@@ -962,6 +962,37 @@ model InvoiceReminder {
 }
 ```
 
+#### GRNReminder Model
+```prisma
+model GRNReminder {
+  id            String   @id @default(uuid())
+  grnId         String
+  shopId        String
+  type          String   // 'PAYMENT' | 'OVERDUE'
+  channel       String   @default("whatsapp")
+  sentAt        DateTime @default(now())
+  message       String?
+  supplierPhone String?
+  supplierName  String?
+  createdAt     DateTime @default(now())
+
+  grn           GRN      @relation(fields: [grnId], references: [id])
+  shop          Shop     @relation(fields: [shopId], references: [id])
+}
+```
+
+#### GRN Reminder API Endpoints
+- **GET `/api/v1/grns/:id/reminders`** - Get all reminders for a GRN
+- **POST `/api/v1/grns/:id/reminders`** - Create a new GRN reminder
+
+#### GRN Reminder WhatsApp Settings (Shop model)
+```prisma
+// Added to Shop model:
+grnReminderEnabled          Boolean? @default(false)
+grnPaymentReminderTemplate  String?  // Template with {grnNumber}, {supplierName}, {balanceDue}, etc.
+grnOverdueReminderTemplate  String?
+```
+
 ### 🚀 Running the Project
 
 #### Backend (Port 3001)
@@ -996,6 +1027,9 @@ cd backend && npm run build
 4. **Customer Phone Lookup**: Check both cached customers and invoice's embedded customer data
 5. **Reminder Service API URL**: The `reminderService.ts` strips `/api/v1` suffix from `VITE_API_URL` since endpoints include the full path
 6. **Invoice Customer Type**: The `Invoice.customer` is a minimal embedded type `{ id, name, email?, phone }`, not the full `Customer` interface
+7. **GRN Reminder Button Visibility**: Check `whatsAppSettings.grnReminderEnabled` and `grn.paymentStatus !== 'paid'` before showing GRN reminder buttons
+8. **GRN ID vs API ID**: Use `grn.apiId` for API calls, `grn.grnNumber` for display
+9. **GRN Reminder Templates**: Use placeholders `{grnNumber}`, `{supplierName}`, `{totalAmount}`, `{balanceDue}`, `{paidAmount}`, `{dueDate}`, `{receivedDate}`, `{shopName}`, `{shopPhone}`
 
 ---
 

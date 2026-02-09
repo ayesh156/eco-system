@@ -2,9 +2,14 @@
 
 // WhatsApp Message Settings
 export interface WhatsAppSettings {
+  // Invoice Reminders
   paymentReminderTemplate: string;
   overdueReminderTemplate: string;
   enabled: boolean;
+  // GRN/Supplier Reminders
+  grnReminderEnabled: boolean;
+  grnPaymentReminderTemplate: string;
+  grnOverdueReminderTemplate: string;
 }
 
 // Creative Default WhatsApp message templates with placeholders - Sri Lankan context
@@ -53,7 +58,51 @@ Best regards,
 📞 {{shopPhone}}
 📍 {{shopAddress}}
 🌐 {{shopWebsite}}`,
-  enabled: true
+  enabled: true,
+  // GRN/Supplier Reminder Templates
+  grnReminderEnabled: true,
+  grnPaymentReminderTemplate: `Hello! 👋
+
+Greetings from *{{shopName}}*!
+
+This is a friendly notification regarding your GRN payment:
+
+📄 *GRN Number:* #{{grnNumber}}
+🏢 *Supplier:* {{supplierName}}
+💰 *Total Amount:* {{totalAmount}}
+✅ *Paid:* {{paidAmount}}
+⏳ *Balance Due:* {{balanceDue}}
+📅 *GRN Date:* {{grnDate}}
+
+We will process the remaining payment as per our agreement.
+
+For any queries, please contact us.
+
+Thank you for your partnership! 🙏
+
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}`,
+  grnOverdueReminderTemplate: `🚨 *URGENT: Payment Overdue*
+
+Dear {{supplierName}},
+
+This is an urgent reminder regarding the *overdue* payment for:
+
+📄 *GRN Number:* #{{grnNumber}}
+📅 *GRN Date:* {{grnDate}}
+💰 *Total Amount:* {{totalAmount}}
+✅ *Paid:* {{paidAmount}}
+⏳ *Balance Due:* {{balanceDue}}
+
+⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.
+
+For any queries or to discuss payment arrangements, please contact us immediately.
+
+Best regards,
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}`
 };
 
 export interface Product {
@@ -2200,6 +2249,9 @@ export interface GoodsReceivedNote {
   grnNumber: string; // GRN-2026-0001 format
   supplierId: string;
   supplierName: string;
+  supplierEmail?: string;
+  supplierPhone?: string;
+  supplierCompany?: string;
   purchaseOrderId?: string; // Reference to PO if exists
   // Dates
   orderDate: string;
@@ -2234,6 +2286,9 @@ export interface GoodsReceivedNote {
   driverName?: string;
   // Payment linking
   linkedPurchaseId?: string;
+  dueDate?: string; // Payment due date for reminders
+  // Reminders
+  reminderCount?: number; // Number of reminders sent
   // Notes
   notes?: string;
   internalNotes?: string;

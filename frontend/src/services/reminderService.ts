@@ -158,4 +158,113 @@ export const reminderService = {
   },
 };
 
+// ==========================================
+// GRN REMINDER SERVICE
+// ==========================================
+
+export interface GRNReminder {
+  id: string;
+  grnId: string;
+  shopId: string;
+  type: 'PAYMENT' | 'OVERDUE';
+  channel: string;
+  sentAt: string;
+  message: string | null;
+  supplierPhone: string | null;
+  supplierName: string | null;
+  createdAt: string;
+}
+
+export interface CreateGRNReminderRequest {
+  type: 'PAYMENT' | 'OVERDUE';
+  channel?: string;
+  message?: string;
+  supplierPhone?: string;
+  supplierName?: string;
+  shopId?: string;
+}
+
+export interface GRNReminderListResponse {
+  success: boolean;
+  data: GRNReminder[];
+  reminderCount?: number;
+}
+
+export interface CreateGRNReminderResponse {
+  success: boolean;
+  data: GRNReminder;
+  reminderCount?: number;
+  message?: string;
+}
+
+export const grnReminderService = {
+  /**
+   * Get all reminders for a GRN
+   */
+  async getByGRN(grnId: string, shopId?: string): Promise<{ reminders: GRNReminder[]; reminderCount: number }> {
+    let url = `${API_BASE_URL}/api/v1/grns/${grnId}/reminders`;
+    if (shopId) {
+      url += `?shopId=${shopId}`;
+    }
+    console.log('🔍 Fetching GRN reminders from:', url);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Failed to fetch GRN reminders:', response.status, errorData);
+      throw new Error(errorData.error || `Failed to fetch reminders: ${response.statusText}`);
+    }
+    
+    const data: GRNReminderListResponse = await response.json();
+    console.log('✅ GRN Reminders loaded:', data);
+    
+    if (!data.success) {
+      throw new Error('Failed to fetch GRN reminders');
+    }
+    
+    return {
+      reminders: data.data,
+      reminderCount: data.reminderCount ?? data.data.length,
+    };
+  },
+
+  /**
+   * Create a new reminder for a GRN
+   */
+  async create(grnId: string, reminder: CreateGRNReminderRequest): Promise<{ reminder: GRNReminder; reminderCount: number }> {
+    let url = `${API_BASE_URL}/api/v1/grns/${grnId}/reminders`;
+    if (reminder.shopId) {
+      url += `?shopId=${reminder.shopId}`;
+    }
+    console.log('📤 Creating GRN reminder:', url, reminder);
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(reminder),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to create GRN reminder: ${response.statusText}`);
+    }
+    
+    const data: CreateGRNReminderResponse = await response.json();
+    console.log('✅ GRN Reminder created:', data);
+    
+    if (!data.success) {
+      throw new Error('Failed to create GRN reminder');
+    }
+    
+    return {
+      reminder: data.data,
+      reminderCount: data.reminderCount ?? 1,
+    };
+  },
+};
+
 export default reminderService;

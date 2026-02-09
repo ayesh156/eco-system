@@ -38,10 +38,15 @@ model Shop {
   // Status
   isActive      Boolean   @default(true)
   
-  // WhatsApp Reminder Templates
+  // WhatsApp Reminder Templates (Invoice)
   reminderEnabled           Boolean   @default(true)
   paymentReminderTemplate   String?   @db.Text
   overdueReminderTemplate   String?   @db.Text
+  
+  // WhatsApp Reminder Templates (GRN/Supplier)
+  grnReminderEnabled        Boolean   @default(true)
+  grnPaymentReminderTemplate String?  @db.Text
+  grnOverdueReminderTemplate String?  @db.Text
   
   // Section Visibility (JSON array of hidden section paths)
   // hiddenSections: SuperAdmin managed - hidden from ADMIN + USER
@@ -61,6 +66,7 @@ model Shop {
   products      Product[]
   invoices      Invoice[]
   invoiceReminders InvoiceReminder[]
+  grnReminders     GRNReminder[]
   suppliers     Supplier[]
   grns          GRN[]
   grnPayments   GRNPayment[]
@@ -653,6 +659,41 @@ enum ReminderType {
 }
 
 // ==========================================
+// GRN REMINDER MANAGEMENT
+// ==========================================
+
+model GRNReminder {
+  id            String        @id @default(cuid())
+  
+  // GRN relation
+  grnId         String
+  grn           GRN           @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  
+  // Shop relation
+  shopId        String
+  shop          Shop          @relation(fields: [shopId], references: [id])
+  
+  // Reminder details
+  type          ReminderType  @default(PAYMENT)
+  channel       String        @default("whatsapp")  // whatsapp, sms, email
+  sentAt        DateTime      @default(now())
+  
+  // Message content
+  message       String?       @db.Text
+  
+  // Supplier info at time of send
+  supplierPhone String?
+  supplierName  String?
+  
+  createdAt     DateTime      @default(now())
+
+  @@index([grnId])
+  @@index([shopId])
+  @@index([sentAt])
+  @@map("grn_reminders")
+}
+
+// ==========================================
 // SUPPLIER MANAGEMENT
 // ==========================================
 
@@ -698,8 +739,12 @@ model GRN {
   
   // Details
   referenceNo   String?   // Supplier's Invoice Number
-  date          DateTime  @default(now())
-  expectedDate  DateTime?
+  deliveryNote  String?   // Delivery note number (8-digit)
+  vehicleNumber String?   // Vehicle plate number
+  receivedBy    String?   // Name of person who received
+  date          DateTime  @default(now())  // Order date
+  expectedDate  DateTime?                   // Expected delivery date
+  receivedDate  DateTime?                   // Actual received date
   
   // Amounts
   subtotal      Float
@@ -723,6 +768,7 @@ model GRN {
 
   items         GRNItem[]
   payments      GRNPayment[]
+  reminders     GRNReminder[]
 
   @@unique([shopId, grnNumber])
   @@index([shopId])

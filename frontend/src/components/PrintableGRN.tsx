@@ -887,6 +887,14 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
               <span className="value">{formatCurrency(grn.totalAmount)}</span>
             </div>
             
+            {/* Paid Amount Row - for partial payments */}
+            {(grn.paidAmount || 0) > 0 && grn.paymentStatus !== 'paid' && (
+              <div className="totals-row">
+                <span className="label">Paid Amount:</span>
+                <span className="value" style={{ color: '#059669' }}>{formatCurrency(grn.paidAmount || 0)}</span>
+              </div>
+            )}
+            
             {/* Payment Info */}
             {grn.paymentMethod && (
               <div className="payment-info">
@@ -897,16 +905,25 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
                     {grn.paymentStatus === 'paid' ? 'PAID' : grn.paymentStatus === 'partial' ? 'PARTIAL' : 'UNPAID'}
                   </span>
                 </div>
-                {grn.paymentStatus === 'partial' && grn.paidAmount && (
-                  <div style={{ fontSize: '8pt', marginTop: '4px', color: '#666' }}>
-                    Paid: {formatCurrency(grn.paidAmount)} | 
-                    Balance: {formatCurrency(grn.totalAmount - grn.paidAmount)}
-                  </div>
-                )}
               </div>
             )}
           </div>
         </div>
+
+        {/* Balance Due Section - Prominent box like in image */}
+        {grn.paymentStatus !== 'paid' && (grn.totalAmount - (grn.paidAmount || 0)) > 0 && (
+          <div className="balance-due-box">
+            <span className="balance-label">⚠ BALANCE DUE:</span>
+            <span className="balance-amount">{formatCurrency(grn.totalAmount - (grn.paidAmount || 0))}</span>
+          </div>
+        )}
+
+        {/* Fully Paid Box */}
+        {grn.paymentStatus === 'paid' && (
+          <div className="fully-paid-box">
+            <span className="paid-label">✓ FULLY PAID</span>
+          </div>
+        )}
 
         {/* Notes */}
         {grn.notes && (

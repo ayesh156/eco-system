@@ -4116,7 +4116,7 @@ Best regards,
       const userId = getUserIdFromToken(req);
       if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
 
-      const { supplierId, referenceNo, date, expectedDate, items, discount = 0, tax = 0, notes, paymentStatus = 'UNPAID', paidAmount = 0 } = body;
+      const { supplierId, referenceNo, date, expectedDate, deliveryNote, vehicleNumber, receivedBy, receivedDate, items, discount = 0, tax = 0, notes, paymentStatus = 'UNPAID', paidAmount = 0 } = body;
       
       const subtotal = items.reduce((sum: number, item: any) => sum + (item.quantity * item.costPrice), 0);
       const totalAmount = subtotal + tax - discount;
@@ -4131,6 +4131,8 @@ Best regards,
             shopId, grnNumber, supplierId, referenceNo,
             date: date ? new Date(date) : new Date(),
             expectedDate: expectedDate ? new Date(expectedDate) : null,
+            deliveryNote, vehicleNumber, receivedBy,
+            receivedDate: receivedDate ? new Date(receivedDate) : null,
             subtotal, tax, discount, totalAmount, paidAmount,
             status: 'COMPLETED', paymentStatus, notes, createdById: userId
           }
@@ -4206,7 +4208,7 @@ Best regards,
       if (!grn) return res.status(404).json({ success: false, message: 'GRN not found' });
       if (grn.shopId !== shopId) return res.status(403).json({ success: false, message: 'Access denied' });
 
-      const { notes, paymentStatus, paidAmount, status } = req.body;
+      const { notes, paymentStatus, paidAmount, status, deliveryNote, vehicleNumber, receivedBy, receivedDate } = req.body;
 
       const updated = await db.gRN.update({
         where: { id: grnIdMatch[1] },
@@ -4214,7 +4216,11 @@ Best regards,
           notes: notes !== undefined ? notes : grn.notes,
           paymentStatus: paymentStatus || grn.paymentStatus,
           paidAmount: paidAmount !== undefined ? paidAmount : grn.paidAmount,
-          status: status || grn.status
+          status: status || grn.status,
+          deliveryNote: deliveryNote !== undefined ? deliveryNote : grn.deliveryNote,
+          vehicleNumber: vehicleNumber !== undefined ? vehicleNumber : grn.vehicleNumber,
+          receivedBy: receivedBy !== undefined ? receivedBy : grn.receivedBy,
+          receivedDate: receivedDate ? new Date(receivedDate) : grn.receivedDate
         },
         include: {
           supplier: true,
@@ -4425,6 +4431,256 @@ Best regards,
       ]);
 
       return res.status(200).json({ success: true, data: updated, message: 'Payment recorded successfully' });
+    }
+
+    // GRN SEND EMAIL - Send GRN email to supplier with PDF attachment
+    const grnSendEmailMatch = path.match(/^\/api\/v1\/grns\/([^/]+)\/send-email$/);
+    if (grnSendEmailMatch && method === 'POST') {
+      const shopId = getEffectiveShopId(req, query);
+      if (!shopId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+      const grnIdOrNumber = grnSendEmailMatch[1];
+      const { pdfBase64, includeAttachment } = body;
+
+      // Find GRN with related data
+      const grn = await db.gRN.findFirst({
+        where: {
+          OR: [
+            { id: grnIdOrNumber },
+            { grnNumber: grnIdOrNumber },
+            { grnNumber: grnIdOrNumber.replace('GRN-', '') }
+          ],
+          shopId
+        },
+        include: {
+          supplier: true,
+          shop: true,
+          items: { include: { product: { select: { name: true } } } }
+        }
+      });
+
+      if (!grn) return res.status(404).json({ success: false, message: 'GRN not found' });
+      if (!grn.supplier) return res.status(400).json({ success: false, message: 'GRN has no registered supplier' });
+      if (!grn.supplier.email) return res.status(400).json({ success: false, message: 'Supplier does not have an email address' });
+
+      // Create email transporter
+      const transporter = createEmailTransporter();
+      if (!transporter) {
+        // Dev mode fallback
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📧 [DEV MODE] GRN email would be sent to:', grn.supplier.email);
+          return res.status(200).json({
+            success: true,
+            message: 'GRN email sent (dev mode)',
+            data: {
+              sentTo: grn.supplier.email,
+              grnNumber: grn.grnNumber,
+              hasPdfAttachment: !!pdfBase64
+            }
+          });
+        }
+        return res.status(500).json({ success: false, message: 'Email service not configured' });
+      }
+
+      // Prepare email content - Modern Design matching Invoice email style
+      const shopName = grn.shop?.name || 'Shop';
+      const shopSubName = grn.shop?.subName || '';
+      const shopAddress = grn.shop?.address || '';
+      const shopPhone = grn.shop?.phone || '';
+      const shopEmail = grn.shop?.email || '';
+      const shopInitial = shopName.charAt(0).toUpperCase();
+      const balanceDue = Number(grn.totalAmount) - Number(grn.paidAmount);
+      const currentYear = new Date().getFullYear();
+
+      const statusColor = grn.paymentStatus === 'PAID' ? '#10b981' : grn.paymentStatus === 'PARTIAL' ? '#f59e0b' : '#ef4444';
+      const statusText = grn.paymentStatus === 'PAID' ? 'Paid' : grn.paymentStatus === 'PARTIAL' ? 'Partially Paid' : 'Unpaid';
+      
+      const itemsHTML = grn.items.map((item: any) => `
+        <tr>
+          <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 14px;">
+            <div style="font-weight: 600;">${item.product?.name || 'Unknown Product'}</div>
+          </td>
+          <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 14px; text-align: center;">${item.quantity}</td>
+          <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 14px; text-align: right;">Rs. ${Number(item.costPrice).toLocaleString()}</td>
+          <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 14px; text-align: right; font-weight: 600;">Rs. ${Number(item.totalCost).toLocaleString()}</td>
+        </tr>
+      `).join('');
+          <td style="padding: 10px; font-size: 9pt; text-align: center; color: #000; font-weight: 700; border-right: 1px solid #000;">${item.quantity}</td>
+          <td style="padding: 10px; font-size: 9pt; text-align: center; color: #000; font-weight: 700; border-right: 1px solid #000;">0</td>
+      const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRN ${grn.grnNumber} - ${shopName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    
+    <!-- Header with Shop Branding -->
+    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 16px 16px 0 0; padding: 32px; text-align: center;">
+      <!-- Shop Logo/Initial -->
+      <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border-radius: 16px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+        <span style="color: white; font-size: 28px; font-weight: 700; line-height: 64px;">${shopInitial}</span>
+      </div>
+      <h1 style="color: white; font-size: 24px; font-weight: 700; margin: 0 0 4px 0;">${shopName}</h1>
+      ${shopSubName ? `<p style="color: #94a3b8; font-size: 14px; margin: 0 0 8px 0;">${shopSubName}</p>` : ''}
+      <p style="color: #64748b; font-size: 13px; margin: 0;">${shopAddress || ''}</p>
+    </div>
+    
+    <!-- Main Content Card -->
+    <div style="background: white; padding: 32px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+      
+      <!-- Gradient Line -->
+      <div style="height: 4px; background: linear-gradient(90deg, #10b981 0%, #3b82f6 50%, #8b5cf6 100%); border-radius: 2px; margin-bottom: 24px;"></div>
+      
+      <!-- GRN Title & Status -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+          <h2 style="color: #0f172a; font-size: 20px; font-weight: 700; margin: 0 0 4px 0;">Goods Received Note</h2>
+          <p style="color: #64748b; font-size: 14px; margin: 0;">${grn.grnNumber}</p>
+        </div>
+        <span style="display: inline-block; padding: 8px 16px; background: linear-gradient(135deg, ${statusColor}15 0%, ${statusColor}25 100%); color: ${statusColor}; font-size: 12px; font-weight: 600; border-radius: 20px; border: 1px solid ${statusColor}30;">${statusText}</span>
+      </div>
+      
+      <!-- Supplier Info Box -->
+      <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #e2e8f0;">
+        <div style="display: flex; align-items: center; margin-bottom: 12px;">
+          <span style="color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Supplier</span>
+        </div>
+        <p style="color: #0f172a; font-size: 16px; font-weight: 600; margin: 0 0 4px 0;">${grn.supplier.company || grn.supplier.name}</p>
+        ${grn.supplier.email ? `<p style="color: #64748b; font-size: 13px; margin: 0;">${grn.supplier.email}</p>` : ''}
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 8px;">GRN Date: ${new Date(grn.date).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      </div>
+      
+      <!-- Items Table -->
+      <div style="margin-bottom: 24px;">
+        <h3 style="color: #0f172a; font-size: 14px; font-weight: 600; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">Items Received</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
+              <th style="padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0;">Item</th>
+              <th style="padding: 12px 16px; text-align: center; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0;">Qty</th>
+              <th style="padding: 12px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0;">Price</th>
+              <th style="padding: 12px 16px; text-align: right; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e2e8f0;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML}
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Totals Section -->
+      <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Subtotal</td>
+            <td style="padding: 8px 0; color: #334155; font-size: 14px; text-align: right; font-weight: 500;">Rs. ${Number(grn.subtotal).toLocaleString()}</td>
+          </tr>
+          ${Number(grn.discount) > 0 ? `
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Discount</td>
+            <td style="padding: 8px 0; color: #10b981; font-size: 14px; text-align: right; font-weight: 500;">-Rs. ${Number(grn.discount).toLocaleString()}</td>
+          </tr>
+          ` : ''}
+          ${Number(grn.tax) > 0 ? `
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Tax</td>
+            <td style="padding: 8px 0; color: #334155; font-size: 14px; text-align: right; font-weight: 500;">Rs. ${Number(grn.tax).toLocaleString()}</td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td colspan="2" style="padding: 12px 0 8px 0;"><div style="height: 2px; background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%); border-radius: 1px;"></div></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #0f172a; font-size: 16px; font-weight: 700;">Grand Total</td>
+            <td style="padding: 8px 0; color: #0f172a; font-size: 18px; text-align: right; font-weight: 700;">Rs. ${Number(grn.totalAmount).toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Amount Paid</td>
+            <td style="padding: 8px 0; color: #10b981; font-size: 14px; text-align: right; font-weight: 600;">Rs. ${Number(grn.paidAmount).toLocaleString()}</td>
+          </tr>
+        </table>
+      </div>
+      
+      ${balanceDue > 0 ? `
+      <!-- Balance Due Warning -->
+      <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #f59e0b30;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+            <span style="color: white; font-size: 20px;">!</span>
+          </div>
+          <div>
+            <p style="color: #92400e; font-size: 13px; font-weight: 600; margin: 0 0 4px 0;">Balance Due to Supplier</p>
+            <p style="color: #b45309; font-size: 20px; font-weight: 700; margin: 0;">Rs. ${balanceDue.toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+      
+      <!-- Thank You Message -->
+      <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+        <p style="color: #065f46; font-size: 16px; font-weight: 600; margin: 0 0 8px 0;">Thank you for your delivery!</p>
+        <p style="color: #047857; font-size: 13px; margin: 0;">This GRN has been recorded in our system.</p>
+      </div>
+      
+      <!-- PDF Attachment Notice -->
+      <div style="text-align: center; padding: 16px; background: #f8fafc; border-radius: 8px; margin-bottom: 16px;">
+        <p style="color: #64748b; font-size: 12px; margin: 0;">📎 A PDF copy of this GRN is attached to this email</p>
+      </div>
+      
+      <!-- Footer -->
+      <div style="text-align: center; padding-top: 24px; border-top: 1px solid #e2e8f0;">
+        <p style="color: #94a3b8; font-size: 12px; margin: 0 0 8px 0;">
+          ${shopPhone ? `📞 ${shopPhone}` : ''} ${shopPhone && shopEmail ? ' | ' : ''} ${shopEmail ? `✉️ ${shopEmail}` : ''}
+        </p>
+        <p style="color: #cbd5e1; font-size: 11px; margin: 0;">© ${currentYear} ${shopName}. This is an automated email.</p>
+      </div>
+      
+    </div>
+  </div>
+</body>
+</html>`;
+
+      const fromName = process.env.SMTP_FROM_NAME || shopName;
+      const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+
+      const mailOptions: any = {
+        from: `"${fromName}" <${fromEmail}>`,
+        to: grn.supplier.email,
+        subject: `📦 GRN #${grn.grnNumber} from ${shopName}`,
+        html: htmlContent
+      };
+
+      // Add PDF attachment if provided
+      if (includeAttachment && pdfBase64) {
+        const base64Data = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+        mailOptions.attachments = [{
+          filename: `GRN-${grn.grnNumber}.pdf`,
+          content: Buffer.from(base64Data, 'base64'),
+          contentType: 'application/pdf',
+        }];
+      }
+
+      try {
+        await transporter.sendMail(mailOptions);
+        console.log('✅ GRN email sent successfully to:', grn.supplier.email);
+        
+        return res.status(200).json({
+          success: true,
+          message: 'GRN email sent successfully',
+          data: {
+            sentTo: grn.supplier.email,
+            grnNumber: grn.grnNumber,
+            hasPdfAttachment: !!(includeAttachment && pdfBase64)
+          }
+        });
+      } catch (emailError) {
+        console.error('❌ Failed to send GRN email:', emailError);
+        return res.status(500).json({ success: false, message: 'Failed to send email' });
+      }
     }
 
     // 404

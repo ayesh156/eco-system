@@ -13,9 +13,14 @@ interface ShopDetails {
 }
 
 interface WhatsAppSettings {
+  // Invoice Reminders
   enabled: boolean;
   paymentReminderTemplate: string;
   overdueReminderTemplate: string;
+  // GRN/Supplier Reminders
+  grnReminderEnabled: boolean;
+  grnPaymentReminderTemplate: string;
+  grnOverdueReminderTemplate: string;
 }
 
 interface WhatsAppSettingsContextType {
@@ -25,7 +30,8 @@ interface WhatsAppSettingsContextType {
   saveSettings: () => Promise<void>;
   loadSettings: () => Promise<void>;
   resetToDefaults: () => void;
-  defaultTemplates: { payment: string; overdue: string };
+  resetGrnToDefaults: () => void;
+  defaultTemplates: { payment: string; overdue: string; grnPayment: string; grnOverdue: string };
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
@@ -95,13 +101,20 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data) {
-          const { enabled, paymentReminderTemplate, overdueReminderTemplate, shopDetails: apiShopDetails } = result.data;
+          const { 
+            enabled, paymentReminderTemplate, overdueReminderTemplate, 
+            grnReminderEnabled, grnPaymentReminderTemplate, grnOverdueReminderTemplate,
+            shopDetails: apiShopDetails 
+          } = result.data;
           
           // Use API data, fallback to defaults only if null/undefined (not empty string)
           setSettings({
             enabled: enabled ?? true,
             paymentReminderTemplate: paymentReminderTemplate ?? mockWhatsAppSettings.paymentReminderTemplate,
             overdueReminderTemplate: overdueReminderTemplate ?? mockWhatsAppSettings.overdueReminderTemplate,
+            grnReminderEnabled: grnReminderEnabled ?? true,
+            grnPaymentReminderTemplate: grnPaymentReminderTemplate ?? mockWhatsAppSettings.grnPaymentReminderTemplate,
+            grnOverdueReminderTemplate: grnOverdueReminderTemplate ?? mockWhatsAppSettings.grnOverdueReminderTemplate,
           });
           
           // Set shop details from API (may contain empty values if not configured)
@@ -136,7 +149,7 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
     setSettings(prev => ({ ...prev, ...newSettings }));
   };
 
-  // Reset templates to defaults
+  // Reset invoice templates to defaults
   const resetToDefaults = useCallback(() => {
     setSettings(prev => ({
       ...prev,
@@ -145,10 +158,21 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
     }));
   }, []);
 
+  // Reset GRN templates to defaults
+  const resetGrnToDefaults = useCallback(() => {
+    setSettings(prev => ({
+      ...prev,
+      grnPaymentReminderTemplate: mockWhatsAppSettings.grnPaymentReminderTemplate,
+      grnOverdueReminderTemplate: mockWhatsAppSettings.grnOverdueReminderTemplate,
+    }));
+  }, []);
+
   // Expose default templates for reference
   const defaultTemplates = {
     payment: mockWhatsAppSettings.paymentReminderTemplate,
     overdue: mockWhatsAppSettings.overdueReminderTemplate,
+    grnPayment: mockWhatsAppSettings.grnPaymentReminderTemplate,
+    grnOverdue: mockWhatsAppSettings.grnOverdueReminderTemplate,
   };
 
   // Save settings to API
@@ -181,6 +205,9 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
             enabled: result.data.enabled ?? true,
             paymentReminderTemplate: result.data.paymentReminderTemplate ?? '',
             overdueReminderTemplate: result.data.overdueReminderTemplate ?? '',
+            grnReminderEnabled: result.data.grnReminderEnabled ?? true,
+            grnPaymentReminderTemplate: result.data.grnPaymentReminderTemplate ?? '',
+            grnOverdueReminderTemplate: result.data.grnOverdueReminderTemplate ?? '',
           });
           if (result.data.shopDetails) {
             setShopDetails(result.data.shopDetails);
@@ -207,6 +234,7 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
       saveSettings, 
       loadSettings,
       resetToDefaults,
+      resetGrnToDefaults,
       defaultTemplates,
       isLoading, 
       isSaving,

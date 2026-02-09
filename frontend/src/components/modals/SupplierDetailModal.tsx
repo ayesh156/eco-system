@@ -9,7 +9,7 @@ import {
   CheckCircle, AlertTriangle, Clock, XCircle, DollarSign,
   Calendar, Truck, ShoppingCart, CreditCard, Banknote,
   ChevronRight, ChevronDown, Loader2, Wallet, Receipt,
-  ArrowUpRight, ArrowDownRight
+  ArrowUpRight, ArrowDownRight, Eye
 } from 'lucide-react';
 
 interface PaymentRecord {
@@ -27,6 +27,8 @@ interface SupplierDetailModalProps {
   purchases: any[];
   onClose: () => void;
   onMakePayment: (purchase: any) => void;
+  onPaymentComplete?: () => void;
+  refreshTrigger?: number;
 }
 
 const paymentMethodConfigs = [
@@ -59,6 +61,8 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
   supplier,
   onClose,
   onMakePayment,
+  onPaymentComplete,
+  refreshTrigger,
 }) => {
   const { theme } = useTheme();
   const { user, isViewingShop, viewingShop, getAccessToken } = useAuth();
@@ -70,6 +74,7 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
   const [expandedGRNs, setExpandedGRNs] = useState<Set<string>>(new Set());
   const [grnPayments, setGRNPayments] = useState<Record<string, PaymentRecord[]>>({});
   const [loadingPayments, setLoadingPayments] = useState<Record<string, boolean>>({});
+  const [selectedPaymentGRN, setSelectedPaymentGRN] = useState<FrontendGRN | null>(null);
 
   const loadGRNs = useCallback(async () => {
     if (!supplier || !isOpen) return;
@@ -146,6 +151,14 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
     setExpandedGRNs(new Set());
     setGRNPayments({});
   }, [loadGRNs]);
+
+  // Refresh GRNs when refreshTrigger changes (after payment)
+  useEffect(() => {
+    if (refreshTrigger && isOpen) {
+      setGRNPayments({});
+      loadGRNs();
+    }
+  }, [refreshTrigger]);
 
   const stats = useMemo(() => {
     const totalGRNs = grns.length;
@@ -558,23 +571,44 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-center">
-                                  {grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < (grn.totalAmount || 0) ? (
-                                    <button
-                                      onClick={() => onMakePayment(grn)}
-                                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                                        theme === 'dark' 
-                                          ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400' 
-                                          : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
-                                      }`}
-                                    >
-                                      <DollarSign className="w-3 h-3" />
-                                      Pay
-                                    </button>
-                                  ) : (
-                                    <span className={`text-xs ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                                      ✓ Paid
-                                    </span>
-                                  )}
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    {/* View Payments Button - Always show if has payments */}
+                                    {(grn.paidAmount || 0) > 0 && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedPaymentGRN(grn);
+                                          loadPaymentsForGRN(grn);
+                                        }}
+                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+                                          theme === 'dark' 
+                                            ? 'bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 hover:scale-105' 
+                                            : 'bg-violet-100 hover:bg-violet-200 text-violet-700 hover:scale-105'
+                                        }`}
+                                        title="View payment history"
+                                      >
+                                        <Eye className="w-3 h-3" />
+                                        View
+                                      </button>
+                                    )}
+                                    {/* Pay Button */}
+                                    {grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < (grn.totalAmount || 0) ? (
+                                      <button
+                                        onClick={() => onMakePayment(grn)}
+                                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                                          theme === 'dark' 
+                                            ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-400 border border-emerald-500/30 hover:scale-105' 
+                                            : 'bg-gradient-to-r from-emerald-100 to-teal-100 hover:from-emerald-200 hover:to-teal-200 text-emerald-700 border border-emerald-200 hover:scale-105'
+                                        }`}
+                                      >
+                                        <DollarSign className="w-3 h-3" />
+                                        Pay
+                                      </button>
+                                    ) : (grn.paidAmount || 0) === 0 ? (
+                                      <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        No payments
+                                      </span>
+                                    ) : null}
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -794,6 +828,151 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Payment History Popup Modal */}
+      {selectedPaymentGRN && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+            onClick={() => setSelectedPaymentGRN(null)} 
+          />
+          <div className={`relative w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${
+            theme === 'dark' ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'
+          }`}>
+            {/* Header */}
+            <div className={`px-5 py-4 border-b flex items-center justify-between ${
+              theme === 'dark' ? 'border-slate-700 bg-gradient-to-r from-violet-600/20 to-purple-600/20' : 'border-slate-200 bg-gradient-to-r from-violet-50 to-purple-50'
+            }`}>
+              <div>
+                <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  Payment History
+                </h3>
+                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  {selectedPaymentGRN.grnNumber}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedPaymentGRN(null)}
+                className={`p-2 rounded-xl transition-colors ${
+                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Summary */}
+            <div className={`px-5 py-4 border-b ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className={`text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Total</p>
+                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    {formatCurrency(selectedPaymentGRN.totalAmount || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className={`text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Paid</p>
+                  <p className="text-lg font-bold text-emerald-500">
+                    {formatCurrency(selectedPaymentGRN.paidAmount || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className={`text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Pending</p>
+                  <p className="text-lg font-bold text-amber-500">
+                    {formatCurrency((selectedPaymentGRN.totalAmount || 0) - (selectedPaymentGRN.paidAmount || 0))}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment List */}
+            <div className="p-5 max-h-[400px] overflow-y-auto">
+              {loadingPayments[selectedPaymentGRN.apiId || selectedPaymentGRN.id] ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className={`w-6 h-6 animate-spin ${theme === 'dark' ? 'text-violet-400' : 'text-violet-600'}`} />
+                  <span className={`ml-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Loading payments...</span>
+                </div>
+              ) : (grnPayments[selectedPaymentGRN.apiId || selectedPaymentGRN.id] || []).length === 0 ? (
+                <div className={`text-center py-8 rounded-xl ${theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
+                  <History className={`w-10 h-10 mx-auto mb-3 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`} />
+                  <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>No payments recorded yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(grnPayments[selectedPaymentGRN.apiId || selectedPaymentGRN.id] || []).map((payment, idx) => {
+                    const methodConfig = getPaymentMethodConfig(payment.paymentMethod);
+                    const MethodIcon = methodConfig.icon;
+                    return (
+                      <div 
+                        key={payment.id || idx}
+                        className={`p-4 rounded-xl border transition-all hover:shadow-md ${
+                          theme === 'dark' 
+                            ? 'bg-slate-800/50 border-slate-700 hover:border-slate-600' 
+                            : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${methodConfig.bgColor}`}>
+                              <MethodIcon className={`w-5 h-5 ${methodConfig.color}`} />
+                            </div>
+                            <div>
+                              <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                {formatCurrency(payment.amount)}
+                              </p>
+                              <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                via {methodConfig.label}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                              {formatDate(payment.sentAt)}
+                            </p>
+                            {payment.notes && (
+                              <p className={`text-xs mt-0.5 max-w-[150px] truncate ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {payment.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className={`px-5 py-4 border-t flex justify-between items-center ${
+              theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
+            }`}>
+              {selectedPaymentGRN.paymentStatus !== 'paid' && (selectedPaymentGRN.paidAmount || 0) < (selectedPaymentGRN.totalAmount || 0) && (
+                <button
+                  onClick={() => {
+                    setSelectedPaymentGRN(null);
+                    onMakePayment(selectedPaymentGRN);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+                >
+                  <DollarSign className="w-4 h-4" />
+                  Record Payment
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedPaymentGRN(null)}
+                className={`ml-auto px-4 py-2 rounded-xl font-medium transition-colors ${
+                  theme === 'dark' 
+                    ? 'bg-slate-700 text-white hover:bg-slate-600' 
+                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                }`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

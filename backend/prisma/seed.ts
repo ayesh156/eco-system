@@ -360,8 +360,11 @@ async function main() {
       taxRate: 0,
       isActive: true,
       reminderEnabled: true,
-      paymentReminderTemplate: 'Dear {customerName}, this is a friendly reminder that your invoice #{invoiceNumber} for Rs. {amount} is due on {dueDate}. Please make the payment at your earliest convenience. Thank you! - {shopName}',
-      overdueReminderTemplate: 'Dear {customerName}, your invoice #{invoiceNumber} for Rs. {amount} is now overdue by {daysPastDue} days. Please settle your account immediately to avoid service interruption. - {shopName}',
+      paymentReminderTemplate: 'Dear {{customerName}}, this is a friendly reminder that your invoice #{{invoiceNumber}} for Rs. {{amount}} is due on {{dueDate}}. Please make the payment at your earliest convenience. Thank you! - {{shopName}}',
+      overdueReminderTemplate: 'Dear {{customerName}}, your invoice #{{invoiceNumber}} for Rs. {{amount}} is now overdue by {{daysPastDue}} days. Please settle your account immediately to avoid service interruption. - {{shopName}}',
+      grnReminderEnabled: true,
+      grnPaymentReminderTemplate: `Hello! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly notification regarding your GRN payment:\n\n📄 *GRN Number:* #{{grnNumber}}\n🏢 *Supplier:* {{supplierName}}\n💰 *Total Amount:* {{totalAmount}}\n✅ *Paid:* {{paidAmount}}\n⏳ *Balance Due:* {{balanceDue}}\n📅 *GRN Date:* {{grnDate}}\n\nWe will process the remaining payment as per our agreement.\n\nFor any queries, please contact us.\n\nThank you for your partnership! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      grnOverdueReminderTemplate: `🚨 *URGENT: Payment Overdue*\n\nDear {{supplierName}},\n\nThis is an urgent reminder regarding the *overdue* payment for:\n\n📄 *GRN Number:* #{{grnNumber}}\n📅 *GRN Date:* {{grnDate}}\n💰 *Total Amount:* {{totalAmount}}\n✅ *Paid:* {{paidAmount}}\n⏳ *Balance Due:* {{balanceDue}}\n\n⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.\n\nFor any queries or to discuss payment arrangements, please contact us immediately.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
     },
   });
   console.log(`   ✅ Shop 1: ${shop1.name} (${shop1.slug})`);
@@ -386,8 +389,11 @@ async function main() {
       taxRate: 0,
       isActive: true,
       reminderEnabled: true,
-      paymentReminderTemplate: 'Dear {customerName}, this is a friendly reminder that your invoice #{invoiceNumber} for Rs. {amount} is due on {dueDate}. Please make the payment at your earliest convenience. Thank you! - {shopName}',
-      overdueReminderTemplate: 'Dear {customerName}, your invoice #{invoiceNumber} for Rs. {amount} is now overdue by {daysPastDue} days. Please settle your account immediately to avoid service interruption. - {shopName}',
+      paymentReminderTemplate: 'Dear {{customerName}}, this is a friendly reminder that your invoice #{{invoiceNumber}} for Rs. {{amount}} is due on {{dueDate}}. Please make the payment at your earliest convenience. Thank you! - {{shopName}}',
+      overdueReminderTemplate: 'Dear {{customerName}}, your invoice #{{invoiceNumber}} for Rs. {{amount}} is now overdue by {{daysPastDue}} days. Please settle your account immediately to avoid service interruption. - {{shopName}}',
+      grnReminderEnabled: true,
+      grnPaymentReminderTemplate: `Hello! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly notification regarding your GRN payment:\n\n📄 *GRN Number:* #{{grnNumber}}\n🏢 *Supplier:* {{supplierName}}\n💰 *Total Amount:* {{totalAmount}}\n✅ *Paid:* {{paidAmount}}\n⏳ *Balance Due:* {{balanceDue}}\n📅 *GRN Date:* {{grnDate}}\n\nWe will process the remaining payment as per our agreement.\n\nFor any queries, please contact us.\n\nThank you for your partnership! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      grnOverdueReminderTemplate: `🚨 *URGENT: Payment Overdue*\n\nDear {{supplierName}},\n\nThis is an urgent reminder regarding the *overdue* payment for:\n\n📄 *GRN Number:* #{{grnNumber}}\n📅 *GRN Date:* {{grnDate}}\n💰 *Total Amount:* {{totalAmount}}\n✅ *Paid:* {{paidAmount}}\n⏳ *Balance Due:* {{balanceDue}}\n\n⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.\n\nFor any queries or to discuss payment arrangements, please contact us immediately.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
     },
   });
   console.log(`   ✅ Shop 2: ${shop2.name} (${shop2.slug})`);
@@ -734,16 +740,28 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
       
       const subtotal = grnItems.reduce((sum, item) => sum + item.totalCost, 0);
       
+      // Generate realistic Sri Lankan data for new fields
+      const vehicleNumbers = ['CAB-1234', 'WP KA-5678', 'NW ABC-9012', 'CP XY-3456', 'SP LM-7890'];
+      const receivedByNames = ['Nuwan Perera', 'Kasun Silva', 'Chaminda Fernando', 'Amal Bandara', 'Saman Kumara'];
+      const grnDate = randomDate(new Date('2026-01-01'), new Date());
+      const receivedDate = grnStatuses[i] === GRNStatus.COMPLETED || grnStatuses[i] === GRNStatus.PENDING 
+        ? new Date(grnDate.getTime() + (Math.random() * 3 * 24 * 60 * 60 * 1000)) // 0-3 days after order
+        : null;
+      
       await prisma.gRN.create({
         data: {
           grnNumber: generateGRNNumber(i + 1),
           supplierId: supplier.id,
           shopId,
           referenceNo: `SUP-INV-${String(Math.floor(Math.random() * 100000)).padStart(6, '0')}`,
-          date: randomDate(new Date('2026-01-01'), new Date()),
+          date: grnDate,
+          deliveryNote: `DN${String(10000000 + Math.floor(Math.random() * 90000000)).padStart(8, '0')}`,
+          vehicleNumber: vehicleNumbers[i % vehicleNumbers.length],
+          receivedBy: receivedByNames[i % receivedByNames.length],
+          receivedDate: receivedDate,
           subtotal,
           tax: 0,
-          discount: 0,
+          discount: Math.random() > 0.5 ? Math.floor(subtotal * 0.02) : 0, // 50% chance of 2% discount
           totalAmount: subtotal,
           paidAmount: grnStatuses[i] === GRNStatus.COMPLETED ? subtotal : 0,
           status: grnStatuses[i],
@@ -936,6 +954,35 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
     }
   }
   console.log(`      ✅ Created ${unpaidInvoices.length} invoice reminders`);
+
+  // ==========================================
+  // GRN REMINDERS (Sample)
+  // ==========================================
+  console.log('   📨 Creating GRN Reminders...');
+  
+  const unpaidGRNs = await prisma.gRN.findMany({
+    where: { shopId, paymentStatus: { in: [PaymentStatus.UNPAID, PaymentStatus.PARTIAL] } },
+    include: { supplier: true },
+    take: 3,
+  });
+  
+  for (const grn of unpaidGRNs) {
+    if (grn.supplier) {
+      const balanceDue = grn.totalAmount - (grn.paidAmount || 0);
+      await prisma.gRNReminder.create({
+        data: {
+          grnId: grn.id,
+          shopId,
+          type: ReminderType.PAYMENT,
+          channel: 'whatsapp',
+          message: `Dear ${grn.supplier.name}, reminder for GRN ${grn.grnNumber} - Total: Rs. ${grn.totalAmount.toLocaleString()}, Balance Due: Rs. ${balanceDue.toLocaleString()}`,
+          supplierPhone: grn.supplier.phone,
+          supplierName: grn.supplier.name,
+        },
+      });
+    }
+  }
+  console.log(`      ✅ Created ${unpaidGRNs.length} GRN reminders`);
 
   // ==========================================
   // INVOICE ITEM HISTORY (Sample modifications)

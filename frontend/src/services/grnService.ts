@@ -36,6 +36,10 @@ export interface APIGRN {
   referenceNo?: string;
   date: string;
   expectedDate?: string;
+  deliveryNote?: string;
+  vehicleNumber?: string;
+  receivedBy?: string;
+  receivedDate?: string;
   subtotal: number;
   tax: number;
   discount: number;
@@ -50,6 +54,9 @@ export interface APIGRN {
   supplier?: {
     id: string;
     name: string;
+    company?: string;
+    email?: string;
+    phone?: string;
   };
   items?: APIGRNItem[];
   createdBy?: {
@@ -57,11 +64,14 @@ export interface APIGRN {
   };
   _count?: {
     items?: number;
+    reminders?: number;
   };
   // Calculated totals from backend
   totalOrderedQuantity?: number;
   totalAcceptedQuantity?: number;
   totalRejectedQuantity?: number;
+  // Reminder count (flattened)
+  reminderCount?: number;
 }
 
 export interface CreateGRNItemDTO {
@@ -76,6 +86,10 @@ export interface CreateGRNDTO {
   referenceNo?: string;
   date?: string;
   expectedDate?: string;
+  deliveryNote?: string;
+  vehicleNumber?: string;
+  receivedBy?: string;
+  receivedDate?: string;
   items: CreateGRNItemDTO[];
   discount?: number;
   tax?: number;
@@ -113,6 +127,9 @@ export interface FrontendGRN {
   grnNumber: string;
   supplierId: string;
   supplierName: string;
+  supplierEmail?: string;
+  supplierPhone?: string;
+  supplierCompany?: string;
   purchaseOrderId?: string;
   orderDate: string;
   expectedDeliveryDate: string;
@@ -146,6 +163,8 @@ export interface FrontendGRN {
   updatedAt: string;
   // API reference
   apiId?: string;
+  // Reminder count
+  reminderCount?: number;
 }
 
 // ===================================
@@ -209,10 +228,13 @@ export const convertAPIGRNToFrontend = (apiGRN: APIGRN): FrontendGRN => {
     apiId: apiGRN.id, // Store actual UUID for API calls
     grnNumber: apiGRN.grnNumber,
     supplierId: apiGRN.supplierId,
-    supplierName: apiGRN.supplier?.name || 'Unknown Supplier',
+    supplierName: apiGRN.supplier?.company || apiGRN.supplier?.name || 'Unknown Supplier',
+    supplierEmail: apiGRN.supplier?.email || '',
+    supplierPhone: apiGRN.supplier?.phone || '',
+    supplierCompany: apiGRN.supplier?.company || '',
     orderDate: apiGRN.date?.split('T')[0] || '',
     expectedDeliveryDate: apiGRN.expectedDate?.split('T')[0] || '',
-    receivedDate: apiGRN.date?.split('T')[0] || '',
+    receivedDate: apiGRN.receivedDate?.split('T')[0] || apiGRN.date?.split('T')[0] || '',
     items,
     totalOrderedQuantity,
     totalReceivedQuantity: totalOrderedQuantity,
@@ -225,10 +247,13 @@ export const convertAPIGRNToFrontend = (apiGRN: APIGRN): FrontendGRN => {
     paymentStatus: mapAPIPaymentStatusToFrontend(apiGRN.paymentStatus),
     paidAmount: apiGRN.paidAmount,
     status: mapAPIStatusToFrontend(apiGRN.status),
-    receivedBy: apiGRN.createdBy?.name || '',
+    receivedBy: apiGRN.receivedBy || apiGRN.createdBy?.name || '',
+    deliveryNote: apiGRN.deliveryNote,
+    vehicleNumber: apiGRN.vehicleNumber,
     notes: apiGRN.notes,
     createdAt: apiGRN.createdAt,
     updatedAt: apiGRN.updatedAt,
+    reminderCount: apiGRN.reminderCount || apiGRN._count?.reminders || 0,
   };
 };
 
@@ -239,6 +264,10 @@ export const convertFrontendToAPIGRN = (frontendGRN: Partial<FrontendGRN>): Crea
     referenceNo: frontendGRN.purchaseOrderId,
     date: frontendGRN.receivedDate || frontendGRN.orderDate,
     expectedDate: frontendGRN.expectedDeliveryDate,
+    deliveryNote: frontendGRN.deliveryNote,
+    vehicleNumber: frontendGRN.vehicleNumber,
+    receivedBy: frontendGRN.receivedBy,
+    receivedDate: frontendGRN.receivedDate,
     items: (frontendGRN.items || []).map(item => ({
       productId: item.productId,
       quantity: item.acceptedQuantity || item.receivedQuantity || item.orderedQuantity,
@@ -509,6 +538,71 @@ export const recordGRNPayment = async (
   }
 };
 
+// ===================================
+// Send GRN Email with PDF
+// ===================================
+
+export interface SendGRNEmailResult {
+  success: boolean;
+  sentTo: string;
+  hasPdfAttachment: boolean;
+}
+
+/**
+ * Send GRN email to supplier with optional PDF attachment
+ * @param grnId - The GRN ID (UUID preferred) to send
+ * @param pdfBase64 - Base64 encoded PDF data (optional, if client-side generated)
+ * @param accessToken - Optional access token
+ * @param shopId - Optional shopId for SUPER_ADMIN context
+ * @returns Email send result
+ */
+export const sendEmailWithPDF = async (
+  grnId: string,
+  pdfBase64?: string,
+  accessToken?: string | null,
+  shopId?: string
+): Promise<SendGRNEmailResult> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (shopId) queryParams.append('shopId', shopId);
+    const url = `${API_BASE_URL}/grns/${grnId}/send-email${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    // Use provided token or fallback to module token
+    const token = accessToken || getAccessToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({
+        pdfBase64,
+        includeAttachment: !!pdfBase64,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to send email');
+    }
+
+    return {
+      success: true,
+      sentTo: result.data?.sentTo || result.sentTo || 'Unknown',
+      hasPdfAttachment: result.data?.hasPdfAttachment || result.hasPdfAttachment || false,
+    };
+  } catch (error) {
+    console.error('Error sending GRN email:', error);
+    throw error;
+  }
+};
+
 export default {
   getGRNs,
   getGRNById,
@@ -517,4 +611,5 @@ export default {
   deleteGRN,
   updateGRN,
   recordGRNPayment,
+  sendEmailWithPDF,
 };

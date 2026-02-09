@@ -592,6 +592,50 @@ Best regards,
 📍 {{shopAddress}}
 🌐 {{shopWebsite}}`;
 
+// GRN/Supplier Reminder Templates
+const DEFAULT_GRN_PAYMENT_REMINDER_TEMPLATE = `Hello! 👋
+
+Greetings from *{{shopName}}*!
+
+This is a friendly notification regarding your GRN payment:
+
+📄 *GRN Number:* #{{grnNumber}}
+🏢 *Supplier:* {{supplierName}}
+💰 *Total Amount:* Rs. {{totalAmount}}
+✅ *Paid:* Rs. {{paidAmount}}
+⏳ *Balance Due:* Rs. {{balanceDue}}
+📅 *GRN Date:* {{grnDate}}
+
+We will process the remaining payment as per our agreement.
+
+For any queries, please contact us.
+
+Thank you for your partnership! 🙏
+
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}`;
+
+const DEFAULT_GRN_OVERDUE_REMINDER_TEMPLATE = `📋 *GRN Payment Reminder*
+
+Dear {{supplierName}},
+
+This is a reminder regarding the pending payment for:
+
+📄 *GRN Number:* #{{grnNumber}}
+📅 *GRN Date:* {{grnDate}}
+💰 *Total Amount:* Rs. {{totalAmount}}
+⏳ *Balance Due:* Rs. {{balanceDue}}
+
+We are processing your payment and will update you soon.
+
+For any queries, please contact us.
+
+Best regards,
+*{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}`;
+
 /**
  * @route   GET /api/v1/shop-admin/whatsapp-settings
  * @desc    Get WhatsApp settings for the shop
@@ -616,6 +660,9 @@ router.get('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         reminderEnabled: true,
         paymentReminderTemplate: true,
         overdueReminderTemplate: true,
+        grnReminderEnabled: true,
+        grnPaymentReminderTemplate: true,
+        grnOverdueReminderTemplate: true,
       },
     });
 
@@ -630,6 +677,9 @@ router.get('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         enabled: shop.reminderEnabled ?? true,
         paymentReminderTemplate: shop.paymentReminderTemplate || DEFAULT_PAYMENT_REMINDER_TEMPLATE,
         overdueReminderTemplate: shop.overdueReminderTemplate || DEFAULT_OVERDUE_REMINDER_TEMPLATE,
+        grnReminderEnabled: shop.grnReminderEnabled ?? true,
+        grnPaymentReminderTemplate: shop.grnPaymentReminderTemplate || DEFAULT_GRN_PAYMENT_REMINDER_TEMPLATE,
+        grnOverdueReminderTemplate: shop.grnOverdueReminderTemplate || DEFAULT_GRN_OVERDUE_REMINDER_TEMPLATE,
         shopDetails: {
           name: shop.name || '',
           phone: shop.phone || '',
@@ -656,7 +706,10 @@ router.put('/whatsapp-settings', async (req: Request, res: Response, next: NextF
       return res.status(403).json({ success: false, message: 'Shop ID required' });
     }
 
-    const { enabled, paymentReminderTemplate, overdueReminderTemplate } = req.body;
+    const { 
+      enabled, paymentReminderTemplate, overdueReminderTemplate,
+      grnReminderEnabled, grnPaymentReminderTemplate, grnOverdueReminderTemplate 
+    } = req.body;
 
     const updatedShop = await prisma.shop.update({
       where: { id: shopId },
@@ -664,6 +717,9 @@ router.put('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         ...(enabled !== undefined && { reminderEnabled: enabled }),
         ...(paymentReminderTemplate !== undefined && { paymentReminderTemplate }),
         ...(overdueReminderTemplate !== undefined && { overdueReminderTemplate }),
+        ...(grnReminderEnabled !== undefined && { grnReminderEnabled }),
+        ...(grnPaymentReminderTemplate !== undefined && { grnPaymentReminderTemplate }),
+        ...(grnOverdueReminderTemplate !== undefined && { grnOverdueReminderTemplate }),
       },
       select: {
         id: true,
@@ -674,6 +730,9 @@ router.put('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         reminderEnabled: true,
         paymentReminderTemplate: true,
         overdueReminderTemplate: true,
+        grnReminderEnabled: true,
+        grnPaymentReminderTemplate: true,
+        grnOverdueReminderTemplate: true,
       },
     });
 
@@ -683,6 +742,9 @@ router.put('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         enabled: updatedShop.reminderEnabled,
         paymentReminderTemplate: updatedShop.paymentReminderTemplate || '',
         overdueReminderTemplate: updatedShop.overdueReminderTemplate || '',
+        grnReminderEnabled: updatedShop.grnReminderEnabled,
+        grnPaymentReminderTemplate: updatedShop.grnPaymentReminderTemplate || '',
+        grnOverdueReminderTemplate: updatedShop.grnOverdueReminderTemplate || '',
         shopDetails: {
           name: updatedShop.name || '',
           phone: updatedShop.phone || '',

@@ -34,7 +34,8 @@ export const CreateGRN: React.FC = () => {
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [, setIsLoading] = useState(false);
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [step, setStep] = useState<Step>(1);
@@ -45,7 +46,7 @@ export const CreateGRN: React.FC = () => {
   
   // GRN Details
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
-  const [expectedDeliveryDate] = useState('');
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().split('T')[0]);
   const [receivedBy, setReceivedBy] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -86,6 +87,7 @@ export const CreateGRN: React.FC = () => {
 
   // Calendar popup state
   const [showOrderCalendar, setShowOrderCalendar] = useState(false);
+  const [showExpectedCalendar, setShowExpectedCalendar] = useState(false);
   const [showReceivedCalendar, setShowReceivedCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
@@ -96,7 +98,7 @@ export const CreateGRN: React.FC = () => {
   // Load suppliers from API on mount
   useEffect(() => {
     const loadSuppliers = async () => {
-      setIsLoading(true);
+      setIsLoadingSuppliers(true);
       try {
         const result = await supplierService.getSuppliers(effectiveShopId);
         if (result.success && result.data) {
@@ -130,7 +132,7 @@ export const CreateGRN: React.FC = () => {
           duration: 4000,
         });
       } finally {
-        setIsLoading(false);
+        setIsLoadingSuppliers(false);
       }
     };
     loadSuppliers();
@@ -139,6 +141,7 @@ export const CreateGRN: React.FC = () => {
   // Load products from API on mount
   useEffect(() => {
     const loadProducts = async () => {
+      setIsLoadingProducts(true);
       try {
         const result = await productService.getAll({ 
           shopId: effectiveShopId,
@@ -155,6 +158,8 @@ export const CreateGRN: React.FC = () => {
           description: 'Please refresh the page to try again',
           duration: 4000,
         });
+      } finally {
+        setIsLoadingProducts(false);
       }
     };
     loadProducts();
@@ -464,8 +469,24 @@ export const CreateGRN: React.FC = () => {
       const result = await grnService.createGRN(grn as unknown as FrontendGRN, effectiveShopId);
       
       if (result.success && result.data) {
-        // Use API-created GRN for print preview
-        setCreatedGRN(result.data as unknown as GoodsReceivedNote);
+        // API now stores deliveryNote, vehicleNumber, receivedBy, receivedDate
+        // Use API response data, falling back to local values only if API didn't return them
+        const apiData = result.data as unknown as GoodsReceivedNote;
+        const mergedGRN: GoodsReceivedNote = {
+          ...grn, // Start with all local data
+          ...apiData, // Override with API data
+          // Use API values if available, else fallback to local
+          deliveryNote: apiData.deliveryNote || deliveryNote,
+          vehicleNumber: apiData.vehicleNumber || vehicleNumber,
+          receivedBy: apiData.receivedBy || receivedBy,
+          receivedDate: apiData.receivedDate || receivedDate,
+          expectedDeliveryDate: apiData.expectedDeliveryDate || expectedDeliveryDate,
+          orderDate: apiData.orderDate || orderDate,
+          notes: apiData.notes || notes,
+          items: grn.items, // Keep local items with full details
+          supplierName: apiData.supplierName || grn.supplierName, // Keep supplier name
+        };
+        setCreatedGRN(mergedGRN);
         toast.success('GRN Created Successfully! 🎉', {
           description: `GRN ${grnNumber} has been created with ${items.length} item(s)`,
           duration: 4000,
@@ -837,36 +858,66 @@ export const CreateGRN: React.FC = () => {
 
               {/* Supplier List */}
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-4">
-                {filteredSuppliers.map((supplier) => (
-                  <button
-                    key={supplier.id}
-                    onClick={() => setSelectedSupplier(supplier.id)}
-                    className={`w-full p-3 rounded-xl text-left transition-all flex items-center gap-3 ${
-                      selectedSupplier === supplier.id
-                        ? 'bg-emerald-500/20 border-2 border-emerald-500'
-                        : theme === 'dark' 
-                          ? 'bg-slate-700/50 hover:bg-slate-700 border-2 border-transparent' 
-                          : 'bg-slate-50 hover:bg-slate-100 border-2 border-transparent'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${
-                      theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
-                    }`}>
-                      {supplier.company.charAt(0)}
+                {isLoadingSuppliers ? (
+                  // Modern skeleton loading for suppliers
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div 
+                      key={i}
+                      className={`w-full p-3 rounded-xl flex items-center gap-3 animate-pulse ${
+                        theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-100'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-lg ${
+                        theme === 'dark' ? 'bg-slate-600' : 'bg-slate-200'
+                      }`} />
+                      <div className="flex-1 space-y-2">
+                        <div className={`h-4 rounded w-3/4 ${
+                          theme === 'dark' ? 'bg-slate-600' : 'bg-slate-200'
+                        }`} />
+                        <div className={`h-3 rounded w-1/2 ${
+                          theme === 'dark' ? 'bg-slate-600/50' : 'bg-slate-200/70'
+                        }`} />
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                        {supplier.company}
-                      </p>
-                      <p className={`text-xs truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {supplier.phone} • {supplier.email}
-                      </p>
-                    </div>
-                    {selectedSupplier === supplier.id && (
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
-                    )}
-                  </button>
-                ))}
+                  ))
+                ) : filteredSuppliers.length === 0 ? (
+                  <div className={`text-center py-8 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <Building2 className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p>No suppliers found</p>
+                    <p className="text-xs mt-1">Try adjusting your search or register a new supplier</p>
+                  </div>
+                ) : (
+                  filteredSuppliers.map((supplier) => (
+                    <button
+                      key={supplier.id}
+                      onClick={() => setSelectedSupplier(supplier.id)}
+                      className={`w-full p-3 rounded-xl text-left transition-all flex items-center gap-3 ${
+                        selectedSupplier === supplier.id
+                          ? 'bg-emerald-500/20 border-2 border-emerald-500'
+                          : theme === 'dark' 
+                            ? 'bg-slate-700/50 hover:bg-slate-700 border-2 border-transparent' 
+                            : 'bg-slate-50 hover:bg-slate-100 border-2 border-transparent'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${
+                        theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
+                      }`}>
+                        {supplier.company.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          {supplier.company}
+                        </p>
+                        <p className={`text-xs truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {supplier.phone} • {supplier.email}
+                        </p>
+                      </div>
+                      {selectedSupplier === supplier.id && (
+                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      )}
+                    </button>
+                  ))
+                )}
               </div>
 
               {/* GRN Details Form */}
@@ -932,6 +983,7 @@ export const CreateGRN: React.FC = () => {
                         type="button"
                         onClick={() => {
                           setShowOrderCalendar(!showOrderCalendar);
+                          setShowExpectedCalendar(false);
                           setShowReceivedCalendar(false);
                           setCalendarMonth(orderDate ? new Date(orderDate) : new Date());
                         }}
@@ -941,6 +993,29 @@ export const CreateGRN: React.FC = () => {
                         {formatDisplayDate(orderDate)}
                       </button>
                       {showOrderCalendar && renderCalendar(orderDate, setOrderDate, setShowOrderCalendar)}
+                    </div>
+
+                    {/* Expected Delivery Date */}
+                    <div className="relative">
+                      <label className={`block text-xs font-medium mb-1 ${
+                        theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+                      }`}>
+                        Expected Delivery
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowExpectedCalendar(!showExpectedCalendar);
+                          setShowOrderCalendar(false);
+                          setShowReceivedCalendar(false);
+                          setCalendarMonth(expectedDeliveryDate ? new Date(expectedDeliveryDate) : new Date());
+                        }}
+                        className={`${inputClass} text-left flex items-center gap-2`}
+                      >
+                        <Calendar className="w-4 h-4 text-slate-400" />
+                        {expectedDeliveryDate ? formatDisplayDate(expectedDeliveryDate) : 'Select date'}
+                      </button>
+                      {showExpectedCalendar && renderCalendar(expectedDeliveryDate, setExpectedDeliveryDate, setShowExpectedCalendar)}
                     </div>
 
                     {/* Received Date */}
@@ -955,6 +1030,7 @@ export const CreateGRN: React.FC = () => {
                         onClick={() => {
                           setShowReceivedCalendar(!showReceivedCalendar);
                           setShowOrderCalendar(false);
+                          setShowExpectedCalendar(false);
                           setCalendarMonth(receivedDate ? new Date(receivedDate) : new Date());
                         }}
                         className={`${inputClass} text-left flex items-center gap-2`}
@@ -966,7 +1042,7 @@ export const CreateGRN: React.FC = () => {
                     </div>
 
                     {/* Received By */}
-                    <div className="col-span-2">
+                    <div>
                       <label className={`block text-xs font-medium mb-1 ${
                         theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                       }`}>
