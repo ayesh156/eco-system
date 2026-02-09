@@ -234,7 +234,8 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
     try {
       // Use standard shop fetch endpoint which includes full shop details
       const url = `${API_BASE_URL}/shops/${effectiveShopId}`;
-      console.log('📡 Fetching sections via shop details:', url);
+      console.log('📡 [ShopSections] API_BASE_URL:', API_BASE_URL);
+      console.log('📡 [ShopSections] Fetching sections from:', url);
       
       const response = await fetch(url, {
         headers: {
@@ -250,13 +251,18 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (response.ok) {
         const responseData = await response.json();
         const data = responseData.data; // Shop object is in .data
-        console.log('📦 Loaded hidden sections:', data.hiddenSections, 'Admin hidden:', data.adminHiddenSections);
+        console.log('📦 [ShopSections] API Response shop.id:', data.id);
+        console.log('📦 [ShopSections] API Response shop.name:', data.name);
+        console.log('📦 [ShopSections] hiddenSections:', data.hiddenSections);
+        console.log('📦 [ShopSections] hiddenSections count:', data.hiddenSections?.length || 0);
+        console.log('📦 [ShopSections] adminHiddenSections:', data.adminHiddenSections);
+        console.log('📦 [ShopSections] adminHiddenSections count:', data.adminHiddenSections?.length || 0);
         setHiddenSections(data.hiddenSections || []);
         setAdminHiddenSections(data.adminHiddenSections || []);
         setLastFetchedShopId(effectiveShopId);
       } else {
         const errorData = await response.json().catch(() => ({}));
-        console.warn('⚠️ Failed to fetch hidden sections:', response.status, errorData);
+        console.warn('⚠️ [ShopSections] Failed to fetch - Status:', response.status, 'Error:', errorData);
         setHiddenSections([]);
         setAdminHiddenSections([]);
       }

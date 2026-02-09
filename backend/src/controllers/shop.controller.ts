@@ -790,3 +790,54 @@ export const updateShopSections = async (req: Request, res: Response, next: Next
     next(error);
   }
 };
+// ==========================================
+// DEBUG: Shop Sections Diagnostic
+// ==========================================
+export const debugShopSections = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const shop = await prisma.shop.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        hiddenSections: true,
+        adminHiddenSections: true,
+      },
+    });
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        message: 'Shop not found',
+        shopId: id,
+      });
+    }
+
+    // Get database URL hint (just the host part for security)
+    const dbUrl = process.env.DATABASE_URL || '';
+    const dbHostMatch = dbUrl.match(/@([^:\/]+)/);
+    const dbHost = dbHostMatch ? dbHostMatch[1] : 'unknown';
+
+    res.json({
+      success: true,
+      message: 'Shop sections diagnostic',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      databaseHost: dbHost,
+      shop: {
+        id: shop.id,
+        name: shop.name,
+        slug: shop.slug,
+        hiddenSections: shop.hiddenSections,
+        hiddenSectionsCount: shop.hiddenSections?.length || 0,
+        adminHiddenSections: shop.adminHiddenSections,
+        adminHiddenSectionsCount: shop.adminHiddenSections?.length || 0,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

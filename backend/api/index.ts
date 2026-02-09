@@ -540,6 +540,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // DEBUG: Shop sections diagnostic endpoint
+    // Use: /api/v1/debug/sections?shopId=xxx (requires auth)
+    if (path === '/api/v1/debug/sections' && method === 'GET') {
+      const debugShopId = query.shopId as string || effectiveShopId;
+      
+      if (!debugShopId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'No shopId provided. Use ?shopId=xxx or authenticate.',
+        });
+      }
+
+      try {
+        const shop = await prisma.shop.findUnique({
+          where: { id: debugShopId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            hiddenSections: true,
+            adminHiddenSections: true,
+          },
+        });
+
+        if (!shop) {
+          return res.status(404).json({ 
+            success: false, 
+            message: 'Shop not found',
+            shopId: debugShopId,
+          });
+        }
+
+        // Get database URL hint (just the host part for security)
+        const dbUrl = process.env.DATABASE_URL || '';
+        const dbHostMatch = dbUrl.match(/@([^:\/]+)/);
+        const dbHost = dbHostMatch ? dbHostMatch[1] : 'unknown';
+
+        return res.status(200).json({
+          success: true,
+          message: 'Shop sections diagnostic',
+          timestamp: new Date().toISOString(),
+          environment: process.env.NODE_ENV || 'development',
+          databaseHost: dbHost,
+          shop: {
+            id: shop.id,
+            name: shop.name,
+            slug: shop.slug,
+            hiddenSections: shop.hiddenSections,
+            hiddenSectionsCount: shop.hiddenSections?.length || 0,
+            adminHiddenSections: shop.adminHiddenSections,
+            adminHiddenSectionsCount: shop.adminHiddenSections?.length || 0,
+          },
+        });
+      } catch (error: any) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch shop sections',
+          error: error.message,
+        });
+      }
+    }
+
     // API Test Route - Beautiful HTML UI
     if (path === '/api/v1/test' && method === 'GET') {
       let dbStatus = 'connected';

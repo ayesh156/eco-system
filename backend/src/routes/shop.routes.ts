@@ -13,6 +13,7 @@ import {
   createShopForUser,
   getShopSections,
   updateShopSections,
+  debugShopSections,
 } from '../controllers/shop.controller';
 import { protect, authorize, requireShop, requireShopAccess } from '../middleware/auth';
 import { shopRegistrationRateLimiter, sensitiveRateLimiter } from '../middleware/rateLimiter';
@@ -73,6 +74,9 @@ router.get('/:id/sections', protect, requireShopAccess, getShopSections);
 // SuperAdmin can update hiddenSections (affects ADMIN + USER)
 // Shop ADMIN can update adminHiddenSections (affects USER only)
 router.put('/:id/sections', protect, requireShopAccess, authorize('ADMIN', 'SUPER_ADMIN'), sensitiveRateLimiter, updateShopSections);
+
+// DEBUG: Shop sections diagnostic endpoint
+router.get('/:id/debug/sections', protect, requireShopAccess, debugShopSections);
 
 // ==========================================
 // SUPER ADMIN ROUTES (platform-wide)
