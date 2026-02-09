@@ -32,8 +32,22 @@ const paymentMethods = [
   { id: 'cheque', label: 'Cheque', icon: Receipt, color: 'text-cyan-500', bgColor: 'bg-cyan-500/10' },
 ];
 
+// Normalize payment method from API (handles CASH, BANK_TRANSFER, etc.) to lowercase
+const normalizePaymentMethod = (method: string): string => {
+  const methodMap: Record<string, string> = {
+    'CASH': 'cash',
+    'BANK_TRANSFER': 'bank',
+    'BANK': 'bank',
+    'CARD': 'card',
+    'CREDIT': 'credit',
+    'CHEQUE': 'cheque',
+  };
+  return methodMap[method?.toUpperCase()] || method?.toLowerCase() || 'cash';
+};
+
 const getPaymentMethodConfig = (method: string) => {
-  return paymentMethods.find(m => m.id === method) || paymentMethods[0];
+  const normalizedMethod = normalizePaymentMethod(method);
+  return paymentMethods.find(m => m.id === normalizedMethod) || paymentMethods[0];
 };
 
 export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
@@ -44,7 +58,7 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
   isProcessing: externalProcessing = false,
 }) => {
   const { theme } = useTheme();
-  const { user, isViewingShop, viewingShop } = useAuth();
+  const { user, isViewingShop, viewingShop, getAccessToken } = useAuth();
   const shopId = isViewingShop && viewingShop ? viewingShop.id : user?.shop?.id;
   
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
@@ -69,7 +83,7 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
     
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
-      const token = localStorage.getItem('auth_token');
+      const token = getAccessToken();
       
       const response = await fetch(`${API_BASE_URL}/grns/${apiId}/payments${shopId ? `?shopId=${shopId}` : ''}`, {
         headers: {

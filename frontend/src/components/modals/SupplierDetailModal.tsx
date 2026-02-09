@@ -8,9 +8,18 @@ import {
   X, Building2, TrendingUp, ClipboardList, History,
   CheckCircle, AlertTriangle, Clock, XCircle, DollarSign,
   Calendar, Truck, ShoppingCart, CreditCard, Banknote,
-  ChevronRight, Loader2,
+  ChevronRight, ChevronDown, Loader2, Wallet, Receipt,
   ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
+
+interface PaymentRecord {
+  id: string;
+  amount: number;
+  paymentMethod: string;
+  sentAt: string;
+  message?: string;
+  notes?: string;
+}
 
 interface SupplierDetailModalProps {
   isOpen: boolean;
@@ -20,6 +29,31 @@ interface SupplierDetailModalProps {
   onMakePayment: (purchase: any) => void;
 }
 
+const paymentMethodConfigs = [
+  { id: 'cash', label: 'Cash', icon: Banknote, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' },
+  { id: 'bank', label: 'Bank Transfer', icon: Building2, color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
+  { id: 'card', label: 'Card', icon: CreditCard, color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
+  { id: 'credit', label: 'Credit', icon: Wallet, color: 'text-orange-500', bgColor: 'bg-orange-500/10' },
+  { id: 'cheque', label: 'Cheque', icon: Receipt, color: 'text-cyan-500', bgColor: 'bg-cyan-500/10' },
+];
+
+const normalizePaymentMethod = (method: string): string => {
+  const methodMap: Record<string, string> = {
+    'CASH': 'cash',
+    'BANK_TRANSFER': 'bank',
+    'BANK': 'bank',
+    'CARD': 'card',
+    'CREDIT': 'credit',
+    'CHEQUE': 'cheque',
+  };
+  return methodMap[method?.toUpperCase()] || method?.toLowerCase() || 'cash';
+};
+
+const getPaymentMethodConfig = (method: string) => {
+  const normalizedMethod = normalizePaymentMethod(method);
+  return paymentMethodConfigs.find(m => m.id === normalizedMethod) || paymentMethodConfigs[0];
+};
+
 export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
   isOpen,
   supplier,
@@ -27,12 +61,15 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
   onMakePayment,
 }) => {
   const { theme } = useTheme();
-  const { user, isViewingShop, viewingShop } = useAuth();
+  const { user, isViewingShop, viewingShop, getAccessToken } = useAuth();
   const shopId = isViewingShop && viewingShop ? viewingShop.id : user?.shop?.id;
   
   const [activeTab, setActiveTab] = useState<'overview' | 'grn' | 'payments'>('overview');
   const [grns, setGRNs] = useState<FrontendGRN[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [expandedGRNs, setExpandedGRNs] = useState<Set<string>>(new Set());
+  const [grnPayments, setGRNPayments] = useState<Record<string, PaymentRecord[]>>({});
+  const [loadingPayments, setLoadingPayments] = useState<Record<string, boolean>>({});
 
   const loadGRNs = useCallback(async () => {
     if (!supplier || !isOpen) return;
@@ -59,9 +96,55 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
     }
   }, [supplier, isOpen, shopId]);
 
+  const loadPaymentsForGRN = useCallback(async (grn: FrontendGRN) => {
+    const grnId = grn.apiId || grn.id;
+    if (grnPayments[grnId]) return; // Already loaded
+    
+    setLoadingPayments(prev => ({ ...prev, [grnId]: true }));
+    
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+      const token = getAccessToken();
+      
+      const response = await fetch(`${API_BASE_URL}/grns/${grnId}/payments${shopId ? `?shopId=${shopId}` : ''}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setGRNPayments(prev => ({ ...prev, [grnId]: result.data }));
+        }
+      }
+    } catch (err) {
+      console.error('Error loading payments for GRN:', err);
+    } finally {
+      setLoadingPayments(prev => ({ ...prev, [grnId]: false }));
+    }
+  }, [shopId, grnPayments]);
+
+  const toggleGRNExpansion = useCallback((grn: FrontendGRN) => {
+    const grnId = grn.apiId || grn.id;
+    setExpandedGRNs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(grnId)) {
+        newSet.delete(grnId);
+      } else {
+        newSet.add(grnId);
+        loadPaymentsForGRN(grn);
+      }
+      return newSet;
+    });
+  }, [loadPaymentsForGRN]);
+
   useEffect(() => {
     loadGRNs();
     setActiveTab('overview');
+    setExpandedGRNs(new Set());
+    setGRNPayments({});
   }, [loadGRNs]);
 
   const stats = useMemo(() => {
@@ -565,56 +648,127 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                           const pending = total - paid;
                           const percentage = total > 0 ? (paid / total) * 100 : 0;
                           const paymentConfig = getPaymentStatusConfig(grn.paymentStatus);
+                          const grnId = grn.apiId || grn.id;
+                          const isExpanded = expandedGRNs.has(grnId);
+                          const payments = grnPayments[grnId] || [];
+                          const isLoadingPayment = loadingPayments[grnId];
                           
                           return (
                             <div 
                               key={grn.id}
-                              className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200'}`}
+                              className={`rounded-xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200'}`}
                             >
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentConfig.bg}`}>
-                                    <ClipboardList className={`w-5 h-5 ${paymentConfig.color}`} />
+                              {/* Clickable Header */}
+                              <button
+                                onClick={() => toggleGRNExpansion(grn)}
+                                className={`w-full p-4 text-left transition-colors ${
+                                  theme === 'dark' ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentConfig.bg}`}>
+                                      <ClipboardList className={`w-5 h-5 ${paymentConfig.color}`} />
+                                    </div>
+                                    <div>
+                                      <h4 className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{grn.grnNumber}</h4>
+                                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                        {formatDate(grn.receivedDate || grn.orderDate)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-3 py-1 rounded-lg text-sm font-medium ${paymentConfig.bg} ${paymentConfig.color}`}>
+                                      {paymentConfig.label}
+                                    </span>
+                                    <ChevronDown className={`w-5 h-5 transition-transform ${
+                                      isExpanded ? 'rotate-180' : ''
+                                    } ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
+                                  </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+                                  <div>
+                                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Total</span>
+                                    <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(total)}</p>
                                   </div>
                                   <div>
-                                    <h4 className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{grn.grnNumber}</h4>
-                                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                      {formatDate(grn.receivedDate || grn.orderDate)}
-                                    </p>
+                                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Paid</span>
+                                    <p className="font-semibold text-emerald-500">{formatCurrency(paid)}</p>
+                                  </div>
+                                  <div>
+                                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Pending</span>
+                                    <p className="font-semibold text-amber-500">{formatCurrency(pending)}</p>
                                   </div>
                                 </div>
-                                <span className={`px-3 py-1 rounded-lg text-sm font-medium ${paymentConfig.bg} ${paymentConfig.color}`}>
-                                  {paymentConfig.label}
-                                </span>
-                              </div>
-                              
-                              <div className="grid grid-cols-3 gap-4 text-sm mb-3">
-                                <div>
-                                  <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Total</span>
-                                  <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(total)}</p>
+                                
+                                <div className={`h-2 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                                  <div 
+                                    className={`h-full rounded-full transition-all bg-gradient-to-r ${
+                                      percentage >= 100 ? 'from-emerald-500 to-teal-500' : 
+                                      percentage >= 50 ? 'from-amber-500 to-orange-500' : 'from-red-500 to-rose-500'
+                                    }`}
+                                    style={{ width: `${Math.min(percentage, 100)}%` }}
+                                  />
                                 </div>
-                                <div>
-                                  <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Paid</span>
-                                  <p className="font-semibold text-emerald-500">{formatCurrency(paid)}</p>
+                                <p className={`text-xs mt-1 text-right ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {percentage.toFixed(1)}% paid
+                                </p>
+                              </button>
+
+                              {/* Expandable Payment History */}
+                              {isExpanded && (
+                                <div className={`border-t px-4 py-3 ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+                                  <h5 className={`text-sm font-medium mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                    <History className="w-4 h-4" />
+                                    Payment History
+                                  </h5>
+                                  
+                                  {isLoadingPayment ? (
+                                    <div className="flex items-center justify-center py-4">
+                                      <Loader2 className={`w-5 h-5 animate-spin ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
+                                    </div>
+                                  ) : payments.length === 0 ? (
+                                    <p className={`text-sm text-center py-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                      No payments recorded yet
+                                    </p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {payments.map((payment, idx) => {
+                                        const methodConfig = getPaymentMethodConfig(payment.paymentMethod);
+                                        const MethodIcon = methodConfig.icon;
+                                        return (
+                                          <div 
+                                            key={payment.id || idx}
+                                            className={`flex items-center justify-between p-3 rounded-lg ${
+                                              theme === 'dark' ? 'bg-slate-700/50' : 'bg-white border border-slate-200'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${methodConfig.bgColor}`}>
+                                                <MethodIcon className={`w-4 h-4 ${methodConfig.color}`} />
+                                              </div>
+                                              <div>
+                                                <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                                  {formatCurrency(payment.amount)}
+                                                </p>
+                                                <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                  {methodConfig.label} • {formatDate(payment.sentAt)}
+                                                </p>
+                                              </div>
+                                            </div>
+                                            {payment.notes && (
+                                              <p className={`text-xs max-w-[150px] truncate ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                {payment.notes}
+                                              </p>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
-                                <div>
-                                  <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Pending</span>
-                                  <p className="font-semibold text-amber-500">{formatCurrency(pending)}</p>
-                                </div>
-                              </div>
-                              
-                              <div className={`h-2 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
-                                <div 
-                                  className={`h-full rounded-full transition-all bg-gradient-to-r ${
-                                    percentage >= 100 ? 'from-emerald-500 to-teal-500' : 
-                                    percentage >= 50 ? 'from-amber-500 to-orange-500' : 'from-red-500 to-rose-500'
-                                  }`}
-                                  style={{ width: `${Math.min(percentage, 100)}%` }}
-                                />
-                              </div>
-                              <p className={`text-xs mt-1 text-right ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                                {percentage.toFixed(1)}% paid
-                              </p>
+                              )}
                             </div>
                           );
                         })}
