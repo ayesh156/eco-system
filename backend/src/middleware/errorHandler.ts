@@ -59,6 +59,17 @@ export const errorHandler = (
   } else if (err.name === 'PrismaClientValidationError') {
     statusCode = 400;
     message = 'Invalid data format. Please check your request data.';
+  } else if (err.name === 'PrismaClientInitializationError') {
+    statusCode = 503;
+    message = 'Database connection failed. The service is temporarily unavailable. Please try again in a moment.';
+    console.error('🚨 Prisma Initialization Error:', err.message);
+  } else if (err.name === 'PrismaClientRustPanicError') {
+    statusCode = 503;
+    message = 'A critical database error occurred. Please try again.';
+    console.error('🚨 Prisma Rust Panic:', err.message);
+  } else if (err.message?.includes('connect') && err.message?.includes('database')) {
+    statusCode = 503;
+    message = 'Database connection failed. Please try again in a moment.';
   }
 
   const response: ErrorResponse = {

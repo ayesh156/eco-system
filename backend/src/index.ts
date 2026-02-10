@@ -29,6 +29,7 @@ import { notFound } from './middleware/notFound';
 import { apiRateLimiter } from './middleware/rateLimiter';
 import { sanitizeRequestBody } from './middleware/validation';
 import { corsConfig } from './config/security';
+import { connectWithRetry } from './lib/prisma';
 
 // Route imports
 import authRoutes from './routes/auth.routes';
@@ -407,10 +408,13 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📡 API available at http://localhost:${PORT}${API_PREFIX}`);
+  
+  // Pre-connect to database (important for Render free tier cold starts)
+  await connectWithRetry(3, 2000);
 });
 
 export default app;

@@ -18,6 +18,7 @@ import {
 } from '../controllers/forgotPassword.controller';
 import { protect } from '../middleware/auth';
 import { authRateLimiter, loginRateLimiter, sensitiveRateLimiter } from '../middleware/rateLimiter';
+import { handleValidationErrors } from '../middleware/validation';
 
 const router = Router();
 
@@ -46,6 +47,7 @@ const registerValidation = [
     .trim()
     .isLength({ min: 2, max: 50 })
     .withMessage('Shop slug must be between 2 and 50 characters'),
+  handleValidationErrors,
 ];
 
 const loginValidation = [
@@ -56,6 +58,7 @@ const loginValidation = [
   body('password')
     .notEmpty()
     .withMessage('Password is required'),
+  handleValidationErrors,
 ];
 
 const updateProfileValidation = [
@@ -69,6 +72,7 @@ const updateProfileValidation = [
     .isEmail()
     .withMessage('Please provide a valid email')
     .normalizeEmail(),
+  handleValidationErrors,
 ];
 
 const changePasswordValidation = [
@@ -80,6 +84,7 @@ const changePasswordValidation = [
     .withMessage('New password must be at least 8 characters long')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  handleValidationErrors,
 ];
 
 // ===================================
@@ -126,6 +131,7 @@ const forgotPasswordValidation = [
     .isEmail()
     .withMessage('Please provide a valid email')
     .normalizeEmail(),
+  handleValidationErrors,
 ];
 
 const verifyOTPValidation = [
@@ -138,6 +144,7 @@ const verifyOTPValidation = [
     .withMessage('OTP must be 6 digits')
     .isNumeric()
     .withMessage('OTP must contain only numbers'),
+  handleValidationErrors,
 ];
 
 const resetPasswordValidation = [
@@ -153,6 +160,7 @@ const resetPasswordValidation = [
     .withMessage('Password must be at least 8 characters long')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  handleValidationErrors,
 ];
 
 /**

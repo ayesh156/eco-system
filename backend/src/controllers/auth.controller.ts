@@ -208,15 +208,35 @@ export const login = async (
       throw new AppError('Please provide email and password', 400);
     }
 
-    // Find user with password
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      include: {
-        shop: {
-          select: { id: true, name: true, slug: true, logo: true },
+    // Find user with password (with connection retry for cold starts)
+    let user;
+    try {
+      user = await prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+        include: {
+          shop: {
+            select: { id: true, name: true, slug: true, logo: true },
+          },
         },
-      },
-    });
+      });
+    } catch (dbError) {
+      // Retry once on connection failure (common on Render cold starts)
+      console.warn('⚠️ Login DB query failed, retrying...', dbError instanceof Error ? dbError.message : dbError);
+      try {
+        await prisma.$connect();
+        user = await prisma.user.findUnique({
+          where: { email: email.toLowerCase() },
+          include: {
+            shop: {
+              select: { id: true, name: true, slug: true, logo: true },
+            },
+          },
+        });
+      } catch (retryError) {
+        console.error('❌ Login DB retry also failed:', retryError instanceof Error ? retryError.message : retryError);
+        throw new AppError('Service temporarily unavailable. Please try again in a moment.', 503);
+      }
+    }
 
     if (!user) {
       throw new AppError('Invalid email or password', 401);
