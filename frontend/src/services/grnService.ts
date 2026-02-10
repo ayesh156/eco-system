@@ -602,7 +602,7 @@ export const sendEmailWithPDF = async (
 
     const result = await response.json();
 
-    if (!response.ok) {
+    if (!response.ok && response.status !== 202) {
       throw new Error(result.message || result.error || 'Failed to send email');
     }
 

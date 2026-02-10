@@ -593,29 +593,33 @@ export const sendGRNEmail = async (req: AuthRequest, res: Response, next: NextFu
       notes: grn.notes || undefined,
     };
 
-    // Send the email with optional PDF attachment
-    const result = await sendGRNWithPDF(
-      emailData,
-      includeAttachment ? pdfBase64 : undefined
-    );
-
-    if (!result.success) {
-      return res.status(500).json({ 
-        success: false, 
-        message: result.error || 'Failed to send GRN email' 
-      });
-    }
-
-    res.json({
+    // ASYNC: Return 202 immediately, send email in background
+    // This prevents timeout on Render.com Web Service (no serverless functions)
+    res.status(202).json({
       success: true,
-      message: 'GRN email sent successfully',
+      message: 'GRN email is being sent',
       data: {
-        messageId: result.messageId,
         sentTo: grn.supplier.email,
         grnNumber: grn.grnNumber,
-        hasPdfAttachment: result.hasPdfAttachment || false,
+        hasPdfAttachment: !!(includeAttachment && pdfBase64),
+        status: 'queued',
       },
     });
+
+    // Fire-and-forget: send email in background after response is sent
+    sendGRNWithPDF(
+      emailData,
+      includeAttachment ? pdfBase64 : undefined
+    ).then((result) => {
+      if (result.success) {
+        console.log(`✅ GRN email sent to ${grn.supplier!.email} for GRN #${grn.grnNumber}`);
+      } else {
+        console.error(`❌ GRN email failed for GRN #${grn.grnNumber}:`, result.error);
+      }
+    }).catch((err) => {
+      console.error(`❌ GRN email error for GRN #${grn.grnNumber}:`, err instanceof Error ? err.message : err);
+    });
+
   } catch (error) {
     next(error);
   }

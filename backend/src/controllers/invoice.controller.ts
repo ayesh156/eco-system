@@ -1449,32 +1449,44 @@ export const sendInvoiceViaEmail = async (
       notes: invoice.notes || undefined,
     };
 
-    // Send the email
-    const result = await sendInvoiceEmail(emailData);
+    // ASYNC: Return 202 immediately, send email in background
+    // This prevents timeout on Render.com Web Service (no serverless functions)
+    const emailMeta = { emailData, invoiceId: invoice.id, customerEmail: invoice.customer.email, invoiceNumber: invoice.invoiceNumber };
 
-    if (!result.success) {
-      throw new AppError(result.error || 'Failed to send invoice email', 500);
-    }
-
-    // Update invoice with email sent status
-    await prisma.invoice.update({
-      where: { id: invoice.id },
-      data: {
-        emailSent: true,
-        emailSentAt: new Date(),
-      },
-    });
-
-    res.json({
+    res.status(202).json({
       success: true,
-      message: 'Invoice email sent successfully',
+      message: 'Invoice email is being sent',
       data: {
-        messageId: result.messageId,
         sentTo: invoice.customer.email,
         invoiceNumber: invoice.invoiceNumber,
         emailSentAt: new Date(),
+        status: 'queued',
       },
     });
+
+    // Fire-and-forget: send email + update DB in background
+    sendInvoiceEmail(emailMeta.emailData)
+      .then(async (result) => {
+        if (result.success) {
+          console.log(`✅ Invoice email sent to ${emailMeta.customerEmail} for Invoice #${emailMeta.invoiceNumber}`);
+          try {
+            await prisma.invoice.update({
+              where: { id: emailMeta.invoiceId },
+              data: {
+                emailSent: true,
+                emailSentAt: new Date(),
+              },
+            });
+          } catch (dbErr) {
+            console.error(`⚠️ Failed to update emailSent status for Invoice #${emailMeta.invoiceNumber}:`, dbErr);
+          }
+        } else {
+          console.error(`❌ Invoice email failed for Invoice #${emailMeta.invoiceNumber}:`, result.error);
+        }
+      })
+      .catch((err) => {
+        console.error(`❌ Invoice email error for Invoice #${emailMeta.invoiceNumber}:`, err instanceof Error ? err.message : err);
+      });
   } catch (error) {
     next(error);
   }
@@ -1770,32 +1782,46 @@ export const sendInvoiceEmailWithPDF = async (
     };
 
     // Send the email with PDF attachment
-    const result = await sendInvoiceWithPDF(emailData, pdfBuffer);
+    const emailResult = { emailData, pdfBuffer, invoiceId: invoice.id, customerEmail: invoice.customer.email, invoiceNumber: invoice.invoiceNumber };
 
-    if (!result.success) {
-      throw new AppError(result.error || 'Failed to send invoice email', 500);
-    }
-
-    // Update invoice with email sent status
-    await prisma.invoice.update({
-      where: { id: invoice.id },
-      data: {
-        emailSent: true,
-        emailSentAt: new Date(),
-      },
-    });
-
-    res.json({
+    // ASYNC: Return 202 immediately, send email in background
+    // This prevents timeout on Render.com Web Service (no serverless functions)
+    res.status(202).json({
       success: true,
-      message: 'Invoice email with PDF sent successfully',
+      message: 'Invoice email is being sent',
       data: {
-        messageId: result.messageId,
         sentTo: invoice.customer.email,
         invoiceNumber: invoice.invoiceNumber,
         emailSentAt: new Date(),
         hasPdfAttachment: true,
+        status: 'queued',
       },
     });
+
+    // Fire-and-forget: send email + update DB in background after response is sent
+    sendInvoiceWithPDF(emailResult.emailData, emailResult.pdfBuffer)
+      .then(async (result) => {
+        if (result.success) {
+          console.log(`✅ Invoice email sent to ${emailResult.customerEmail} for Invoice #${emailResult.invoiceNumber}`);
+          // Update invoice with email sent status
+          try {
+            await prisma.invoice.update({
+              where: { id: emailResult.invoiceId },
+              data: {
+                emailSent: true,
+                emailSentAt: new Date(),
+              },
+            });
+          } catch (dbErr) {
+            console.error(`⚠️ Failed to update emailSent status for Invoice #${emailResult.invoiceNumber}:`, dbErr);
+          }
+        } else {
+          console.error(`❌ Invoice email failed for Invoice #${emailResult.invoiceNumber}:`, result.error);
+        }
+      })
+      .catch((err) => {
+        console.error(`❌ Invoice email error for Invoice #${emailResult.invoiceNumber}:`, err instanceof Error ? err.message : err);
+      });
   } catch (error) {
     next(error);
   }

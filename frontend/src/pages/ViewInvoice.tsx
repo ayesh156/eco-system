@@ -608,12 +608,12 @@ export const ViewInvoice: React.FC = () => {
       setCachedInvoices(updateWithEmail);
       
       const successMessage = result.hasPdfAttachment 
-        ? 'Invoice sent with PDF attachment!' 
-        : 'Invoice sent (PDF available to download)';
+        ? 'Invoice is being sent with PDF attachment!' 
+        : 'Invoice is being sent!';
       
       toast.success(successMessage, {
         id: 'email-pdf',
-        description: `Invoice #${invoice.id} emailed to ${result.sentTo}`,
+        description: `Invoice #${invoice.id} email queued for ${result.sentTo}`,
       });
     } catch (error) {
       console.error('❌ Failed to send invoice email:', error);

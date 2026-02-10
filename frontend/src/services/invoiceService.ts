@@ -360,7 +360,7 @@ export const invoiceService = {
   /**
    * Send invoice via email to customer
    */
-  async sendEmail(invoiceId: string, shopId?: string): Promise<{ messageId: string; sentTo: string; invoiceNumber: string; emailSentAt: string }> {
+  async sendEmail(invoiceId: string, shopId?: string): Promise<{ messageId?: string; sentTo: string; invoiceNumber?: string; emailSentAt?: string }> {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 180000);
@@ -371,7 +371,7 @@ export const invoiceService = {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      const result = await handleResponse<APIResponse<{ messageId: string; sentTo: string; invoiceNumber: string; emailSentAt: string }>>(response);
+      const result = await handleResponse<APIResponse<{ messageId?: string; sentTo: string; invoiceNumber?: string; emailSentAt?: string }>>(response);
       return result.data;
     } catch (error) {
       clearTimeout(timeoutId);
@@ -445,10 +445,10 @@ export const invoiceService = {
    * @param pdfBase64 - Optional base64-encoded PDF (generated client-side)
    */
   async sendEmailWithPDF(invoiceId: string, shopId?: string, pdfBase64?: string): Promise<{ 
-    messageId: string; 
+    messageId?: string; 
     sentTo: string; 
-    invoiceNumber: string; 
-    emailSentAt: string;
+    invoiceNumber?: string; 
+    emailSentAt?: string;
     hasPdfAttachment: boolean;
   }> {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
@@ -469,10 +469,10 @@ export const invoiceService = {
 
       clearTimeout(timeoutId);
       const result = await handleResponse<APIResponse<{ 
-        messageId: string; 
+        messageId?: string; 
         sentTo: string; 
-        invoiceNumber: string; 
-        emailSentAt: string;
+        invoiceNumber?: string; 
+        emailSentAt?: string;
         hasPdfAttachment: boolean;
       }>>(response);
       return result.data;
