@@ -1,6 +1,36 @@
 import { PrismaClient } from '@prisma/client';
 
 // ===================================
+// Supabase PgBouncer Auto-Configuration
+// ===================================
+
+/**
+ * Auto-append pgbouncer=true & connection_limit=1 to DATABASE_URL
+ * when using Supabase's connection pooler (port 6543).
+ * This MUST run before PrismaClient is created.
+ */
+function ensurePoolerParams(): void {
+  const url = process.env.DATABASE_URL;
+  if (!url) return;
+
+  // Detect Supabase pooler (port 6543 or pooler.supabase.com)
+  if (url.includes('pooler.supabase.com') || url.includes(':6543')) {
+    const separator = url.includes('?') ? '&' : '?';
+    const params: string[] = [];
+    if (!url.includes('pgbouncer=')) params.push('pgbouncer=true');
+    if (!url.includes('connection_limit=')) params.push('connection_limit=1');
+    if (!url.includes('pool_timeout=')) params.push('pool_timeout=20');
+    if (params.length > 0) {
+      process.env.DATABASE_URL = url + separator + params.join('&');
+      console.log('🔧 Auto-added PgBouncer params to DATABASE_URL (connection_limit=1, pool_timeout=20)');
+    }
+  }
+}
+
+// Must run before PrismaClient instantiation
+ensurePoolerParams();
+
+// ===================================
 // Connection State & Mutex
 // ===================================
 
@@ -37,6 +67,8 @@ const CONNECTION_ERROR_PATTERNS = [
   'unable to start a transaction',
   'Transaction API error',
   'invalid length of startup packet',
+  'Timed out fetching a new connection from the connection pool',
+  'connection pool',
 ];
 
 const CONNECTION_ERROR_NAMES = [
@@ -44,7 +76,7 @@ const CONNECTION_ERROR_NAMES = [
   'PrismaClientRustPanicError',
 ];
 
-const CONNECTION_ERROR_CODES = ['P1001', 'P1002', 'P1008', 'P1017'];
+const CONNECTION_ERROR_CODES = ['P1001', 'P1002', 'P1008', 'P1017', 'P2024'];
 
 function isConnectionError(error: any): boolean {
   if (!error) return false;
@@ -162,17 +194,24 @@ if (process.env.NODE_ENV !== 'production') {
 
 /**
  * Check if the database is reachable.
- * Does NOT trigger reconnection — just reports current state.
+ * Lightweight: if already reconnecting or recently checked, returns cached state.
+ * Does NOT trigger cascading retries.
  */
 export async function checkDbHealth(): Promise<{ connected: boolean; error?: string }> {
-  // If we know we're disconnected and already reconnecting, just report status
+  // If already reconnecting, just report status (don't pile on DB calls)
   if (isReconnecting) {
     return { connected: false, error: 'Reconnecting...' };
+  }
+
+  // If connected recently (within 30s), trust cached state to avoid pool pressure
+  if (isConnected && (Date.now() - lastConnectAttempt) < 30000) {
+    return { connected: true };
   }
 
   try {
     await prisma.$queryRawUnsafe('SELECT 1');
     isConnected = true;
+    lastConnectAttempt = Date.now();
     return { connected: true };
   } catch (err) {
     isConnected = false;

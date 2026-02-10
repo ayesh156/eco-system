@@ -46,7 +46,11 @@ export const errorHandler = (
   } else if (err.name === 'PrismaClientKnownRequestError') {
     // Handle Prisma-specific errors
     const prismaError = err as any;
-    if (prismaError.code === 'P2025') {
+    if (prismaError.code === 'P2024') {
+      statusCode = 503;
+      message = 'Database connection pool timeout. The service is temporarily busy. Please try again in a moment.';
+      console.error('🚨 Connection Pool Timeout (P2024):', err.message?.substring(0, 200));
+    } else if (prismaError.code === 'P2025') {
       statusCode = 404;
       message = 'Record not found. The requested resource does not exist.';
     } else if (prismaError.code === 'P2002') {
@@ -77,6 +81,8 @@ export const errorHandler = (
     err.message?.includes('server closed the connection') ||
     err.message?.includes('Server has closed the connection') ||
     err.message?.includes('connect ETIMEDOUT') ||
+    err.message?.includes('connection pool') ||
+    err.message?.includes('Timed out fetching a new connection') ||
     (err.message?.includes('connect') && err.message?.includes('database'))
   ) {
     statusCode = 503;
