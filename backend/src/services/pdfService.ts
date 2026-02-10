@@ -1,6 +1,6 @@
 /**
  * PDF Generation Service
- * Generates invoice PDFs using Puppeteer - MATCHES FRONTEND PrintableInvoice EXACTLY
+ * Generates invoice and GRN PDFs using Puppeteer - MATCHES FRONTEND EXACTLY
  */
 
 import puppeteer from 'puppeteer';
@@ -32,6 +32,59 @@ export interface InvoicePDFData {
   paidAmount: number;
   dueAmount: number;
   status: string;
+  notes?: string;
+  // Shop branding
+  shopName: string;
+  shopSubName?: string;
+  shopAddress?: string;
+  shopPhone?: string;
+  shopEmail?: string;
+  shopLogo?: string; // Base64 encoded logo or URL
+}
+
+// GRN item interface
+interface GRNItem {
+  productName: string;
+  category?: string;
+  unitPrice: number;
+  originalUnitPrice?: number;
+  orderedQuantity: number;
+  receivedQuantity: number;
+  acceptedQuantity: number;
+  rejectedQuantity: number;
+  totalAmount: number;
+  sellingPrice?: number;
+  discountType?: 'fixed' | 'percentage';
+  discountValue?: number;
+}
+
+// GRN data interface for PDF generation
+export interface GRNPDFData {
+  grnNumber: string;
+  supplierName: string;
+  supplierEmail?: string;
+  supplierPhone?: string;
+  supplierAddress?: string;
+  orderDate: string;
+  expectedDeliveryDate: string;
+  receivedDate: string;
+  deliveryNote?: string;
+  receivedBy?: string;
+  vehicleNumber?: string;
+  status: 'completed' | 'partial' | 'pending' | 'rejected';
+  paymentStatus: 'paid' | 'unpaid' | 'partial';
+  paymentMethod?: string;
+  items: GRNItem[];
+  totalOrderedQuantity: number;
+  totalReceivedQuantity: number;
+  totalAcceptedQuantity: number;
+  totalRejectedQuantity: number;
+  subtotal: number;
+  totalDiscount?: number;
+  discountAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  paidAmount?: number;
   notes?: string;
   // Shop branding
   shopName: string;
@@ -741,6 +794,871 @@ export const generateInvoicePDF = async (data: InvoicePDFData): Promise<Buffer> 
 export const generateInvoicePDFToFile = async (data: InvoicePDFData, filePath: string): Promise<string> => {
   const fs = await import('fs').then(m => m.promises);
   const pdfBuffer = await generateInvoicePDF(data);
+  await fs.writeFile(filePath, pdfBuffer);
+  return filePath;
+};
+
+// ═════════════════════════════════════════════════════════════════
+// GRN PDF GENERATION
+// ═════════════════════════════════════════════════════════════════
+
+// Get status label for GRN
+const getGRNStatusLabel = (status: string): string => {
+  switch (status) {
+    case 'completed': return 'COMPLETED';
+    case 'partial': return 'PARTIAL RECEIVED';
+    case 'pending': return 'PENDING';
+    case 'rejected': return 'REJECTED';
+    default: return status.toUpperCase();
+  }
+};
+
+// Generate the HTML template for GRN (MATCHES FRONTEND PrintableGRN EXACTLY)
+const generateGRNHTML = (data: GRNPDFData): string => {
+  // Generate items rows
+  const itemRows = data.items.map((item) => {
+    const hasDiscount = (item.discountValue || 0) > 0;
+    const originalPrice = item.originalUnitPrice || item.unitPrice;
+    
+    const priceCell = hasDiscount
+      ? `<div>
+           <span style="text-decoration: line-through; font-size: 7pt; display: block;">${formatCurrency(originalPrice)}</span>
+           <span style="font-weight: 600; display: block;">${formatCurrency(item.unitPrice)}</span>
+           <span style="display: inline-block; font-size: 7pt; background: #f0f0f0; padding: 1px 4px; border-radius: 2px; margin-top: 2px;">
+             -${item.discountType === 'percentage' ? `${item.discountValue}%` : formatCurrency(item.discountValue || 0)}
+           </span>
+         </div>`
+      : formatCurrency(item.unitPrice);
+    
+    return `
+      <tr>
+        <td>
+          <div style="font-weight: 600; color: #000;">${item.productName}</div>
+          ${item.category ? `<div style="font-size: 7pt; color: #666; margin-top: 2px;">${item.category}</div>` : ''}
+          ${item.sellingPrice ? `<div style="font-size: 7pt; color: #000; margin-top: 4px; padding: 2px 4px; background: #f5f5f5; border-left: 2px solid #000; display: inline-block;">Sell @ ${formatCurrency(item.sellingPrice)}</div>` : ''}
+        </td>
+        <td style="text-align: right; font-family: 'Consolas', monospace; font-size: 8pt;">${priceCell}</td>
+        <td style="text-align: center; font-weight: 600;">${item.orderedQuantity}</td>
+        <td style="text-align: center; font-weight: 600;">${item.receivedQuantity}</td>
+        <td style="text-align: center; font-weight: 700; color: #059669;">${item.acceptedQuantity}</td>
+        <td style="text-align: center; font-weight: 700; color: #dc2626;">${item.rejectedQuantity}</td>
+        <td style="text-align: right; font-weight: 700; font-family: 'Consolas', monospace; font-size: 8pt;">${formatCurrency(item.totalAmount)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  // Shop logo section
+  const logoSection = data.shopLogo
+    ? `<img src="${data.shopLogo}" alt="Shop Logo" style="max-width: 120px; max-height: 80px; object-fit: contain;" />`
+    : getDefaultLogoSVG();
+
+  // Address formatted with line breaks
+  const formattedAddress = data.shopAddress 
+    ? data.shopAddress.split(',').map(line => line.trim()).join('<br>')
+    : 'N/A';
+
+  // Balance due calculation
+  const balanceDue = data.totalAmount - (data.paidAmount || 0);
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRN ${data.grnNumber}</title>
+  <style>
+    /* ═══════════════════════════════════════════════════════════════
+       INK-EFFICIENT B&W PRINT OPTIMIZED - MATCHES FRONTEND EXACTLY
+       ═══════════════════════════════════════════════════════════════ */
+    
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      font-size: 10pt;
+      line-height: 1.4;
+      color: #000;
+      background: white;
+      padding: 12mm 15mm;
+    }
+
+    /* HEADER - Company Info - INK EFFICIENT */
+    .grn-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: stretch;
+      margin-bottom: 8px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #000;
+    }
+
+    .company-section {
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    .company-logo {
+      width: auto;
+      height: auto;
+      max-width: 120px;
+      max-height: 80px;
+      align-self: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .company-info h1 {
+      font-size: 16pt;
+      font-weight: 700;
+      color: #000;
+      margin: 0 0 1px 0;
+    }
+
+    .company-info .sub-name {
+      font-size: 9pt;
+      font-weight: 600;
+      color: #000;
+      margin-bottom: 6px;
+    }
+
+    .company-info .details {
+      font-size: 8pt;
+      color: #000;
+      line-height: 1.4;
+    }
+
+    .contact-box {
+      text-align: right;
+    }
+
+    .contact-box h3 {
+      font-size: 9pt;
+      font-weight: 600;
+      color: #000;
+      margin: 0 0 4px 0;
+      text-decoration: underline;
+    }
+
+    .contact-box .info {
+      font-size: 8pt;
+      color: #000;
+      line-height: 1.5;
+    }
+
+    /* TITLE SECTION */
+    .grn-title-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 15px 18px;
+      margin-bottom: 15px;
+      background: white;
+      border: 2px solid #000;
+    }
+
+    .grn-title h2 {
+      font-size: 16pt;
+      font-weight: 700;
+      color: #000;
+      margin: 0 0 2px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .grn-title .company-label {
+      font-size: 8pt;
+      color: #000;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+
+    .grn-status {
+      text-align: right;
+    }
+
+    .status-badges {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border: 2px solid #000;
+      border-radius: 4px;
+      font-size: 9pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: white;
+      color: #000;
+    }
+
+    .status-badge.partial,
+    .status-badge.pending {
+      border: 2px dashed #000;
+    }
+
+    /* Payment Status Badges - INK EFFICIENT */
+    .payment-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 9pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: white;
+      color: #000;
+      border: 2px solid #000;
+    }
+
+    .payment-badge.unpaid {
+      border: 2px dashed #000;
+    }
+
+    .grn-status .total-amount {
+      margin-top: 8px;
+      font-size: 18pt;
+      font-weight: 700;
+      color: #000;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    /* GRN META */
+    .grn-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      gap: 20px;
+    }
+
+    .supplier-info {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #000;
+    }
+
+    .supplier-info label {
+      font-size: 7pt;
+      color: #000;
+      display: block;
+      margin-bottom: 2px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .supplier-info .name {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #000;
+      margin-bottom: 4px;
+    }
+
+    .supplier-info .info {
+      font-size: 8pt;
+      color: #000;
+      line-height: 1.4;
+    }
+
+    .grn-details {
+      text-align: right;
+    }
+
+    .grn-details .row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-bottom: 4px;
+      font-size: 8pt;
+    }
+
+    .grn-details .row label {
+      color: #000;
+      font-weight: 500;
+    }
+
+    .grn-details .row .value {
+      color: #000;
+      font-weight: 600;
+      min-width: 90px;
+      text-align: right;
+    }
+
+    .grn-details .row .value.highlight {
+      font-weight: 700;
+      font-size: 9pt;
+    }
+
+    /* ITEMS TABLE */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+    }
+
+    .items-table thead th {
+      background: white;
+      color: #000;
+      font-size: 8pt;
+      font-weight: 700;
+      padding: 8px 10px;
+      text-align: left;
+      border: 1px solid #000;
+      border-bottom: 2px solid #000;
+      text-transform: uppercase;
+    }
+
+    .items-table tbody tr {
+      border-bottom: 1px solid #000;
+    }
+
+    .items-table tbody td {
+      padding: 10px;
+      font-size: 9pt;
+      color: #000;
+      vertical-align: top;
+      border-left: 1px solid #000;
+      border-right: 1px solid #000;
+    }
+
+    /* SUMMARY SECTION */
+    .summary-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 18px;
+      gap: 25px;
+    }
+
+    .quantity-summary {
+      flex: 1;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .qty-box {
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+      padding: 12px 8px;
+      border: 2px solid #000;
+      background: white;
+    }
+
+    .qty-box .label {
+      font-size: 7pt;
+      font-weight: 600;
+      color: #000;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .qty-box .value {
+      font-size: 16pt;
+      font-weight: 700;
+      color: #000;
+    }
+
+    .qty-box.accepted .value {
+      color: #059669;
+    }
+
+    .qty-box.rejected .value {
+      color: #dc2626;
+    }
+
+    .totals-box {
+      width: 220px;
+      border: 1px solid #000;
+      padding: 10px;
+    }
+
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      font-size: 8pt;
+      border-bottom: 1px dotted #000;
+    }
+
+    .totals-row .label { color: #000; }
+    .totals-row .value {
+      font-family: 'Consolas', 'Monaco', monospace;
+      color: #000;
+      font-weight: 500;
+    }
+
+    .totals-row.total {
+      border-bottom: none;
+      padding-top: 8px;
+      margin-top: 4px;
+      border-top: 2px solid #000;
+    }
+
+    .totals-row.total .label {
+      font-weight: 700;
+      color: #000;
+      text-transform: uppercase;
+    }
+
+    .totals-row.total .value {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #000;
+    }
+
+    .payment-info {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #000;
+    }
+
+    .payment-info .payment-label {
+      font-size: 7pt;
+      font-weight: 600;
+      color: #000;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .payment-info .payment-detail {
+      font-size: 8pt;
+      color: #000;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .payment-info .payment-status {
+      font-size: 7pt;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: white;
+      border: 1px solid #000;
+    }
+
+    /* BALANCE DUE BOX - INK EFFICIENT */
+    .balance-due-box {
+      background: #fff;
+      border: 2px solid #000;
+      padding: 12px 15px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .balance-due-box .balance-label {
+      font-size: 10pt;
+      font-weight: 800;
+      color: #000;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .balance-due-box .balance-amount {
+      font-size: 13pt;
+      font-weight: 900;
+      color: #000;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    /* FULLY PAID BOX */
+    .fully-paid-box {
+      text-align: center;
+      font-weight: 700;
+      margin-bottom: 15px;
+      padding: 10px 16px;
+      border: 2px solid #000;
+      border-radius: 0;
+      background: white;
+    }
+
+    .fully-paid-box .paid-label {
+      font-size: 12pt;
+      font-weight: 700;
+      color: #000;
+      letter-spacing: 1px;
+    }
+
+    /* NOTES SECTION */
+    .notes-section {
+      background: white;
+      border: 1px solid #000;
+      padding: 10px 12px;
+      margin-bottom: 15px;
+    }
+
+    .notes-section h4 {
+      font-size: 8pt;
+      font-weight: 700;
+      color: #000;
+      margin: 0 0 6px 0;
+      text-transform: uppercase;
+      border-bottom: 1px solid #000;
+      padding-bottom: 4px;
+    }
+
+    .notes-section p {
+      font-size: 7pt;
+      color: #000;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    /* SIGNATURES */
+    .signatures-section {
+      display: flex;
+      gap: 30px;
+      justify-content: space-between;
+      margin-bottom: 15px;
+      padding-top: 12px;
+    }
+
+    .signature-box {
+      flex: 1;
+      text-align: center;
+    }
+
+    .signature-box .line {
+      height: 40px;
+      border-bottom: 1px solid #000;
+      margin-bottom: 6px;
+    }
+
+    .signature-box .label {
+      font-size: 8pt;
+      color: #000;
+      font-weight: 600;
+    }
+
+    /* FOOTER */
+    .footer-section {
+      border-top: 2px solid #000;
+      padding-top: 12px;
+      margin-bottom: 8px;
+    }
+
+    .footer-section h4 {
+      font-size: 7pt;
+      font-weight: 700;
+      color: #000;
+      margin: 0 0 3px 0;
+    }
+
+    .footer-section p {
+      font-size: 7pt;
+      color: #000;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .footer-thank-you {
+      text-align: center;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px dashed #000;
+      font-size: 9pt;
+      font-weight: 600;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="grn-header">
+    <div class="company-section">
+      <div class="company-logo">
+        ${logoSection}
+      </div>
+      <div class="company-info">
+        <h1>${data.shopName}</h1>
+        ${data.shopSubName ? `<div class="sub-name">${data.shopSubName}</div>` : ''}
+        <div class="details">${formattedAddress}</div>
+      </div>
+    </div>
+    <div class="contact-box">
+      <h3>Contact information</h3>
+      <div class="info">
+        ${data.shopEmail || ''}<br>
+        ${data.shopPhone || ''}
+      </div>
+    </div>
+  </div>
+
+  <!-- GRN Title Section -->
+  <div class="grn-title-section">
+    <div class="grn-title">
+      <h2>GOODS RECEIVED NOTE</h2>
+      <div class="company-label">${data.shopName} ${data.shopSubName || ''}</div>
+    </div>
+    <div class="grn-status">
+      <div class="status-badges">
+        <span class="status-badge ${data.status}">
+          ${getGRNStatusLabel(data.status)}
+        </span>
+        <span class="payment-badge ${data.paymentStatus}">
+          ${data.paymentStatus === 'paid' ? '✓ PAID' : data.paymentStatus === 'partial' ? '◐ PARTIAL' : '○ UNPAID'}
+        </span>
+      </div>
+      <div class="total-amount">${formatCurrency(data.totalAmount)}</div>
+    </div>
+  </div>
+
+  <!-- Supplier Info & GRN Details -->
+  <div class="grn-meta">
+    <div class="supplier-info">
+      <label>Supplier:</label>
+      <div class="name">${data.supplierName}</div>
+      ${data.supplierEmail || data.supplierPhone || data.supplierAddress ? `
+        <div class="info">
+          ${data.supplierEmail ? `Email: ${data.supplierEmail}<br>` : ''}
+          ${data.supplierPhone ? `Phone: ${data.supplierPhone}<br>` : ''}
+          ${data.supplierAddress ? `Address: ${data.supplierAddress}` : ''}
+        </div>
+      ` : ''}
+    </div>
+    <div class="grn-details">
+      <div class="row">
+        <label>GRN Number:</label>
+        <span class="value highlight">${data.grnNumber}</span>
+      </div>
+      <div class="row">
+        <label>Delivery Note:</label>
+        <span class="value">${data.deliveryNote || '-'}</span>
+      </div>
+      <div class="row">
+        <label>Order Date:</label>
+        <span class="value">${formatDate(data.orderDate)}</span>
+      </div>
+      <div class="row">
+        <label>Expected Delivery:</label>
+        <span class="value">${formatDate(data.expectedDeliveryDate)}</span>
+      </div>
+      <div class="row">
+        <label>Received Date:</label>
+        <span class="value">${formatDate(data.receivedDate)}</span>
+      </div>
+      <div class="row">
+        <label>Received By:</label>
+        <span class="value">${data.receivedBy || '-'}</span>
+      </div>
+      ${data.vehicleNumber ? `
+        <div class="row">
+          <label>Vehicle No:</label>
+          <span class="value">${data.vehicleNumber}</span>
+        </div>
+      ` : ''}
+    </div>
+  </div>
+
+  <!-- Items Table -->
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="width: 30%;">Product</th>
+        <th style="width: 12%; text-align: right;">Unit Price</th>
+        <th style="width: 10%; text-align: center;">Ordered</th>
+        <th style="width: 10%; text-align: center;">Received</th>
+        <th style="width: 10%; text-align: center;">Accepted</th>
+        <th style="width: 10%; text-align: center;">Rejected</th>
+        <th style="width: 18%; text-align: right;">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows}
+    </tbody>
+  </table>
+
+  <!-- Summary Section -->
+  <div class="summary-section">
+    <div class="quantity-summary">
+      <div class="qty-box ordered">
+        <div class="label">Ordered</div>
+        <div class="value">${data.totalOrderedQuantity}</div>
+      </div>
+      <div class="qty-box received">
+        <div class="label">Received</div>
+        <div class="value">${data.totalReceivedQuantity}</div>
+      </div>
+      <div class="qty-box accepted">
+        <div class="label">Accepted</div>
+        <div class="value">${data.totalAcceptedQuantity}</div>
+      </div>
+      <div class="qty-box rejected">
+        <div class="label">Rejected</div>
+        <div class="value">${data.totalRejectedQuantity}</div>
+      </div>
+    </div>
+    <div class="totals-box">
+      <div class="totals-row">
+        <span class="label">Sub Total:</span>
+        <span class="value">${formatCurrency(data.subtotal)}</span>
+      </div>
+      ${(data.totalDiscount || 0) > 0 ? `
+        <div class="totals-row">
+          <span class="label">Total Discount:</span>
+          <span class="value">-${formatCurrency(data.totalDiscount || 0)}</span>
+        </div>
+      ` : ''}
+      ${data.discountAmount > 0 && !(data.totalDiscount) ? `
+        <div class="totals-row">
+          <span class="label">Discount:</span>
+          <span class="value">-${formatCurrency(data.discountAmount)}</span>
+        </div>
+      ` : ''}
+      ${data.taxAmount > 0 ? `
+        <div class="totals-row">
+          <span class="label">Tax:</span>
+          <span class="value">${formatCurrency(data.taxAmount)}</span>
+        </div>
+      ` : ''}
+      <div class="totals-row total">
+        <span class="label">Grand Total:</span>
+        <span class="value">${formatCurrency(data.totalAmount)}</span>
+      </div>
+      
+      ${(data.paidAmount || 0) > 0 && data.paymentStatus !== 'paid' ? `
+        <div class="totals-row">
+          <span class="label">Paid Amount:</span>
+          <span class="value" style="color: #059669;">${formatCurrency(data.paidAmount || 0)}</span>
+        </div>
+      ` : ''}
+      
+      ${data.paymentMethod ? `
+        <div class="payment-info">
+          <div class="payment-label">Payment Details</div>
+          <div class="payment-detail">
+            ${data.paymentMethod.charAt(0).toUpperCase() + data.paymentMethod.slice(1)}
+            <span class="payment-status ${data.paymentStatus || 'unpaid'}">
+              ${data.paymentStatus === 'paid' ? 'PAID' : data.paymentStatus === 'partial' ? 'PARTIAL' : 'UNPAID'}
+            </span>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  </div>
+
+  ${data.paymentStatus !== 'paid' && balanceDue > 0 ? `
+    <div class="balance-due-box">
+      <span class="balance-label">⚠️ BALANCE DUE :</span>
+      <span class="balance-amount">${formatCurrency(balanceDue)}</span>
+    </div>
+  ` : ''}
+
+  ${data.paymentStatus === 'paid' ? `
+    <div class="fully-paid-box">
+      <span class="paid-label">✓ FULLY PAID</span>
+    </div>
+  ` : ''}
+
+  ${data.notes ? `
+    <div class="notes-section">
+      <h4>Notes / Remarks</h4>
+      <p>${data.notes}</p>
+    </div>
+  ` : ''}
+
+  <!-- Signatures -->
+  <div class="signatures-section">
+    <div class="signature-box">
+      <div class="line"></div>
+      <div class="label">Received By</div>
+    </div>
+    <div class="signature-box">
+      <div class="line"></div>
+      <div class="label">Inspected By</div>
+    </div>
+    <div class="signature-box">
+      <div class="line"></div>
+      <div class="label">Approved By</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer-section">
+    <h4>Terms & Conditions:</h4>
+    <p>
+      All goods received are subject to quality inspection. Rejected items will be returned to the supplier. 
+      Any discrepancy must be reported within 24 hours of receipt. This document serves as proof of goods received 
+      and must be retained for records and future reference.
+    </p>
+  </div>
+
+  <div class="footer-thank-you">
+    Thank you for your business partnership!
+  </div>
+</body>
+</html>
+  `;
+};
+
+/**
+ * Generate PDF from GRN data
+ * Returns a Buffer containing the PDF
+ */
+export const generateGRNPDF = async (data: GRNPDFData): Promise<Buffer> => {
+  let browser = null;
+  
+  try {
+    // Launch headless browser
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
+    
+    const page = await browser.newPage();
+    
+    // Set the HTML content
+    const html = generateGRNHTML(data);
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    
+    // Generate PDF
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '10mm',
+        right: '12mm',
+        bottom: '10mm',
+        left: '12mm',
+      },
+    });
+    
+    return Buffer.from(pdfBuffer);
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+};
+
+/**
+ * Generate GRN PDF and save to file
+ */
+export const generateGRNPDFToFile = async (data: GRNPDFData, filePath: string): Promise<string> => {
+  const fs = await import('fs').then(m => m.promises);
+  const pdfBuffer = await generateGRNPDF(data);
   await fs.writeFile(filePath, pdfBuffer);
   return filePath;
 };

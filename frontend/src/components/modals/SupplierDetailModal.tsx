@@ -61,7 +61,7 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
   supplier,
   onClose,
   onMakePayment,
-  onPaymentComplete,
+  onPaymentComplete: _onPaymentComplete,
   refreshTrigger,
 }) => {
   const { theme } = useTheme();

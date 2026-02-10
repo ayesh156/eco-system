@@ -2,7 +2,6 @@
  * Client-Side PDF Generation Service
  * 
  * Uses html2canvas + jsPDF to generate PDFs directly in the browser.
- * This works in Vercel serverless environment where Puppeteer cannot run.
  */
 
 import html2canvas from 'html2canvas';
@@ -129,9 +128,9 @@ export async function generatePDFAsDataURL(
 }
 
 /**
- * Open WhatsApp Web with a pre-filled message
- * Since WhatsApp Web doesn't support direct file attachments via URL,
- * we download the PDF first and instruct the user to attach it.
+ * Open WhatsApp with a pre-filled message
+ * Uses WhatsApp Desktop protocol (whatsapp://) on desktop,
+ * falls back to WhatsApp Web for mobile browsers.
  * 
  * @param phoneNumber - Customer's phone number (with country code)
  * @param message - Pre-filled message text
@@ -156,9 +155,17 @@ export function openWhatsAppWithMessage(
 
   // Encode message for URL
   const encodedMessage = encodeURIComponent(message);
+  const phoneWithoutPlus = formattedPhone.replace('+', '');
   
-  // Open WhatsApp Web
-  const whatsappUrl = `https://web.whatsapp.com/send?phone=${formattedPhone.replace('+', '')}&text=${encodedMessage}`;
+  // Detect if on mobile device
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+  
+  // Use WhatsApp Desktop protocol on desktop, WhatsApp Web on mobile
+  const whatsappUrl = isMobile 
+    ? `https://web.whatsapp.com/send?phone=${phoneWithoutPlus}&text=${encodedMessage}`
+    : `whatsapp://send?phone=${phoneWithoutPlus}&text=${encodedMessage}`;
+  
   window.open(whatsappUrl, '_blank');
 }
 

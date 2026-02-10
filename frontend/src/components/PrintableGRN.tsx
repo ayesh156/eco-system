@@ -222,6 +222,14 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
             text-align: right;
           }
 
+          .grn-status .status-badges {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            align-items: center;
+            flex-wrap: wrap;
+          }
+
           .grn-status .status-badge {
             display: inline-block;
             padding: 6px 12px;
@@ -257,6 +265,35 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
             background: white;
             color: #000;
             border: 2px double #000;
+          }
+
+          /* Payment Status Badges - INK EFFICIENT */
+          .grn-status .payment-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 9pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+
+          .grn-status .payment-badge.paid {
+            background: white;
+            color: #000;
+            border: 2px solid #000;
+          }
+
+          .grn-status .payment-badge.partial-pay {
+            background: white;
+            color: #000;
+            border: 2px solid #000;
+          }
+
+          .grn-status .payment-badge.unpaid {
+            background: white;
+            color: #000;
+            border: 2px dashed #000;
           }
 
           .grn-status .total-amount {
@@ -677,6 +714,51 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
             color: #000;
             font-weight: 600;
           }
+
+          /* BALANCE DUE BOX - Creative styling */
+          .balance-due-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            padding: 12px 16px;
+            border: 2px solid #000;
+            border-radius: 0;
+            background: white;
+          }
+
+          .balance-due-box .balance-label {
+            font-size: 11pt;
+            font-weight: 700;
+            color: #000;
+            letter-spacing: 0.5px;
+          }
+
+          .balance-due-box .balance-amount {
+            font-size: 14pt;
+            font-weight: 800;
+            color: #000;
+            font-family: 'Consolas', 'Monaco', monospace;
+          }
+
+          /* FULLY PAID BOX */
+          .fully-paid-box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px 16px;
+            border: 2px solid #000;
+            border-radius: 0;
+            background: white;
+          }
+
+          .fully-paid-box .paid-label {
+            font-size: 12pt;
+            font-weight: 700;
+            color: #000;
+            letter-spacing: 1px;
+          }
         `}</style>
 
         {/* Header */}
@@ -728,9 +810,14 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
             <div className="company-label">{shopName} {shopSubName}</div>
           </div>
           <div className="grn-status">
-            <span className={`status-badge ${grn.status}`}>
-              {getStatusLabel(grn.status)}
-            </span>
+            <div className="status-badges">
+              <span className={`status-badge ${grn.status}`}>
+                {getStatusLabel(grn.status)}
+              </span>
+              <span className={`payment-badge ${grn.paymentStatus === 'paid' ? 'paid' : grn.paymentStatus === 'partial' ? 'partial-pay' : 'unpaid'}`}>
+                {grn.paymentStatus === 'paid' ? '✓ PAID' : grn.paymentStatus === 'partial' ? '◐ PARTIAL' : '○ UNPAID'}
+              </span>
+            </div>
             <div className="total-amount">{formatCurrency(grn.totalAmount)}</div>
           </div>
         </div>
@@ -913,7 +1000,7 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
         {/* Balance Due Section - Prominent box like in image */}
         {grn.paymentStatus !== 'paid' && (grn.totalAmount - (grn.paidAmount || 0)) > 0 && (
           <div className="balance-due-box">
-            <span className="balance-label">⚠ BALANCE DUE:</span>
+            <span className="balance-label">⚠️ BALANCE DUE :</span>
             <span className="balance-amount">{formatCurrency(grn.totalAmount - (grn.paidAmount || 0))}</span>
           </div>
         )}

@@ -636,6 +636,36 @@ Best regards,
 📞 {{shopPhone}}
 📍 {{shopAddress}}`;
 
+// Supplier Order Template (for placing new orders via WhatsApp)
+const DEFAULT_SUPPLIER_ORDER_TEMPLATE = `🛒 *NEW ORDER REQUEST*
+━━━━━━━━━━━━━━━━━━━━━
+
+Hello {{supplierName}}! 👋
+
+This is *{{shopName}}* reaching out for a new order.
+
+📅 *Date:* {{orderDate}}
+🏢 *Supplier:* {{supplierCompany}}
+
+━━━━━━━━━━━━━━━━━━━━━
+📦 *ORDER DETAILS:*
+━━━━━━━━━━━━━━━━━━━━━
+
+Please share your:
+✅ Latest product catalog
+✅ Current stock availability
+✅ Best pricing for bulk orders
+✅ Expected delivery timeline
+
+━━━━━━━━━━━━━━━━━━━━━
+
+We look forward to doing business with you! 🤝
+
+_Sent via {{shopName}} POS System_
+🌟 *Quality Products, Quality Service*
+📞 {{shopPhone}}
+📍 {{shopAddress}}`;
+
 /**
  * @route   GET /api/v1/shop-admin/whatsapp-settings
  * @desc    Get WhatsApp settings for the shop
@@ -663,6 +693,7 @@ router.get('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         grnReminderEnabled: true,
         grnPaymentReminderTemplate: true,
         grnOverdueReminderTemplate: true,
+        supplierOrderTemplate: true,
       },
     });
 
@@ -680,6 +711,7 @@ router.get('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         grnReminderEnabled: shop.grnReminderEnabled ?? true,
         grnPaymentReminderTemplate: shop.grnPaymentReminderTemplate || DEFAULT_GRN_PAYMENT_REMINDER_TEMPLATE,
         grnOverdueReminderTemplate: shop.grnOverdueReminderTemplate || DEFAULT_GRN_OVERDUE_REMINDER_TEMPLATE,
+        supplierOrderTemplate: shop.supplierOrderTemplate || DEFAULT_SUPPLIER_ORDER_TEMPLATE,
         shopDetails: {
           name: shop.name || '',
           phone: shop.phone || '',
@@ -708,7 +740,8 @@ router.put('/whatsapp-settings', async (req: Request, res: Response, next: NextF
 
     const { 
       enabled, paymentReminderTemplate, overdueReminderTemplate,
-      grnReminderEnabled, grnPaymentReminderTemplate, grnOverdueReminderTemplate 
+      grnReminderEnabled, grnPaymentReminderTemplate, grnOverdueReminderTemplate,
+      supplierOrderTemplate
     } = req.body;
 
     const updatedShop = await prisma.shop.update({
@@ -720,6 +753,7 @@ router.put('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         ...(grnReminderEnabled !== undefined && { grnReminderEnabled }),
         ...(grnPaymentReminderTemplate !== undefined && { grnPaymentReminderTemplate }),
         ...(grnOverdueReminderTemplate !== undefined && { grnOverdueReminderTemplate }),
+        ...(supplierOrderTemplate !== undefined && { supplierOrderTemplate }),
       },
       select: {
         id: true,
@@ -733,6 +767,7 @@ router.put('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         grnReminderEnabled: true,
         grnPaymentReminderTemplate: true,
         grnOverdueReminderTemplate: true,
+        supplierOrderTemplate: true,
       },
     });
 
@@ -745,6 +780,7 @@ router.put('/whatsapp-settings', async (req: Request, res: Response, next: NextF
         grnReminderEnabled: updatedShop.grnReminderEnabled,
         grnPaymentReminderTemplate: updatedShop.grnPaymentReminderTemplate || '',
         grnOverdueReminderTemplate: updatedShop.grnOverdueReminderTemplate || '',
+        supplierOrderTemplate: updatedShop.supplierOrderTemplate || '',
         shopDetails: {
           name: updatedShop.name || '',
           phone: updatedShop.phone || '',

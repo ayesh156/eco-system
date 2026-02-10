@@ -406,13 +406,11 @@ app.use(`${API_PREFIX}/grns`, grnRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
-// Start server only if not in serverless environment
-if (process.env.VERCEL !== '1') {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`📡 API available at http://localhost:${PORT}${API_PREFIX}`);
-  });
-}
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📡 API available at http://localhost:${PORT}${API_PREFIX}`);
+});
 
 export default app;

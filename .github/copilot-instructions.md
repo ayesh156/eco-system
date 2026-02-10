@@ -1866,115 +1866,18 @@ If you see warnings, the `.env` file is not being loaded. Check:
 
 ---
 
-## ⚠️ CRITICAL: Dual API Index Files for Vercel Deployment
+## 🌐 Deployment: Render.com
 
-**IMPORTANT:** This project has TWO API index files that MUST stay in sync:
+This project is deployed on **Render.com** using `render.yaml` blueprint:
 
-1. **`backend/api/index.ts`** - Backend development server (Express routes)
-2. **`api/index.ts`** - Vercel serverless function handler
+- **Backend**: Web Service (Node.js + Express + Prisma) at `backend/`
+- **Frontend**: Static Site (React + Vite) at `frontend/`
+- **Database**: Supabase PostgreSQL
 
-### When to Update Both Files:
-
-Whenever you add or modify ANY API route/endpoint, you MUST update BOTH files:
-
-✅ **Routes to keep in sync:**
-- Authentication (`/api/v1/auth/*`)
-- Shop management (`/api/v1/shops/*`, `/api/v1/shop-admin/*`)
-- Customer management (`/api/v1/customers/*`)
-- Product management (`/api/v1/products/*`)
-- Invoice management (`/api/v1/invoices/*`)
-- Admin routes (`/api/v1/admin/*`)
-- Any other API endpoints
-
-### Step-by-Step Sync Process:
-
-1. **Make changes in `backend/src/routes/*.ts`** (Express routes)
-2. **Extract the route logic**
-3. **Update BOTH files:**
-   - Add the route handler in `backend/api/index.ts`
-   - Add the EXACT SAME route handler in `api/index.ts`
-4. **Use consistent patterns:**
-   - Path matching: Use regex for dynamic parameters
-   - Database: Use `prisma` or `db` variable (varies by file)
-   - Response: Return consistent JSON structure
-   - Authentication: Check JWT token properly
-5. **Test both:**
-   - Local: `npm run dev` (backend/api/index.ts)
-   - Production: Deploy to Vercel (`api/index.ts`)
-
-### Example: Adding a New Endpoint
-
-**Step 1 - Create in backend (Express):**
-```typescript
-// backend/src/routes/example.routes.ts
-router.get('/api/v1/examples', async (req, res) => {
-  const items = await prisma.example.findMany();
-  res.json({ success: true, data: items });
-});
-```
-
-**Step 2 - Add to backend/api/index.ts:**
-```typescript
-// In api/index.ts main handler function, add:
-if (path === '/api/v1/examples' && method === 'GET') {
-  const items = await db.example.findMany();
-  return res.status(200).json({ success: true, data: items });
-}
-```
-
-**Step 3 - Add to api/index.ts (root):**
-```typescript
-// In api/index.ts main handler function, add SAME code:
-if (path === '/api/v1/examples' && method === 'GET') {
-  const items = await prisma.example.findMany();  // Note: uses 'prisma' not 'db'
-  return res.status(200).json({ success: true, data: items });
-}
-```
-
-### Common Pitfalls to Avoid:
-
-❌ **WRONG:** Update only `backend/src/routes/*.ts` and forget `api/index.ts`
-- Result: Route works locally but fails on Vercel (404 errors)
-
-❌ **WRONG:** Use different database variable names
-- `backend/api/index.ts` uses `db` from prisma.ts
-- `api/index.ts` uses `prisma` global instance
-- Keep consistent within each file!
-
-❌ **WRONG:** Forget to add CORS/auth checks in serverless version
-- Frontend CORS errors
-- Authentication fails in production
-
-### Verification Checklist:
-
-Before deploying to Vercel, verify:
-- [ ] New route added in `backend/src/routes/*.ts`
-- [ ] Route logic copied to `backend/api/index.ts`
-- [ ] Route logic copied to `api/index.ts` with proper var names
-- [ ] Both versions handle same response format
-- [ ] Both versions have same error handling
-- [ ] Database queries use correct client (`db` vs `prisma`)
-- [ ] Authentication/authorization logic matches
-- [ ] CORS headers applied (if needed)
-- [ ] Local testing passes: `npm run dev`
-- [ ] Build passes: `npm run build`
-
-### Files to Always Check Together:
-
-```
-📁 backend/
-  📁 api/
-    └── index.ts          ← UPDATE THIS
-  📁 src/
-    📁 routes/
-      ├── auth.routes.ts
-      ├── shop.routes.ts
-      ├── customer.routes.ts
-      └── ...
-
-📁 api/
-  └── index.ts            ← AND UPDATE THIS TOO!
-```
-
-**Remember:** Vercel runs `api/index.ts`, NOT `backend/src/routes/*.ts`. If you only update one file, the other environment will fail!
+### Render Deployment Notes:
+1. Backend builds with `npm install && npx prisma generate && npx tsc` and runs `node dist/index.js`
+2. Frontend builds with `npm install && npm run build` and serves from `dist/`
+3. Environment variables are configured in Render dashboard
+4. SPA routing handled by Render's rewrite rules (`/* → /index.html`)
+5. All API routes are in `backend/src/routes/*.ts` - no separate serverless handlers needed
 ````

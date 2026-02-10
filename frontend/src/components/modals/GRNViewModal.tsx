@@ -2,13 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useShopBranding } from '../../contexts/ShopBrandingContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { useWhatsAppSettings } from '../../contexts/WhatsAppSettingsContext';
+// import { useWhatsAppSettings } from '../../contexts/WhatsAppSettingsContext'; // Uncomment when enabling handleSendReminder
 import type { GoodsReceivedNote, GRNStatus, GRNItemStatus, Supplier } from '../../data/mockData';
 import { mockSuppliers } from '../../data/mockData';
 import PrintableGRN from '../PrintableGRN';
 import { downloadPDFFromElement, openWhatsAppWithMessage, generatePDFAsDataURL } from '../../services/clientPdfService';
 import grnService from '../../services/grnService';
-import { grnReminderService } from '../../services/reminderService';
+// import { grnReminderService } from '../../services/reminderService'; // Uncomment when enabling handleSendReminder
+import { GRNReminderHistoryModal } from './GRNReminderHistoryModal';
 import {
   X,
   Package,
@@ -89,14 +90,15 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
   const { theme } = useTheme();
   const { branding } = useShopBranding();
   const { getAccessToken, isViewingShop, viewingShop } = useAuth();
-  const { settings: whatsAppSettings } = useWhatsAppSettings();
+  // const { settings: whatsAppSettings } = useWhatsAppSettings(); // Uncomment when enabling handleSendReminder
   const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [isSendingReminder, setIsSendingReminder] = useState(false);
+  // const [isSendingReminder, setIsSendingReminder] = useState(false); // Uncomment when enabling handleSendReminder
   const [reminderCount, setReminderCount] = useState(0);
+  const [showReminderHistoryModal, setShowReminderHistoryModal] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const hiddenPrintRef = useRef<HTMLDivElement>(null); // Hidden ref for direct PDF generation
   
@@ -125,11 +127,15 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
           email: grn.supplierEmail || '',
           phone: grn.supplierPhone || '',
           address: '',
-          status: 'active',
           totalOrders: 0,
           totalPurchases: 0,
           lastOrder: '',
-        } as Supplier);
+          creditBalance: 0,
+          creditLimit: 0,
+          creditStatus: 'clear',
+          rating: 0,
+          categories: [],
+        });
       }
     }
   }, [isOpen, grn]);
@@ -263,13 +269,13 @@ export const GRNViewModal: React.FC<GRNViewModalProps> = ({
       toast.loading('Generating PDF...', { id: 'grn-whatsapp-pdf' });
       await downloadPDFFromElement(printElement, `GRN-${grn.grnNumber}.pdf`);
 
-      // Step 2: Build WhatsApp message
+      // Step 2: Build WhatsApp message with actual shop details from database
       const balanceDue = grn.totalAmount - (grn.paidAmount || 0);
       const paymentStatusText = grn.paymentStatus === 'paid' ? '✅ PAID' :
                                 grn.paymentStatus === 'partial' ? '⚠️ PARTIALLY PAID' :
                                 '❌ UNPAID';
 
-      const shopName = branding?.shopName || 'Our Shop';
+      const shopName = branding?.name || 'Your Shop';
       const shopAddress = branding?.address || '';
       const shopPhone = branding?.phone || '';
 
@@ -374,7 +380,8 @@ Thank you for your service! 🙏`;
     }
   };
 
-  // Send payment reminder via WhatsApp
+  /* Send payment reminder via WhatsApp - DISABLED for now
+  // To enable, uncomment this function and add UI buttons that call it
   const handleSendReminder = async (type: 'PAYMENT' | 'OVERDUE') => {
     // Check if GRN reminders are enabled
     if (!whatsAppSettings?.grnReminderEnabled) {
@@ -415,6 +422,7 @@ Thank you for your service! 🙏`;
         year: 'numeric',
       }) : 'N/A';
 
+      // Replace placeholders in template with actual shop details from database
       const message = template
         .replace(/\{\{grnNumber\}\}/g, grn.grnNumber)
         .replace(/\{\{supplierName\}\}/g, grn.supplierName)
@@ -424,7 +432,7 @@ Thank you for your service! 🙏`;
         .replace(/\{\{dueDate\}\}/g, dueDateStr)
         .replace(/\{\{grnDate\}\}/g, formatDate(grn.receivedDate || grn.orderDate))
         .replace(/\{\{receivedDate\}\}/g, formatDate(grn.receivedDate || grn.orderDate))
-        .replace(/\{\{shopName\}\}/g, branding?.shopName || 'Our Shop')
+        .replace(/\{\{shopName\}\}/g, branding?.name || 'Your Shop')
         .replace(/\{\{shopPhone\}\}/g, branding?.phone || '')
         .replace(/\{\{shopAddress\}\}/g, branding?.address || '');
 
@@ -433,14 +441,14 @@ Thank you for your service! 🙏`;
 
       // Save reminder to database
       const grnId = grn.apiId || grn.id;
-      const token = getAccessToken();
       await grnReminderService.create(grnId, {
         type,
         channel: 'whatsapp',
         message,
         supplierPhone,
         supplierName: grn.supplierName,
-      }, token, effectiveShopId);
+        shopId: effectiveShopId,
+      });
 
       // Update local count
       setReminderCount(prev => prev + 1);
@@ -458,6 +466,7 @@ Thank you for your service! 🙏`;
       setIsSendingReminder(false);
     }
   };
+  // End of handleSendReminder - uncomment to enable */
 
   // Copy GRN number
   const handleCopyGRNNumber = () => {
@@ -490,71 +499,60 @@ Thank you for your service! 🙏`;
           ? 'bg-slate-900 border-slate-700' 
           : 'bg-white border-slate-200'
       }`}>
-        {/* Header */}
-        <div className={`px-6 py-4 border-b flex items-center justify-between flex-shrink-0 ${
+        {/* Header - Two Row Layout */}
+        <div className={`px-6 py-4 border-b flex-shrink-0 ${
           theme === 'dark' 
             ? 'bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border-slate-700' 
             : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-slate-200'
         }`}>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-              <ClipboardCheck className="w-6 h-6 text-white" />
+          {/* Row 1: Title + Action Buttons */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <ClipboardCheck className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {grn.grnNumber}
+                </h2>
+                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Goods Received Note
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                {grn.grnNumber}
-              </h2>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                Goods Received Note
-              </p>
-            </div>
-            <span className={`ml-4 px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 ${statusInfo.bgColor} ${statusInfo.color} border ${statusInfo.borderColor}`}>
-              <StatusIcon className="w-4 h-4" />
-              {statusInfo.label}
-            </span>
-            {/* Reminder Count Badge */}
-            {reminderCount > 0 && (
-              <span className={`ml-2 px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 ${
-                theme === 'dark'
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                  : 'bg-amber-100 text-amber-700 border border-amber-300'
-              }`}>
-                <Bell className="w-3.5 h-3.5" />
-                {reminderCount} {reminderCount === 1 ? 'reminder' : 'reminders'}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Pay Button - Show when not fully paid with animation highlight */}
-            {onPay && grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
+            
+            {/* Action Buttons - Right Side */}
+            <div className="flex items-center gap-2">
+              {/* Pay Button - Show when not fully paid with animation highlight */}
+              {onPay && grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
+                <button
+                  onClick={() => onPay(grn)}
+                  className={`relative flex items-center gap-1.5 px-4 py-2 rounded-xl font-medium shadow-lg transition-all transform hover:scale-105 ${
+                    theme === 'dark' 
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-amber-500/30' 
+                      : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-amber-500/30'
+                  }`}
+                  title="Record Payment"
+                >
+                  {/* Pulse animation - pointer-events-none to prevent blocking clicks */}
+                  <span className="absolute inset-0 rounded-xl bg-white/20 animate-ping opacity-75 pointer-events-none" />
+                  <DollarSign className="w-4 h-4 relative z-10" />
+                  <span className="text-sm font-semibold relative z-10">Pay Now</span>
+                </button>
+              )}
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(grn)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+                  }`}
+                  title="Edit GRN"
+                >
+                  <Edit className="w-5 h-5" />
+                </button>
+              )}
               <button
-                onClick={() => onPay(grn)}
-                className={`relative flex items-center gap-1.5 px-4 py-2 rounded-xl font-medium shadow-lg transition-all transform hover:scale-105 ${
-                  theme === 'dark' 
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-amber-500/30' 
-                    : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-amber-500/30'
-                }`}
-                title="Record Payment"
-              >
-                {/* Pulse animation - pointer-events-none to prevent blocking clicks */}
-                <span className="absolute inset-0 rounded-xl bg-white/20 animate-ping opacity-75 pointer-events-none" />
-                <DollarSign className="w-4 h-4 relative z-10" />
-                <span className="text-sm font-semibold relative z-10">Pay Now</span>
-              </button>
-            )}
-            {onEdit && (
-              <button
-                onClick={() => onEdit(grn)}
-                className={`p-2 rounded-lg transition-colors ${
-                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
-                }`}
-                title="Edit GRN"
-              >
-                <Edit className="w-5 h-5" />
-              </button>
-            )}
-            <button
-              onClick={handlePrint}
+                onClick={handlePrint}
               className={`p-2 rounded-lg transition-colors ${
                 theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
               }`}
@@ -647,6 +645,47 @@ Thank you for your service! 🙏`;
             >
               <X className="w-5 h-5" />
             </button>
+            </div>
+          </div>
+
+          {/* Row 2: Status Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Receipt Status Badge */}
+            <span className={`px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 ${statusInfo.bgColor} ${statusInfo.color} border ${statusInfo.borderColor}`}>
+              <StatusIcon className="w-4 h-4" />
+              {statusInfo.label}
+            </span>
+            
+            {/* Payment Status Badge */}
+            <span className={`px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 ${
+              grn.paymentStatus === 'paid' 
+                ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30'
+                : grn.paymentStatus === 'partial'
+                ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
+                : 'bg-red-500/10 text-red-500 border border-red-500/30'
+            }`}>
+              {grn.paymentStatus === 'paid' 
+                ? '✓ Paid' 
+                : grn.paymentStatus === 'partial'
+                ? '◐ Partial'
+                : '○ Unpaid'}
+            </span>
+            
+            {/* Reminder Count Badge - Clickable for history */}
+            {reminderCount > 0 && (
+              <button
+                onClick={() => setShowReminderHistoryModal(true)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-all hover:scale-105 ${
+                  theme === 'dark'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20'
+                    : 'bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200'
+                }`}
+                title="View reminder history"
+              >
+                <Bell className="w-3.5 h-3.5" />
+                {reminderCount} {reminderCount === 1 ? 'reminder' : 'reminders'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -1063,6 +1102,15 @@ Thank you for your service! 🙏`;
       <div className="fixed -left-[9999px] top-0 opacity-0 pointer-events-none">
         <PrintableGRN ref={hiddenPrintRef} grn={grn} supplier={supplier} branding={branding} />
       </div>
+
+      {/* GRN Reminder History Modal */}
+      <GRNReminderHistoryModal
+        isOpen={showReminderHistoryModal}
+        onClose={() => setShowReminderHistoryModal(false)}
+        grnId={(grn as any)?.apiId || grn?.id}
+        grnNumber={grn?.grnNumber}
+        supplierName={grn?.supplierName}
+      />
     </div>
   );
 };

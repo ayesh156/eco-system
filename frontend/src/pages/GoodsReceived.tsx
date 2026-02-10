@@ -9,6 +9,7 @@ import { GRNFormModal } from '../components/modals/GRNFormModal';
 import { GRNViewModal } from '../components/modals/GRNViewModal';
 import { GRNPaymentModal } from '../components/modals/GRNPaymentModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
+import { GRNReminderHistoryModal } from '../components/modals/GRNReminderHistoryModal';
 import { SearchableSelect } from '../components/ui/searchable-select';
 import * as grnService from '../services/grnService';
 import * as supplierService from '../services/supplierService';
@@ -57,7 +58,7 @@ type ViewMode = 'grid' | 'table';
 
 export const GoodsReceived: React.FC = () => {
   const { theme } = useTheme();
-  const { isViewingShop, viewingShop, getAccessToken } = useAuth();
+  const { isViewingShop, viewingShop } = useAuth();
   const { settings: whatsAppSettings } = useWhatsAppSettings();
   const { branding } = useShopBranding();
   const navigate = useNavigate();
@@ -74,6 +75,8 @@ export const GoodsReceived: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
+  const [showReminderHistoryModal, setShowReminderHistoryModal] = useState(false);
+  const [reminderHistoryGRN, setReminderHistoryGRN] = useState<GoodsReceivedNote | null>(null);
   
   // Date range filter states
   const [startDate, setStartDate] = useState('');
@@ -525,7 +528,7 @@ export const GoodsReceived: React.FC = () => {
         year: 'numeric',
       });
 
-      // Replace placeholders in template
+      // Replace placeholders in template with actual shop details from database
       const message = template
         .replace(/\{\{grnNumber\}\}/g, grn.grnNumber)
         .replace(/\{\{supplierName\}\}/g, grn.supplierName)
@@ -533,7 +536,7 @@ export const GoodsReceived: React.FC = () => {
         .replace(/\{\{balanceDue\}\}/g, `Rs. ${balanceDue.toLocaleString()}`)
         .replace(/\{\{paidAmount\}\}/g, `Rs. ${(grn.paidAmount || 0).toLocaleString()}`)
         .replace(/\{\{grnDate\}\}/g, grnDate)
-        .replace(/\{\{shopName\}\}/g, branding?.shopName || 'Our Shop')
+        .replace(/\{\{shopName\}\}/g, branding?.name || 'Your Shop')
         .replace(/\{\{shopPhone\}\}/g, branding?.phone || '')
         .replace(/\{\{shopAddress\}\}/g, branding?.address || '');
 
@@ -542,7 +545,6 @@ export const GoodsReceived: React.FC = () => {
 
       // Save reminder to database
       let reminderCount = (grn.reminderCount || 0) + 1;
-      const token = getAccessToken();
       
       try {
         const result = await grnReminderService.create(grnIdentifier, {
@@ -551,7 +553,8 @@ export const GoodsReceived: React.FC = () => {
           message,
           supplierPhone,
           supplierName: grn.supplierName,
-        }, token, effectiveShopId);
+          shopId: effectiveShopId,
+        });
         
         if (result.reminderCount) {
           reminderCount = result.reminderCount;
@@ -580,6 +583,12 @@ export const GoodsReceived: React.FC = () => {
     } finally {
       setSendingReminderId(null);
     }
+  };
+
+  // Open reminder history modal
+  const handleOpenReminderHistory = (grn: GoodsReceivedNote) => {
+    setReminderHistoryGRN(grn);
+    setShowReminderHistoryModal(true);
   };
 
   const formatDate = (dateString: string) => {
@@ -1343,9 +1352,16 @@ export const GoodsReceived: React.FC = () => {
                         <MessageCircle className="w-4 h-4" />
                       )}
                       {sendingReminderId === ((grn as FrontendGRN).apiId || grn.id) ? '...' : '💬'}
-                      {/* Reminder count badge */}
+                      {/* Reminder count badge - clickable for history */}
                       {grn.reminderCount !== undefined && grn.reminderCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-green-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                        <span 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenReminderHistory(grn);
+                          }}
+                          className="absolute -top-1 -right-1 bg-green-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center cursor-pointer hover:bg-green-700 hover:scale-110 transition-all"
+                          title="View reminder history"
+                        >
                           {grn.reminderCount}
                         </span>
                       )}
@@ -1765,6 +1781,20 @@ export const GoodsReceived: React.FC = () => {
         onPayment={handleGRNPayment}
         isProcessing={isProcessingPayment}
       />
+
+      {/* GRN Reminder History Modal */}
+      {reminderHistoryGRN && (
+        <GRNReminderHistoryModal
+          isOpen={showReminderHistoryModal}
+          onClose={() => {
+            setShowReminderHistoryModal(false);
+            setReminderHistoryGRN(null);
+          }}
+          grnId={(reminderHistoryGRN as FrontendGRN).apiId || reminderHistoryGRN.id}
+          grnNumber={reminderHistoryGRN.grnNumber}
+          supplierName={reminderHistoryGRN.supplierName}
+        />
+      )}
     </div>
   );
 };

@@ -359,6 +359,13 @@ export const getGRNById = async (id: string, shopId?: string): Promise<{ success
 export const createGRN = async (grnData: Partial<FrontendGRN>, shopId?: string): Promise<{ success: boolean; data?: FrontendGRN; error?: string }> => {
   try {
     const apiData = convertFrontendToAPIGRN(grnData);
+    
+    // Debug log to see what's being sent
+    console.log('📦 Creating GRN with data:', JSON.stringify(apiData, null, 2));
+    console.log('📦 Supplier ID:', apiData.supplierId);
+    console.log('📦 Items count:', apiData.items?.length);
+    console.log('📦 First item:', apiData.items?.[0]);
+    
     const queryParams = new URLSearchParams();
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/grns${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;

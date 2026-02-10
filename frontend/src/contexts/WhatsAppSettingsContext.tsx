@@ -21,6 +21,8 @@ interface WhatsAppSettings {
   grnReminderEnabled: boolean;
   grnPaymentReminderTemplate: string;
   grnOverdueReminderTemplate: string;
+  // Supplier Order Template
+  supplierOrderTemplate: string;
 }
 
 interface WhatsAppSettingsContextType {
@@ -31,7 +33,8 @@ interface WhatsAppSettingsContextType {
   loadSettings: () => Promise<void>;
   resetToDefaults: () => void;
   resetGrnToDefaults: () => void;
-  defaultTemplates: { payment: string; overdue: string; grnPayment: string; grnOverdue: string };
+  resetSupplierOrderToDefaults: () => void;
+  defaultTemplates: { payment: string; overdue: string; grnPayment: string; grnOverdue: string; supplierOrder: string };
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
@@ -104,6 +107,7 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
           const { 
             enabled, paymentReminderTemplate, overdueReminderTemplate, 
             grnReminderEnabled, grnPaymentReminderTemplate, grnOverdueReminderTemplate,
+            supplierOrderTemplate,
             shopDetails: apiShopDetails 
           } = result.data;
           
@@ -115,6 +119,7 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
             grnReminderEnabled: grnReminderEnabled ?? true,
             grnPaymentReminderTemplate: grnPaymentReminderTemplate ?? mockWhatsAppSettings.grnPaymentReminderTemplate,
             grnOverdueReminderTemplate: grnOverdueReminderTemplate ?? mockWhatsAppSettings.grnOverdueReminderTemplate,
+            supplierOrderTemplate: supplierOrderTemplate ?? mockWhatsAppSettings.supplierOrderTemplate,
           });
           
           // Set shop details from API (may contain empty values if not configured)
@@ -167,12 +172,21 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
     }));
   }, []);
 
+  // Reset supplier order template to defaults
+  const resetSupplierOrderToDefaults = useCallback(() => {
+    setSettings(prev => ({
+      ...prev,
+      supplierOrderTemplate: mockWhatsAppSettings.supplierOrderTemplate,
+    }));
+  }, []);
+
   // Expose default templates for reference
   const defaultTemplates = {
     payment: mockWhatsAppSettings.paymentReminderTemplate,
     overdue: mockWhatsAppSettings.overdueReminderTemplate,
     grnPayment: mockWhatsAppSettings.grnPaymentReminderTemplate,
     grnOverdue: mockWhatsAppSettings.grnOverdueReminderTemplate,
+    supplierOrder: mockWhatsAppSettings.supplierOrderTemplate,
   };
 
   // Save settings to API
@@ -208,6 +222,7 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
             grnReminderEnabled: result.data.grnReminderEnabled ?? true,
             grnPaymentReminderTemplate: result.data.grnPaymentReminderTemplate ?? '',
             grnOverdueReminderTemplate: result.data.grnOverdueReminderTemplate ?? '',
+            supplierOrderTemplate: result.data.supplierOrderTemplate ?? '',
           });
           if (result.data.shopDetails) {
             setShopDetails(result.data.shopDetails);
@@ -235,6 +250,7 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
       loadSettings,
       resetToDefaults,
       resetGrnToDefaults,
+      resetSupplierOrderToDefaults,
       defaultTemplates,
       isLoading, 
       isSaving,

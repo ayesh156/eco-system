@@ -10,6 +10,8 @@ export interface WhatsAppSettings {
   grnReminderEnabled: boolean;
   grnPaymentReminderTemplate: string;
   grnOverdueReminderTemplate: string;
+  // Supplier Order Template
+  supplierOrderTemplate: string;
 }
 
 // Creative Default WhatsApp message templates with placeholders - Sri Lankan context
@@ -69,9 +71,9 @@ This is a friendly notification regarding your GRN payment:
 
 📄 *GRN Number:* #{{grnNumber}}
 🏢 *Supplier:* {{supplierName}}
-💰 *Total Amount:* {{totalAmount}}
-✅ *Paid:* {{paidAmount}}
-⏳ *Balance Due:* {{balanceDue}}
+💰 *Total Amount:* Rs. {{totalAmount}}
+✅ *Paid:* Rs. {{paidAmount}}
+⏳ *Balance Due:* Rs. {{balanceDue}}
 📅 *GRN Date:* {{grnDate}}
 
 We will process the remaining payment as per our agreement.
@@ -91,9 +93,9 @@ This is an urgent reminder regarding the *overdue* payment for:
 
 📄 *GRN Number:* #{{grnNumber}}
 📅 *GRN Date:* {{grnDate}}
-💰 *Total Amount:* {{totalAmount}}
-✅ *Paid:* {{paidAmount}}
-⏳ *Balance Due:* {{balanceDue}}
+💰 *Total Amount:* Rs. {{totalAmount}}
+✅ *Paid:* Rs. {{paidAmount}}
+⏳ *Balance Due:* Rs. {{balanceDue}}
 
 ⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.
 
@@ -101,6 +103,35 @@ For any queries or to discuss payment arrangements, please contact us immediatel
 
 Best regards,
 *{{shopName}}*
+📞 {{shopPhone}}
+📍 {{shopAddress}}`,
+  // Supplier Order Template (for placing new orders)
+  supplierOrderTemplate: `🛒 *NEW ORDER REQUEST*
+━━━━━━━━━━━━━━━━━━━━━
+
+Hello {{supplierName}}! 👋
+
+This is *{{shopName}}* reaching out for a new order.
+
+📅 *Date:* {{orderDate}}
+🏢 *Supplier:* {{supplierCompany}}
+
+━━━━━━━━━━━━━━━━━━━━━
+📦 *ORDER DETAILS:*
+━━━━━━━━━━━━━━━━━━━━━
+
+Please share your:
+✅ Latest product catalog
+✅ Current stock availability
+✅ Best pricing for bulk orders
+✅ Expected delivery timeline
+
+━━━━━━━━━━━━━━━━━━━━━
+
+We look forward to doing business with you! 🤝
+
+_Sent via {{shopName}} POS System_
+🌟 *Quality Products, Quality Service*
 📞 {{shopPhone}}
 📍 {{shopAddress}}`
 };

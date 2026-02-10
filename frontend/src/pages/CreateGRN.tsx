@@ -35,7 +35,7 @@ export const CreateGRN: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(true);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [_isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [step, setStep] = useState<Step>(1);
@@ -54,7 +54,7 @@ export const CreateGRN: React.FC = () => {
 
   // Payment & Discount state
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | 'card' | 'credit' | 'cheque'>('cash');
-  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial'>('unpaid');
+  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial'>('paid');
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [overallDiscountType, setOverallDiscountType] = useState<'percentage' | 'fixed'>('fixed');
   const [overallDiscountValue, setOverallDiscountValue] = useState<number>(0);

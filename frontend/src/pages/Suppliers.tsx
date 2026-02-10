@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
+import { useShopBranding } from '../contexts/ShopBrandingContext';
 import { mockWhatsAppSettings, mockSupplierPurchases } from '../data/mockData';
 import type { Supplier, SupplierPurchase, GoodsReceivedNote } from '../data/mockData';
 import { SupplierFormModal } from '../components/modals/SupplierFormModal';
@@ -16,7 +18,7 @@ import {
   Search, Plus, Edit, Mail, Phone, Trash2,
   AlertTriangle, CheckCircle, Clock, CreditCard,
   Calendar, MessageCircle, Package, DollarSign, Zap, Eye,
-  ShoppingCart,
+  ShoppingCart, Pencil, RotateCcw,
   X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, SlidersHorizontal,
   List, LayoutGrid, ArrowDownUp, SortAsc, SortDesc, Loader2, Filter
 } from 'lucide-react';
@@ -26,10 +28,13 @@ import type { FrontendSupplier } from '../services/supplierService';
 
 export const Suppliers: React.FC = () => {
   const { theme } = useTheme();
-  const { isViewingShop, viewingShop } = useAuth();
+  const { isViewingShop, viewingShop, user } = useAuth();
+  const { settings: whatsAppSettings, shopDetails } = useWhatsAppSettings();
+  const { branding } = useShopBranding();
   
   // Get effective shopId for SUPER_ADMIN viewing a shop
   const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
+  const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
   
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -128,6 +133,8 @@ export const Suppliers: React.FC = () => {
   const [purchaseForPayment, setPurchaseForPayment] = useState<SupplierPurchase | null>(null);
   const [grnForPayment, setGrnForPayment] = useState<GoodsReceivedNote | null>(null);
   const [supplierForOrder, setSupplierForOrder] = useState<Supplier | null>(null);
+  const [orderMessage, setOrderMessage] = useState<string>('');
+  const [isEditingOrderMessage, setIsEditingOrderMessage] = useState(false);
   const [supplierForPaymentHistory, setSupplierForPaymentHistory] = useState<Supplier | null>(null);
   const [isProcessingGRNPayment, setIsProcessingGRNPayment] = useState(false);
   const [supplierDetailRefreshTrigger, setSupplierDetailRefreshTrigger] = useState(0);
@@ -511,6 +518,22 @@ export const Suppliers: React.FC = () => {
   // Handle order from supplier
   const handleOrderFromSupplier = (supplier: Supplier) => {
     setSupplierForOrder(supplier);
+    // Generate message from template
+    const today = new Date().toLocaleDateString('en-GB', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const generatedMessage = whatsAppSettings.supplierOrderTemplate
+      .replace(/\{\{supplierName\}\}/g, supplier.name)
+      .replace(/\{\{supplierCompany\}\}/g, supplier.company)
+      .replace(/\{\{orderDate\}\}/g, today)
+      .replace(/\{\{shopName\}\}/g, branding?.name || shopDetails?.name || effectiveShop?.name || 'Your Shop')
+      .replace(/\{\{shopPhone\}\}/g, branding?.phone || shopDetails?.phone || effectiveShop?.phone || '')
+      .replace(/\{\{shopAddress\}\}/g, branding?.address || shopDetails?.address || effectiveShop?.address || '');
+    setOrderMessage(generatedMessage);
+    setIsEditingOrderMessage(false);
     setIsOrderModalOpen(true);
   };
 
@@ -1914,101 +1937,190 @@ ECOTEC Computer Solutions`;
         purchases={purchases}
       />
 
-      {/* Order Modal */}
+      {/* Order Modal - Creative Preview & Edit Design */}
       {isOrderModalOpen && supplierForOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${
+          <div className={`w-full max-w-2xl max-h-[90vh] rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
             theme === 'dark' 
               ? 'bg-slate-900 border-slate-700' 
               : 'bg-white border-slate-200'
           }`}>
-            {/* Modal Header */}
+            {/* Modal Header - Orange Gradient */}
             <div className={`px-6 py-4 border-b flex items-center justify-between flex-shrink-0 ${
-              theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
+              theme === 'dark' ? 'border-slate-700 bg-gradient-to-r from-orange-900/50 to-amber-900/30' : 'border-slate-200 bg-gradient-to-r from-orange-50 to-amber-50'
             }`}>
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm ${
-                  'bg-gradient-to-br from-emerald-500 to-green-600'
-                }`}>
-                  <ShoppingCart className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/30">
+                  <ShoppingCart className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Place Order
                   </h2>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-orange-300/70' : 'text-orange-700'}`}>
                     {supplierForOrder.company}
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setIsOrderModalOpen(false)}
+                onClick={() => {
+                  setIsOrderModalOpen(false);
+                  setSupplierForOrder(null);
+                  setOrderMessage('');
+                  setIsEditingOrderMessage(false);
+                }}
                 className={`p-2 rounded-lg transition-colors ${
-                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+                  theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-white/50 text-slate-600'
                 }`}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className={`px-6 py-6 border-b ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-              <div className="space-y-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Supplier
-                  </label>
-                  <div className={`px-4 py-3 rounded-xl border ${
-                    theme === 'dark' 
-                      ? 'bg-slate-800/50 border-slate-700/50 text-slate-300'
-                      : 'bg-slate-50 border-slate-200 text-slate-700'
-                  }`}>
-                    {supplierForOrder.company}
+            {/* Modal Body - Scrollable */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Supplier Info Cards */}
+              <div className={`px-6 py-4 ${theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'}`}>
+                    <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Contact Person</p>
+                    <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{supplierForOrder.name}</p>
+                  </div>
+                  <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'}`}>
+                    <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Phone</p>
+                    <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{supplierForOrder.phone}</p>
+                  </div>
+                  <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'}`}>
+                    <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Email</p>
+                    <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{supplierForOrder.email}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Message Section */}
+              <div className="px-6 py-4">
+                {/* Section Header with Edit Toggle */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className={`w-5 h-5 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
+                    <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      Order Message
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isEditingOrderMessage && (
+                      <button
+                        onClick={() => {
+                          // Reset to template
+                          const today = new Date().toLocaleDateString('en-GB', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          });
+                          const generatedMessage = whatsAppSettings.supplierOrderTemplate
+                            .replace(/\{\{supplierName\}\}/g, supplierForOrder.name)
+                            .replace(/\{\{supplierCompany\}\}/g, supplierForOrder.company)
+                            .replace(/\{\{orderDate\}\}/g, today)
+                            .replace(/\{\{shopName\}\}/g, branding?.name || shopDetails?.name || effectiveShop?.name || 'Your Shop')
+                            .replace(/\{\{shopPhone\}\}/g, branding?.phone || shopDetails?.phone || effectiveShop?.phone || '')
+                            .replace(/\{\{shopAddress\}\}/g, branding?.address || shopDetails?.address || effectiveShop?.address || '');
+                          setOrderMessage(generatedMessage);
+                          toast.success('Message reset to template');
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          theme === 'dark'
+                            ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        }`}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        Reset
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setIsEditingOrderMessage(!isEditingOrderMessage)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        isEditingOrderMessage
+                          ? 'bg-orange-500 text-white'
+                          : theme === 'dark'
+                            ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                    >
+                      {isEditingOrderMessage ? (
+                        <>
+                          <Eye className="w-3.5 h-3.5" />
+                          Preview
+                        </>
+                      ) : (
+                        <>
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
 
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Contact
-                  </label>
-                  <div className={`px-4 py-3 rounded-xl border ${
-                    theme === 'dark' 
-                      ? 'bg-slate-800/50 border-slate-700/50 text-slate-300'
-                      : 'bg-slate-50 border-slate-200 text-slate-700'
+                {/* Message Preview or Editor */}
+                {isEditingOrderMessage ? (
+                  <textarea
+                    value={orderMessage}
+                    onChange={(e) => setOrderMessage(e.target.value)}
+                    rows={14}
+                    className={`w-full px-4 py-3 rounded-xl border font-mono text-sm resize-none transition-all ${
+                      theme === 'dark'
+                        ? 'bg-slate-800/50 border-slate-600/50 text-slate-200 placeholder-slate-500 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20'
+                        : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20'
+                    }`}
+                    placeholder="Enter your order message..."
+                  />
+                ) : (
+                  /* WhatsApp-style Preview */
+                  <div className={`relative rounded-2xl overflow-hidden ${
+                    theme === 'dark' ? 'bg-[#0b141a]' : 'bg-[#efeae2]'
                   }`}>
-                    {supplierForOrder.email}
+                    {/* WhatsApp Chat Background Pattern */}
+                    <div className="absolute inset-0 opacity-5" style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                    }} />
+                    <div className="relative p-4">
+                      {/* Message Bubble */}
+                      <div className={`max-w-[85%] ml-auto rounded-2xl rounded-tr-sm p-4 ${
+                        theme === 'dark' ? 'bg-[#005c4b]' : 'bg-[#d9fdd3]'
+                      }`}>
+                        <div className={`text-sm whitespace-pre-wrap break-words ${
+                          theme === 'dark' ? 'text-white' : 'text-slate-900'
+                        }`}>
+                          {orderMessage}
+                        </div>
+                        <div className={`flex items-center justify-end gap-1 mt-2 ${
+                          theme === 'dark' ? 'text-emerald-300/70' : 'text-slate-500'
+                        }`}>
+                          <span className="text-[10px]">
+                            {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </span>
+                          <svg className="w-4 h-4" viewBox="0 0 16 15" fill="currentColor">
+                            <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-1.891-1.891a.365.365 0 0 0-.516.005l-.423.433a.365.365 0 0 0 .005.516l2.675 2.675a.32.32 0 0 0 .484-.033l6.08-7.747a.365.365 0 0 0-.063-.51l.006.001zm-3.35-.008l-.478-.372a.365.365 0 0 0-.51.063L5.316 9.879a.32.32 0 0 1-.484.033l-1.891-1.891a.365.365 0 0 0-.516.005l-.423.433a.365.365 0 0 0 .005.516l2.675 2.675a.32.32 0 0 0 .484-.033l6.08-7.747a.365.365 0 0 0-.063-.51l.006.001z"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Phone
-                  </label>
-                  <div className={`px-4 py-3 rounded-xl border ${
-                    theme === 'dark' 
-                      ? 'bg-slate-800/50 border-slate-700/50 text-slate-300'
-                      : 'bg-slate-50 border-slate-200 text-slate-700'
-                  }`}>
-                    {supplierForOrder.phone}
-                  </div>
-                </div>
-
-                <div className={`p-4 rounded-xl border-l-4 ${
-                  theme === 'dark' 
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-                    : 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                }`}>
-                  <p className="text-sm font-medium">
-                    📱 Click "Send Order" to open WhatsApp Desktop with a pre-filled order message for this supplier.
-                  </p>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className={`px-6 py-4 flex gap-3 ${theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
+            {/* Modal Footer - Fixed at Bottom */}
+            <div className={`px-6 py-4 border-t flex gap-3 ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
               <button
-                onClick={() => setIsOrderModalOpen(false)}
+                onClick={() => {
+                  setIsOrderModalOpen(false);
+                  setSupplierForOrder(null);
+                  setOrderMessage('');
+                  setIsEditingOrderMessage(false);
+                }}
                 className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   theme === 'dark'
                     ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -2031,48 +2143,18 @@ ECOTEC Computer Solutions`;
                   }
                   phoneNumber = phoneNumber.replace('+', '');
                   
-                  // Get current date formatted
-                  const today = new Date();
-                  const dateStr = today.toLocaleDateString('en-GB', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  });
-                  
-                  // Creative WhatsApp message
-                  const message = `🛒 *NEW ORDER REQUEST*
-━━━━━━━━━━━━━━━━━━━━━
-
-Hello ${supplierForOrder.name}! 👋
-
-This is *ECOTEC Electronics* reaching out for a new order.
-
-📅 *Date:* ${dateStr}
-🏢 *Supplier:* ${supplierForOrder.company}
-
-━━━━━━━━━━━━━━━━━━━━━
-📦 *ORDER DETAILS:*
-━━━━━━━━━━━━━━━━━━━━━
-
-Please share your:
-✅ Latest product catalog
-✅ Current stock availability  
-✅ Best pricing for bulk orders
-✅ Expected delivery timeline
-
-━━━━━━━━━━━━━━━━━━━━━
-
-We look forward to doing business with you! 🤝
-
-_Sent via ECOTEC POS System_
-🌟 *Quality Electronics, Quality Service*`;
-
-                  const encodedMessage = encodeURIComponent(message);
+                  const encodedMessage = encodeURIComponent(orderMessage);
                   window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+                  toast.success('Opening WhatsApp...', {
+                    description: `Sending order request to ${supplierForOrder.company}`,
+                    duration: 3000,
+                  });
                   setIsOrderModalOpen(false);
+                  setSupplierForOrder(null);
+                  setOrderMessage('');
+                  setIsEditingOrderMessage(false);
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/25`}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/25"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>

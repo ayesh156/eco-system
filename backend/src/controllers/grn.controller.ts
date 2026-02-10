@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import type { AuthRequest } from '../types/express';
 import { StockMovementType, GRNStatus, PaymentStatus, PriceChangeType } from '@prisma/client';
 import { sendGRNWithPDF, GRNEmailData } from '../services/emailService';
+import { generateGRNPDF, GRNPDFData } from '../services/pdfService';
 
 // Helper function to get effective shopId for SuperAdmin shop viewing
 const getEffectiveShopId = (req: AuthRequest): string | null => {
@@ -562,7 +563,7 @@ export const sendGRNEmail = async (req: AuthRequest, res: Response, next: NextFu
     // Prepare email data
     const emailData: GRNEmailData = {
       email: grn.supplier.email,
-      supplierName: grn.supplier.company || grn.supplier.name,
+      supplierName: grn.supplier.name,
       grnNumber: grn.grnNumber,
       date: grn.date.toLocaleDateString('en-GB', {
         day: '2-digit',
@@ -615,6 +616,108 @@ export const sendGRNEmail = async (req: AuthRequest, res: Response, next: NextFu
         hasPdfAttachment: result.hasPdfAttachment || false,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};/**
+ * Generate GRN PDF
+ * GET /api/v1/grns/:id/pdf
+ */
+export const generateGRNPDFController = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const shopId = getEffectiveShopId(req);
+    const { id } = req.params;
+    
+    if (!shopId) {
+      return res.status(403).json({ success: false, message: 'Shop access required' });
+    }
+
+    // Fetch GRN with all necessary relations
+    const grn = await prisma.gRN.findFirst({
+      where: {
+        OR: [
+          { id },
+          { grnNumber: id },
+          { grnNumber: id.replace(/^GRN-/, '') },
+        ],
+        shopId,
+      },
+      include: {
+        supplier: true,
+        items: {
+          include: {
+            product: {
+              include: {
+                category: true,
+              },
+            },
+          },
+        },
+        shop: true,
+      },
+    });
+    
+    if (!grn) {
+      return res.status(404).json({ success: false, message: 'GRN not found' });
+    }
+
+    // Prepare GRN PDF data
+    const pdfData: GRNPDFData = {
+      grnNumber: grn.grnNumber,
+      supplierName: grn.supplier.name,
+      supplierEmail: grn.supplier.email || undefined,
+      supplierPhone: grn.supplier.phone || undefined,
+      supplierAddress: grn.supplier.address || undefined,
+      orderDate: grn.date.toISOString(),
+      expectedDeliveryDate: grn.expectedDate?.toISOString() || grn.date.toISOString(),
+      receivedDate: grn.receivedDate?.toISOString() || new Date().toISOString(),
+      deliveryNote: grn.deliveryNote || undefined,
+      receivedBy: grn.receivedBy || undefined,
+      vehicleNumber: grn.vehicleNumber || undefined,
+      status: grn.status.toLowerCase() as 'completed' | 'partial' | 'pending' | 'rejected',
+      paymentStatus: grn.paymentStatus.toLowerCase() as 'paid' | 'unpaid' | 'partial',
+      paymentMethod: undefined,
+      items: grn.items.map((item) => ({
+        productName: item.product?.name || 'Unknown Product',
+        category: item.product?.category?.name || undefined,
+        unitPrice: Number(item.costPrice),
+        originalUnitPrice: undefined,
+        orderedQuantity: item.quantity,
+        receivedQuantity: item.quantity,
+        acceptedQuantity: item.quantity,
+        rejectedQuantity: 0,
+        totalAmount: Number(item.totalCost),
+        sellingPrice: item.sellingPrice ? Number(item.sellingPrice) : undefined,
+        discountType: undefined,
+        discountValue: undefined,
+      })),
+      totalOrderedQuantity: grn.items.reduce((sum, item) => sum + item.quantity, 0),
+      totalReceivedQuantity: grn.items.reduce((sum, item) => sum + item.quantity, 0),
+      totalAcceptedQuantity: grn.items.reduce((sum, item) => sum + item.quantity, 0),
+      totalRejectedQuantity: 0,
+      subtotal: Number(grn.subtotal),
+      totalDiscount: grn.discount ? Number(grn.discount) : undefined,
+      discountAmount: Number(grn.discount),
+      taxAmount: Number(grn.tax),
+      totalAmount: Number(grn.totalAmount),
+      paidAmount: grn.paidAmount ? Number(grn.paidAmount) : undefined,
+      notes: grn.notes || undefined,
+      // Shop branding
+      shopName: grn.shop.name,
+      shopSubName: grn.shop.subName || undefined,
+      shopAddress: grn.shop.address || undefined,
+      shopPhone: grn.shop.phone || undefined,
+      shopEmail: grn.shop.email || undefined,
+      shopLogo: grn.shop.logo || undefined,
+    };
+
+    // Generate PDF
+    const pdfBuffer = await generateGRNPDF(pdfData);
+    
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${grn.grnNumber}.pdf"`);
+    res.send(pdfBuffer);
   } catch (error) {
     next(error);
   }

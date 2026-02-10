@@ -9,7 +9,8 @@ import {
   getGRNById,
   deleteGRN,
   updateGRN,
-  sendGRNEmail
+  sendGRNEmail,
+  generateGRNPDFController
 } from '../controllers/grn.controller';
 
 const router = Router();
@@ -19,6 +20,7 @@ router.use(protect, requireShop);
 router.post('/', createGRN);
 router.get('/', getGRNs);
 router.get('/:id', getGRNById);
+router.get('/:id/pdf', generateGRNPDFController);  // PDF generation endpoint
 router.put('/:id', updateGRN);
 router.delete('/:id', authorize('ADMIN', 'MANAGER'), deleteGRN);
 

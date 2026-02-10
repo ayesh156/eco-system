@@ -48,6 +48,9 @@ model Shop {
   grnPaymentReminderTemplate String?  @db.Text
   grnOverdueReminderTemplate String?  @db.Text
   
+  // Supplier Order Template (WhatsApp message for placing orders)
+  supplierOrderTemplate     String?   @db.Text
+  
   // Section Visibility (JSON array of hidden section paths)
   // hiddenSections: SuperAdmin managed - hidden from ADMIN + USER
   // adminHiddenSections: Shop ADMIN managed - hidden from USER only

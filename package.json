@@ -1,5 +1,5 @@
 {
-  "name": "eco-system-frontend",
+  "name": "eco-system",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -20,19 +20,9 @@
     "lint:backend": "cd backend && npm run lint",
     "postinstall": "npm run install:all",
     "install:all": "cd frontend && npm install && cd ../backend && npm install",
-    "vercel-build": "cd frontend && npm install && npm run build && cd ../backend && npm install && npx prisma generate"
+    "render-build": "cd backend && npm install && npm run build && cd ../frontend && npm install && npm run build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
-  },
-  "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.7",
-    "@types/nodemailer": "^7.0.9",
-    "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^7.0.13",
-    "prisma": "^5.22.0"
   }
 }

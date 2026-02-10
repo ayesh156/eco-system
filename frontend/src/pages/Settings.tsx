@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { 
   Bell, Palette, MessageCircle, Info, Copy, Check, 
   Moon, Sun, Sparkles,
-  Mail, Building2, Save, Package,
+  Mail, Building2, Save, Package, Truck,
   RefreshCw, Eye, EyeOff, CheckCircle2, AlertCircle, Clock,
   Smartphone, Laptop, SendHorizontal, Settings2, FileText, RotateCcw,
   Users, Layers, Search, Edit, Key, UserPlus, UserCog,
@@ -51,7 +51,7 @@ type RoleFilter = 'all' | 'MANAGER' | 'STAFF';
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, isViewingShop, viewingShop, getAccessToken } = useAuth();
-  const { settings: whatsAppSettings, shopDetails, updateSettings, saveSettings, resetToDefaults, resetGrnToDefaults, isSaving: whatsAppSaving } = useWhatsAppSettings();
+  const { settings: whatsAppSettings, shopDetails, updateSettings, saveSettings, resetToDefaults, resetGrnToDefaults, defaultTemplates } = useWhatsAppSettings();
   const { branding, saveBranding, hasUnsavedChanges: brandingHasUnsavedChanges } = useShopBranding();
   const { settings: taxSettings, updateSettings: updateTaxSettings, saveSettings: saveTaxSettings } = useTaxSettings();
   const { 
@@ -77,8 +77,10 @@ export const Settings: React.FC = () => {
   const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
   
   const [copiedPlaceholder, setCopiedPlaceholder] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'grn' | 'invoice' | 'sections' | 'branding' | 'users'>('appearance');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'profile' | 'notifications' | 'grn' | 'invoice' | 'supplierOrders' | 'sections' | 'branding' | 'users'>('appearance');
   const [showPreview, setShowPreview] = useState(false);
+  const [showGrnPreview, setShowGrnPreview] = useState(false);
+  const [showSupplierPreview, setShowSupplierPreview] = useState(false);
   const [previewType, setPreviewType] = useState<'payment' | 'overdue'>('payment');
   const [grnPreviewType, setGrnPreviewType] = useState<'payment' | 'overdue'>('payment');
   const [isSaving, setIsSaving] = useState(false);
@@ -107,6 +109,15 @@ export const Settings: React.FC = () => {
   const [localHiddenSections, setLocalHiddenSections] = useState<string[]>(hiddenSections);
   const [localAdminHiddenSections, setLocalAdminHiddenSections] = useState<string[]>(adminHiddenSections);
   const [sectionsHasChanges, setSectionsHasChanges] = useState(false);
+  
+  // Supplier Order Template state
+  const [supplierOrderTemplateHasChanges, setSupplierOrderTemplateHasChanges] = useState(false);
+  
+  // Invoice template changes tracking
+  const [invoiceTemplatesHasChanges, setInvoiceTemplatesHasChanges] = useState(false);
+  
+  // GRN template changes tracking
+  const [grnTemplatesHasChanges, setGrnTemplatesHasChanges] = useState(false);
 
   // Update form when effective shop changes (e.g., SUPER_ADMIN switches shops)
   React.useEffect(() => {
@@ -1007,6 +1018,45 @@ export const Settings: React.FC = () => {
       .replace(/\{\{shopWebsite\}\}/g, effectiveShopWebsite);
   };
 
+  // GRN preview data
+  const grnPreviewData = {
+    grnNumber: 'GRN-2026-0042',
+    supplierName: 'HP Sri Lanka',
+    totalAmount: '185,000',
+    paidAmount: '100,000',
+    balanceDue: '85,000',
+    grnDate: '10/02/2026',
+  };
+
+  const generateGrnPreview = (template: string) => {
+    return template
+      .replace(/\{\{grnNumber\}\}/g, grnPreviewData.grnNumber)
+      .replace(/\{\{supplierName\}\}/g, grnPreviewData.supplierName)
+      .replace(/\{\{totalAmount\}\}/g, grnPreviewData.totalAmount)
+      .replace(/\{\{paidAmount\}\}/g, grnPreviewData.paidAmount)
+      .replace(/\{\{balanceDue\}\}/g, grnPreviewData.balanceDue)
+      .replace(/\{\{grnDate\}\}/g, grnPreviewData.grnDate)
+      .replace(/\{\{shopName\}\}/g, effectiveShopName)
+      .replace(/\{\{shopPhone\}\}/g, effectiveShopPhone)
+      .replace(/\{\{shopAddress\}\}/g, effectiveShopAddress);
+  };
+
+  const generateSupplierPreview = (template: string) => {
+    const today = new Date().toLocaleDateString('en-GB', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    return template
+      .replace(/\{\{supplierName\}\}/g, 'Roshan Fernando')
+      .replace(/\{\{supplierCompany\}\}/g, 'HP Sri Lanka')
+      .replace(/\{\{orderDate\}\}/g, today)
+      .replace(/\{\{shopName\}\}/g, effectiveShopName)
+      .replace(/\{\{shopPhone\}\}/g, effectiveShopPhone)
+      .replace(/\{\{shopAddress\}\}/g, effectiveShopAddress);
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -1022,6 +1072,21 @@ export const Settings: React.FC = () => {
       if (activeTab === 'profile' && brandingHasUnsavedChanges) {
         await saveBranding();
       }
+      // Save supplier order template changes if on supplierOrders tab and has changes
+      if (activeTab === 'supplierOrders' && supplierOrderTemplateHasChanges) {
+        await saveSettings();
+        setSupplierOrderTemplateHasChanges(false);
+      }
+      // Save invoice WhatsApp template changes if on invoice tab and has changes
+      if (activeTab === 'invoice' && invoiceTemplatesHasChanges) {
+        await saveSettings();
+        setInvoiceTemplatesHasChanges(false);
+      }
+      // Save GRN WhatsApp template changes if on grn tab and has changes
+      if (activeTab === 'grn' && grnTemplatesHasChanges) {
+        await saveSettings();
+        setGrnTemplatesHasChanges(false);
+      }
       // Simulate API call for other settings
       await new Promise(resolve => setTimeout(resolve, 500));
       setSaveSuccess(true);
@@ -1035,23 +1100,14 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleWhatsAppSave = async () => {
-    try {
-      await saveSettings();
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (error) {
-      console.error('Failed to save WhatsApp settings:', error);
-    }
-  };
-
   // All available tabs - organized in categories
   const generalTabs = [
     { id: 'appearance' as const, label: 'Appearance', icon: Palette, color: 'emerald' },
     { id: 'profile' as const, label: 'Business Profile', icon: Building2, color: 'purple', businessOnly: true },
     { id: 'notifications' as const, label: 'WhatsApp Reminders', icon: MessageCircle, color: 'green', businessOnly: true },
-    { id: 'grn' as const, label: 'GRN Settings', icon: Package, color: 'teal', businessOnly: true },
     { id: 'invoice' as const, label: 'Invoice Settings', icon: FileText, color: 'blue', businessOnly: true },
+    { id: 'grn' as const, label: 'GRN Settings', icon: Package, color: 'teal', businessOnly: true },
+    { id: 'supplierOrders' as const, label: 'Supplier Orders', icon: Truck, color: 'orange', businessOnly: true },
   ];
 
   // Shop Admin tabs - only for SUPER_ADMIN viewing a shop
@@ -1099,8 +1155,8 @@ export const Settings: React.FC = () => {
                 </p>
               </div>
             </div>
-            {/* Save Button - Always visible at top except for tabs with their own save */}
-            {activeTab !== 'invoice' && activeTab !== 'users' && (
+            {/* Save Button - Show for all tabs except users */}
+            {activeTab !== 'users' && (
               <button
                 onClick={handleSave}
                 disabled={isSaving}
@@ -1176,10 +1232,10 @@ export const Settings: React.FC = () => {
           
           <div className={`grid gap-2 ${
             canViewShopAdminSettings 
-              ? 'grid-cols-2 sm:grid-cols-4' 
-              : 'grid-cols-2 md:grid-cols-4'
+              ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' 
+              : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
           }`}>
-            {tabs.slice(0, canViewShopAdminSettings ? 4 : tabs.length).map((tab) => {
+            {tabs.slice(0, canViewShopAdminSettings ? 6 : tabs.length).map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               const getGradient = () => {
@@ -1191,6 +1247,9 @@ export const Settings: React.FC = () => {
                   case 'violet': return 'from-violet-500 to-purple-500';
                   case 'pink': return 'from-pink-500 to-rose-500';
                   case 'cyan': return 'from-cyan-500 to-blue-500';
+                  case 'orange': return 'from-orange-500 to-amber-500';
+                  case 'teal': return 'from-teal-500 to-cyan-500';
+                  case 'green': return 'from-green-500 to-emerald-500';
                   default: return 'from-emerald-500 to-teal-500';
                 }
               };
@@ -1203,6 +1262,9 @@ export const Settings: React.FC = () => {
                   case 'violet': return 'rgba(139, 92, 246, 0.5)';
                   case 'pink': return 'rgba(236, 72, 153, 0.5)';
                   case 'cyan': return 'rgba(6, 182, 212, 0.5)';
+                  case 'orange': return 'rgba(249, 115, 22, 0.5)';
+                  case 'teal': return 'rgba(20, 184, 166, 0.5)';
+                  case 'green': return 'rgba(34, 197, 94, 0.5)';
                   default: return 'rgba(16, 185, 129, 0.5)';
                 }
               };
@@ -1237,8 +1299,8 @@ export const Settings: React.FC = () => {
                   <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-200'}`} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {tabs.slice(4).map((tab) => {
+              <div className="grid grid-cols-2 gap-2">
+                {tabs.slice(6).map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
                   const getGradient = () => {
@@ -1272,6 +1334,10 @@ export const Settings: React.FC = () => {
                     >
                       <Icon className="w-5 h-5 flex-shrink-0" />
                       <span className="hidden sm:inline text-sm">{tab.label}</span>
+                      {/* Unsaved changes indicator */}
+                      {tab.id === 'supplierOrders' && supplierOrderTemplateHasChanges && (
+                        <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : 'bg-orange-500'}`} />
+                      )}
                     </button>
                   );
                 })}
@@ -1700,7 +1766,10 @@ export const Settings: React.FC = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => updateSettings({ enabled: !whatsAppSettings.enabled })}
+                    onClick={() => {
+                      updateSettings({ enabled: !whatsAppSettings.enabled });
+                      setInvoiceTemplatesHasChanges(true);
+                    }}
                     className={`relative w-20 h-10 rounded-full transition-all duration-300 ${
                       whatsAppSettings.enabled 
                         ? 'bg-white/30' 
@@ -1831,6 +1900,7 @@ export const Settings: React.FC = () => {
                             onClick={() => {
                               if (confirm('Reset this template to the default? Your current template will be replaced.')) {
                                 resetToDefaults();
+                                setInvoiceTemplatesHasChanges(true);
                               }
                             }}
                             className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all ${
@@ -1854,7 +1924,10 @@ export const Settings: React.FC = () => {
                       </div>
                       <textarea
                         value={previewType === 'payment' ? whatsAppSettings.paymentReminderTemplate : whatsAppSettings.overdueReminderTemplate}
-                        onChange={(e) => updateSettings(previewType === 'payment' ? { paymentReminderTemplate: e.target.value } : { overdueReminderTemplate: e.target.value })}
+                        onChange={(e) => {
+                          updateSettings(previewType === 'payment' ? { paymentReminderTemplate: e.target.value } : { overdueReminderTemplate: e.target.value });
+                          setInvoiceTemplatesHasChanges(true);
+                        }}
                         rows={16}
                         className={`w-full px-4 py-3 rounded-xl border font-mono text-sm leading-relaxed transition-all resize-none whitespace-pre-wrap ${
                           theme === 'dark' 
@@ -1946,35 +2019,6 @@ export const Settings: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Save Button */}
-                  <div className="flex justify-end pt-4">
-                    <button
-                      onClick={handleWhatsAppSave}
-                      disabled={whatsAppSaving}
-                      className={`relative px-8 py-3 rounded-xl font-semibold text-white transition-all overflow-hidden ${
-                        saveSuccess 
-                          ? 'bg-green-500' 
-                          : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 hover:shadow-lg hover:shadow-blue-500/30'
-                      }`}
-                    >
-                      {whatsAppSaving ? (
-                        <span className="flex items-center gap-2">
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                          Saving...
-                        </span>
-                      ) : saveSuccess ? (
-                        <span className="flex items-center gap-2">
-                          <CheckCircle2 className="w-5 h-5" />
-                          Saved Successfully!
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <Save className="w-5 h-5" />
-                          Save Templates
-                        </span>
-                      )}
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -2018,7 +2062,10 @@ export const Settings: React.FC = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => updateSettings({ grnReminderEnabled: !whatsAppSettings.grnReminderEnabled })}
+                    onClick={() => {
+                      updateSettings({ grnReminderEnabled: !whatsAppSettings.grnReminderEnabled });
+                      setGrnTemplatesHasChanges(true);
+                    }}
                     className={`relative w-20 h-10 rounded-full transition-all duration-300 ${
                       whatsAppSettings.grnReminderEnabled 
                         ? 'bg-white/30' 
@@ -2105,68 +2152,137 @@ export const Settings: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Template Editor */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
-                        {grnPreviewType === 'payment' ? '💳 GRN Payment Reminder' : '📋 GRN Balance Reminder'}
-                      </label>
-                      <button
-                        onClick={() => {
-                          if (confirm('Reset GRN templates to defaults?')) {
-                            resetGrnToDefaults();
-                          }
+                  {/* Template Editor with Preview */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Editor */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <label className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                          {grnPreviewType === 'payment' ? '💳 GRN Payment Reminder' : '📋 GRN Balance Reminder'}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              if (confirm('Reset GRN templates to defaults?')) {
+                                resetGrnToDefaults();
+                                setGrnTemplatesHasChanges(true);
+                              }
+                            }}
+                            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all ${
+                              theme === 'dark' ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                            }`}
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                            Reset
+                          </button>
+                          <button
+                            onClick={() => setShowGrnPreview(!showGrnPreview)}
+                            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all lg:hidden ${
+                              theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {showGrnPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            {showGrnPreview ? 'Hide' : 'Show'} Preview
+                          </button>
+                        </div>
+                      </div>
+                      <textarea
+                        value={grnPreviewType === 'payment' ? whatsAppSettings.grnPaymentReminderTemplate : whatsAppSettings.grnOverdueReminderTemplate}
+                        onChange={(e) => {
+                          updateSettings(grnPreviewType === 'payment' ? { grnPaymentReminderTemplate: e.target.value } : { grnOverdueReminderTemplate: e.target.value });
+                          setGrnTemplatesHasChanges(true);
                         }}
-                        className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all ${
-                          theme === 'dark' ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                        rows={16}
+                        className={`w-full px-4 py-3 rounded-xl border font-mono text-sm leading-relaxed transition-all resize-none whitespace-pre-wrap ${
+                          theme === 'dark' 
+                            ? 'bg-slate-800/50 border-slate-700 text-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20' 
+                            : 'bg-white border-slate-200 text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                         }`}
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        Reset
-                      </button>
+                        placeholder="Enter your GRN reminder message template..."
+                      />
                     </div>
-                    <textarea
-                      value={grnPreviewType === 'payment' ? whatsAppSettings.grnPaymentReminderTemplate : whatsAppSettings.grnOverdueReminderTemplate}
-                      onChange={(e) => updateSettings(grnPreviewType === 'payment' ? { grnPaymentReminderTemplate: e.target.value } : { grnOverdueReminderTemplate: e.target.value })}
-                      rows={12}
-                      className={`w-full px-4 py-3 rounded-xl border font-mono text-sm leading-relaxed transition-all resize-none whitespace-pre-wrap ${
-                        theme === 'dark' 
-                          ? 'bg-slate-800/50 border-slate-700 text-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20' 
-                          : 'bg-white border-slate-200 text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
-                      }`}
-                      placeholder="Enter your GRN reminder message template..."
-                    />
+
+                    {/* Live Preview */}
+                    <div className={`${showGrnPreview ? 'block' : 'hidden'} lg:block`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Eye className={`w-4 h-4 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                            Live Preview
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            Auto-filled with sample data
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Supplier Info Preview */}
+                      <div className={`mb-3 p-3 rounded-xl border ${
+                        theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <p className={`text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          📌 Sample supplier details for preview:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`text-xs px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-100 text-teal-700'}`}>
+                            🏭 {grnPreviewData.supplierName}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                            📋 {grnPreviewData.grnNumber}
+                          </span>
+                          <span className={`text-xs px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
+                            💰 Rs. {grnPreviewData.balanceDue}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* WhatsApp Style Preview */}
+                      <div className="bg-[#0B141A] rounded-2xl overflow-hidden shadow-2xl">
+                        {/* WhatsApp Header */}
+                        <div className="bg-[#202C33] px-4 py-3 flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            HP
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-white font-medium text-sm">{grnPreviewData.supplierName}</p>
+                            <p className="text-green-400 text-xs">online</p>
+                          </div>
+                        </div>
+                        
+                        {/* Chat Background */}
+                        <div className="p-4 min-h-[300px] max-h-[400px] overflow-y-auto" style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                          backgroundColor: '#0B141A'
+                        }}>
+                          {/* Message Bubble */}
+                          <div className="max-w-[85%] ml-auto">
+                            <div className="bg-[#005C4B] rounded-xl rounded-tr-sm px-3 py-2 text-white text-sm whitespace-pre-wrap leading-relaxed">
+                              {generateGrnPreview(grnPreviewType === 'payment' ? whatsAppSettings.grnPaymentReminderTemplate : whatsAppSettings.grnOverdueReminderTemplate)}
+                              <div className="flex items-center justify-end gap-1 mt-1">
+                                <span className="text-[10px] text-green-200/70">
+                                  {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Input Bar */}
+                        <div className="bg-[#202C33] px-4 py-3 flex items-center gap-3">
+                          <div className="flex-1 bg-[#2A3942] rounded-full px-4 py-2.5 text-slate-400 text-sm">
+                            Type a message
+                          </div>
+                          <div className="w-10 h-10 bg-[#00A884] rounded-full flex items-center justify-center">
+                            <SendHorizontal className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Save Button */}
-                  <div className="flex justify-end pt-4">
-                    <button
-                      onClick={handleWhatsAppSave}
-                      disabled={whatsAppSaving}
-                      className={`relative px-8 py-3 rounded-xl font-semibold text-white transition-all overflow-hidden ${
-                        saveSuccess 
-                          ? 'bg-green-500' 
-                          : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 hover:shadow-lg hover:shadow-emerald-500/30'
-                      }`}
-                    >
-                      {whatsAppSaving ? (
-                        <span className="flex items-center gap-2">
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                          Saving...
-                        </span>
-                      ) : saveSuccess ? (
-                        <span className="flex items-center gap-2">
-                          <CheckCircle2 className="w-5 h-5" />
-                          Saved!
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <Save className="w-5 h-5" />
-                          Save GRN Templates
-                        </span>
-                      )}
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -2185,6 +2301,249 @@ export const Settings: React.FC = () => {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ========== SUPPLIER ORDERS TAB ========== */}
+        {activeTab === 'supplierOrders' && canViewBusinessSettings && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Creative Header with Orange Gradient */}
+            <div className={`relative overflow-hidden rounded-3xl border ${theme === 'dark' ? 'bg-gradient-to-br from-orange-900/30 via-slate-800/50 to-amber-900/30 border-orange-500/20' : 'bg-gradient-to-br from-orange-50 via-white to-amber-50 border-orange-200 shadow-xl'}`}>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-orange-500/20 to-amber-500/10 rounded-full blur-3xl -translate-y-32 translate-x-32" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-yellow-500/10 to-orange-500/10 rounded-full blur-3xl translate-y-24 -translate-x-24" />
+              <div className="relative p-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/30">
+                      <Truck className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        Supplier Order Template
+                      </h2>
+                      <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Customize the WhatsApp message template for placing orders with suppliers
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        updateSettings({ supplierOrderTemplate: defaultTemplates.supplierOrder });
+                        setSupplierOrderTemplateHasChanges(false);
+                        toast.success('Template reset to default');
+                      }}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        theme === 'dark'
+                          ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+                          : 'bg-white/80 text-slate-700 hover:bg-white shadow-sm'
+                      }`}
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Reset Default
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Available Placeholders Card */}
+            <div className={`rounded-2xl border overflow-hidden ${
+              theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-lg'
+            }`}>
+              <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20">
+                    <Info className={`w-5 h-5 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
+                  </div>
+                  <div>
+                    <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      Available Placeholders
+                    </h3>
+                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Click to copy • These will be replaced with actual values
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {[
+                    { key: 'supplierName', label: 'Supplier Name', desc: 'Contact person name' },
+                    { key: 'supplierCompany', label: 'Supplier Company', desc: 'Company/business name' },
+                    { key: 'orderDate', label: 'Order Date', desc: 'Current date' },
+                    { key: 'shopName', label: 'Shop Name', desc: 'Your business name' },
+                    { key: 'shopPhone', label: 'Shop Phone', desc: 'Your contact number' },
+                    { key: 'shopAddress', label: 'Shop Address', desc: 'Your business address' },
+                  ].map(({ key, label, desc }) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        navigator.clipboard.writeText(`{{${key}}}`);
+                        setCopiedPlaceholder(key);
+                        setTimeout(() => setCopiedPlaceholder(null), 2000);
+                        toast.success(`Copied {{${key}}}`);
+                      }}
+                      className={`relative group p-3 rounded-xl border text-left transition-all ${
+                        copiedPlaceholder === key
+                          ? theme === 'dark'
+                            ? 'bg-orange-500/20 border-orange-500/50'
+                            : 'bg-orange-50 border-orange-300'
+                          : theme === 'dark'
+                            ? 'bg-slate-700/50 border-slate-600/50 hover:border-orange-500/50 hover:bg-slate-700'
+                            : 'bg-slate-50 border-slate-200 hover:border-orange-300 hover:bg-orange-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-xs font-mono ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>
+                          {`{{${key}}}`}
+                        </span>
+                        {copiedPlaceholder === key ? (
+                          <Check className="w-3.5 h-3.5 text-orange-500" />
+                        ) : (
+                          <Copy className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
+                        )}
+                      </div>
+                      <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{label}</p>
+                      <p className={`text-[10px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Template Editor & Preview Card */}
+            <div className={`rounded-2xl border overflow-hidden ${
+              theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-lg'
+            }`}>
+              <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20">
+                      <MessageCircle className={`w-5 h-5 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
+                    </div>
+                    <div>
+                      <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        Order Message Template
+                      </h3>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        This message will be sent when you click "Place Order" on a supplier
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowSupplierPreview(!showSupplierPreview)}
+                    className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-all lg:hidden ${
+                      theme === 'dark' ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {showSupplierPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showSupplierPreview ? 'Hide' : 'Show'} Preview
+                  </button>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Editor */}
+                  <div>
+                    <textarea
+                      value={whatsAppSettings.supplierOrderTemplate}
+                      onChange={(e) => {
+                        updateSettings({ supplierOrderTemplate: e.target.value });
+                        setSupplierOrderTemplateHasChanges(true);
+                      }}
+                      rows={16}
+                      className={`w-full px-4 py-3 rounded-xl border font-mono text-sm resize-none transition-all ${
+                        theme === 'dark'
+                          ? 'bg-slate-900/50 border-slate-600/50 text-slate-200 placeholder-slate-500 focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20'
+                          : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20'
+                      }`}
+                      placeholder="Enter your order message template..."
+                    />
+                  </div>
+
+                  {/* Live Preview */}
+                  <div className={`${showSupplierPreview ? 'block' : 'hidden'} lg:block`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Eye className={`w-4 h-4 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
+                        <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                          Live Preview
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          theme === 'dark' ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          Auto-filled with sample data
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Supplier Info Preview */}
+                    <div className={`mb-3 p-3 rounded-xl border ${
+                      theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <p className={`text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        📌 Sample supplier details for preview:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`text-xs px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
+                          👤 Roshan Fernando
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
+                          🏭 HP Sri Lanka
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded-md ${theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
+                          🏪 {effectiveShopName}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* WhatsApp Style Preview */}
+                    <div className="bg-[#0B141A] rounded-2xl overflow-hidden shadow-2xl">
+                      {/* WhatsApp Header */}
+                      <div className="bg-[#202C33] px-4 py-3 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                          RF
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-white font-medium text-sm">Roshan Fernando</p>
+                          <p className="text-green-400 text-xs">online</p>
+                        </div>
+                      </div>
+                      
+                      {/* Chat Background */}
+                      <div className="p-4 min-h-[280px] max-h-[380px] overflow-y-auto" style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                        backgroundColor: '#0B141A'
+                      }}>
+                        {/* Message Bubble */}
+                        <div className="max-w-[85%] ml-auto">
+                          <div className="bg-[#005C4B] rounded-xl rounded-tr-sm px-3 py-2 text-white text-sm whitespace-pre-wrap leading-relaxed">
+                            {generateSupplierPreview(whatsAppSettings.supplierOrderTemplate)}
+                            <div className="flex items-center justify-end gap-1 mt-1">
+                              <span className="text-[10px] text-green-200/70">
+                                {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Input Bar */}
+                      <div className="bg-[#202C33] px-4 py-3 flex items-center gap-3">
+                        <div className="flex-1 bg-[#2A3942] rounded-full px-4 py-2.5 text-slate-400 text-sm">
+                          Type a message
+                        </div>
+                        <div className="w-10 h-10 bg-[#00A884] rounded-full flex items-center justify-center">
+                          <SendHorizontal className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

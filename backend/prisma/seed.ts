@@ -75,6 +75,19 @@ const CONFIG = {
     email: 'sdachathuranga@gmail.com',
     password: 'SuperAdmin@123',
     name: 'Sachitha Chathuranga'
+  },
+
+  // Shop 3 Configuration - SuperAdmin's Shop (Sri Lankan Fake Details)
+  SHOP3: {
+    name: 'TechZone Lanka',
+    slug: 'techzone-lanka',
+    subName: 'ELECTRONICS',
+    tagline: 'Your Digital Lifestyle Partner',
+    admin: {
+      email: 'sdachathuranga@gmail.com',
+      password: 'SuperAdmin@123',
+      name: 'Sachitha Chathuranga'
+    }
   }
 };
 
@@ -360,11 +373,12 @@ async function main() {
       taxRate: 0,
       isActive: true,
       reminderEnabled: true,
-      paymentReminderTemplate: 'Dear {{customerName}}, this is a friendly reminder that your invoice #{{invoiceNumber}} for Rs. {{amount}} is due on {{dueDate}}. Please make the payment at your earliest convenience. Thank you! - {{shopName}}',
-      overdueReminderTemplate: 'Dear {{customerName}}, your invoice #{{invoiceNumber}} for Rs. {{amount}} is now overdue by {{daysPastDue}} days. Please settle your account immediately to avoid service interruption. - {{shopName}}',
+      paymentReminderTemplate: `Hello {{customerName}}! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly reminder about your pending payment:\n\n📄 *Invoice:* #{{invoiceId}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{dueAmount}}\n📅 *Due Date:* {{dueDate}}\n\nWe kindly request you to settle your outstanding balance at your earliest convenience.\n\nIf you've already made the payment, please disregard this message.\n\nFor any queries, please contact us.\n\nThank you for your continued trust! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      overdueReminderTemplate: `⚠️ *URGENT: Payment Overdue Notice*\n\nDear {{customerName}},\n\nWe regret to inform you that your payment is now *OVERDUE*.\n\n📄 *Invoice:* #{{invoiceId}}\n📅 *Original Due Date:* {{dueDate}}\n⏰ *Days Overdue:* {{daysOverdue}} days\n💰 *Outstanding Amount:* Rs. {{dueAmount}}\n\n*Immediate action is required.* Please settle this payment as soon as possible to avoid any inconvenience.\n\nFor payment assistance or queries, please contact us immediately.\n\nWe value your business and appreciate your prompt attention to this matter.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
       grnReminderEnabled: true,
-      grnPaymentReminderTemplate: `Hello! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly notification regarding your GRN payment:\n\n📄 *GRN Number:* #{{grnNumber}}\n🏢 *Supplier:* {{supplierName}}\n💰 *Total Amount:* {{totalAmount}}\n✅ *Paid:* {{paidAmount}}\n⏳ *Balance Due:* {{balanceDue}}\n📅 *GRN Date:* {{grnDate}}\n\nWe will process the remaining payment as per our agreement.\n\nFor any queries, please contact us.\n\nThank you for your partnership! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
-      grnOverdueReminderTemplate: `🚨 *URGENT: Payment Overdue*\n\nDear {{supplierName}},\n\nThis is an urgent reminder regarding the *overdue* payment for:\n\n📄 *GRN Number:* #{{grnNumber}}\n📅 *GRN Date:* {{grnDate}}\n💰 *Total Amount:* {{totalAmount}}\n✅ *Paid:* {{paidAmount}}\n⏳ *Balance Due:* {{balanceDue}}\n\n⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.\n\nFor any queries or to discuss payment arrangements, please contact us immediately.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      grnPaymentReminderTemplate: `Hello! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly notification regarding your GRN payment:\n\n📄 *GRN Number:* #{{grnNumber}}\n🏢 *Supplier:* {{supplierName}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{balanceDue}}\n📅 *GRN Date:* {{grnDate}}\n\nWe will process the remaining payment as per our agreement.\n\nFor any queries, please contact us.\n\nThank you for your partnership! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      grnOverdueReminderTemplate: `🚨 *URGENT: Payment Overdue*\n\nDear {{supplierName}},\n\nThis is an urgent reminder regarding the *overdue* payment for:\n\n📄 *GRN Number:* #{{grnNumber}}\n📅 *GRN Date:* {{grnDate}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{balanceDue}}\n\n⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.\n\nFor any queries or to discuss payment arrangements, please contact us immediately.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      supplierOrderTemplate: `🛒 *NEW ORDER REQUEST*\n━━━━━━━━━━━━━━━━━━━━━\n\nHello {{supplierName}}! 👋\n\nThis is *{{shopName}}* reaching out for a new order.\n\n📅 *Date:* {{orderDate}}\n🏢 *Supplier:* {{supplierCompany}}\n\n━━━━━━━━━━━━━━━━━━━━━\n📦 *ORDER DETAILS:*\n━━━━━━━━━━━━━━━━━━━━━\n\nPlease share your:\n✅ Latest product catalog\n✅ Current stock availability\n✅ Best pricing for bulk orders\n✅ Expected delivery timeline\n\n━━━━━━━━━━━━━━━━━━━━━\n\nWe look forward to doing business with you! 🤝\n\n_Sent via {{shopName}} POS System_\n🌟 *Quality Products, Quality Service*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
     },
   });
   console.log(`   ✅ Shop 1: ${shop1.name} (${shop1.slug})`);
@@ -389,14 +403,52 @@ async function main() {
       taxRate: 0,
       isActive: true,
       reminderEnabled: true,
-      paymentReminderTemplate: 'Dear {{customerName}}, this is a friendly reminder that your invoice #{{invoiceNumber}} for Rs. {{amount}} is due on {{dueDate}}. Please make the payment at your earliest convenience. Thank you! - {{shopName}}',
-      overdueReminderTemplate: 'Dear {{customerName}}, your invoice #{{invoiceNumber}} for Rs. {{amount}} is now overdue by {{daysPastDue}} days. Please settle your account immediately to avoid service interruption. - {{shopName}}',
+      paymentReminderTemplate: `Hello {{customerName}}! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly reminder about your pending payment:\n\n📄 *Invoice:* #{{invoiceId}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{dueAmount}}\n📅 *Due Date:* {{dueDate}}\n\nWe kindly request you to settle your outstanding balance at your earliest convenience.\n\nIf you've already made the payment, please disregard this message.\n\nFor any queries, please contact us.\n\nThank you for your continued trust! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      overdueReminderTemplate: `⚠️ *URGENT: Payment Overdue Notice*\n\nDear {{customerName}},\n\nWe regret to inform you that your payment is now *OVERDUE*.\n\n📄 *Invoice:* #{{invoiceId}}\n📅 *Original Due Date:* {{dueDate}}\n⏰ *Days Overdue:* {{daysOverdue}} days\n💰 *Outstanding Amount:* Rs. {{dueAmount}}\n\n*Immediate action is required.* Please settle this payment as soon as possible to avoid any inconvenience.\n\nFor payment assistance or queries, please contact us immediately.\n\nWe value your business and appreciate your prompt attention to this matter.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
       grnReminderEnabled: true,
-      grnPaymentReminderTemplate: `Hello! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly notification regarding your GRN payment:\n\n📄 *GRN Number:* #{{grnNumber}}\n🏢 *Supplier:* {{supplierName}}\n💰 *Total Amount:* {{totalAmount}}\n✅ *Paid:* {{paidAmount}}\n⏳ *Balance Due:* {{balanceDue}}\n📅 *GRN Date:* {{grnDate}}\n\nWe will process the remaining payment as per our agreement.\n\nFor any queries, please contact us.\n\nThank you for your partnership! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
-      grnOverdueReminderTemplate: `🚨 *URGENT: Payment Overdue*\n\nDear {{supplierName}},\n\nThis is an urgent reminder regarding the *overdue* payment for:\n\n📄 *GRN Number:* #{{grnNumber}}\n📅 *GRN Date:* {{grnDate}}\n💰 *Total Amount:* {{totalAmount}}\n✅ *Paid:* {{paidAmount}}\n⏳ *Balance Due:* {{balanceDue}}\n\n⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.\n\nFor any queries or to discuss payment arrangements, please contact us immediately.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      grnPaymentReminderTemplate: `Hello! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly notification regarding your GRN payment:\n\n📄 *GRN Number:* #{{grnNumber}}\n🏢 *Supplier:* {{supplierName}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{balanceDue}}\n📅 *GRN Date:* {{grnDate}}\n\nWe will process the remaining payment as per our agreement.\n\nFor any queries, please contact us.\n\nThank you for your partnership! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      grnOverdueReminderTemplate: `🚨 *URGENT: Payment Overdue*\n\nDear {{supplierName}},\n\nThis is an urgent reminder regarding the *overdue* payment for:\n\n📄 *GRN Number:* #{{grnNumber}}\n📅 *GRN Date:* {{grnDate}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{balanceDue}}\n\n⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.\n\nFor any queries or to discuss payment arrangements, please contact us immediately.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      supplierOrderTemplate: `🛒 *NEW ORDER REQUEST*\n━━━━━━━━━━━━━━━━━━━━━\n\nHello {{supplierName}}! 👋\n\nThis is *{{shopName}}* reaching out for a new order.\n\n📅 *Date:* {{orderDate}}\n🏢 *Supplier:* {{supplierCompany}}\n\n━━━━━━━━━━━━━━━━━━━━━\n📦 *ORDER DETAILS:*\n━━━━━━━━━━━━━━━━━━━━━\n\nPlease share your:\n✅ Latest product catalog\n✅ Current stock availability\n✅ Best pricing for bulk orders\n✅ Expected delivery timeline\n\n━━━━━━━━━━━━━━━━━━━━━\n\nWe look forward to doing business with you! 🤝\n\n_Sent via {{shopName}} POS System_\n🌟 *Quality Products, Quality Service*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
     },
   });
   console.log(`   ✅ Shop 2: ${shop2.name} (${shop2.slug})`);
+
+  // Shop 3: TechZone Lanka (SuperAdmin's Shop) - Sri Lankan Fake Details
+  const shop3 = await prisma.shop.upsert({
+    where: { slug: CONFIG.SHOP3.slug },
+    update: {},
+    create: {
+      name: CONFIG.SHOP3.name,
+      slug: CONFIG.SHOP3.slug,
+      subName: CONFIG.SHOP3.subName,
+      tagline: CONFIG.SHOP3.tagline,
+      description: 'Premium computers, mobiles & accessories in Nugegoda',
+      address: 'No. 78/A, High Level Road, Nugegoda, Sri Lanka',
+      phone: '+94 11 285 6743',
+      email: 'info@techzonelanka.lk',
+      website: 'https://techzonelanka.lk',
+      businessRegNo: 'PV00456789',
+      taxId: 'TIN456789123',
+      currency: 'LKR',
+      taxRate: 0,
+      isActive: true,
+      reminderEnabled: true,
+      paymentReminderTemplate: `Hello {{customerName}}! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly reminder about your pending payment:\n\n📄 *Invoice:* #{{invoiceId}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{dueAmount}}\n📅 *Due Date:* {{dueDate}}\n\nWe kindly request you to settle your outstanding balance at your earliest convenience.\n\nIf you've already made the payment, please disregard this message.\n\nFor any queries, please contact us.\n\nThank you for your continued trust! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      overdueReminderTemplate: `⚠️ *URGENT: Payment Overdue Notice*\n\nDear {{customerName}},\n\nWe regret to inform you that your payment is now *OVERDUE*.\n\n📄 *Invoice:* #{{invoiceId}}\n📅 *Original Due Date:* {{dueDate}}\n⏰ *Days Overdue:* {{daysOverdue}} days\n💰 *Outstanding Amount:* Rs. {{dueAmount}}\n\n*Immediate action is required.* Please settle this payment as soon as possible to avoid any inconvenience.\n\nFor payment assistance or queries, please contact us immediately.\n\nWe value your business and appreciate your prompt attention to this matter.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      grnReminderEnabled: true,
+      grnPaymentReminderTemplate: `Hello! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly notification regarding your GRN payment:\n\n📄 *GRN Number:* #{{grnNumber}}\n🏢 *Supplier:* {{supplierName}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{balanceDue}}\n📅 *GRN Date:* {{grnDate}}\n\nWe will process the remaining payment as per our agreement.\n\nFor any queries, please contact us.\n\nThank you for your partnership! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      grnOverdueReminderTemplate: `🚨 *URGENT: Payment Overdue*\n\nDear {{supplierName}},\n\nThis is an urgent reminder regarding the *overdue* payment for:\n\n📄 *GRN Number:* #{{grnNumber}}\n📅 *GRN Date:* {{grnDate}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{balanceDue}}\n\n⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.\n\nFor any queries or to discuss payment arrangements, please contact us immediately.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      supplierOrderTemplate: `🛒 *NEW ORDER REQUEST*\n━━━━━━━━━━━━━━━━━━━━━\n\nHello {{supplierName}}! 👋\n\nThis is *{{shopName}}* reaching out for a new order.\n\n📅 *Date:* {{orderDate}}\n🏢 *Supplier:* {{supplierCompany}}\n\n━━━━━━━━━━━━━━━━━━━━━\n📦 *ORDER DETAILS:*\n━━━━━━━━━━━━━━━━━━━━━\n\nPlease share your:\n✅ Latest product catalog\n✅ Current stock availability\n✅ Best pricing for bulk orders\n✅ Expected delivery timeline\n\n━━━━━━━━━━━━━━━━━━━━━\n\nWe look forward to doing business with you! 🤝\n\n_Sent via {{shopName}} POS System_\n🌟 *Quality Products, Quality Service*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+    },
+  });
+  console.log(`   ✅ Shop 3: ${shop3.name} (${shop3.slug}) [SuperAdmin's Shop]`);
+
+  // Assign SuperAdmin to Shop 3
+  await prisma.user.update({
+    where: { email: CONFIG.SUPER_ADMIN.email },
+    data: { shopId: shop3.id },
+  });
+  console.log(`   🔗 SuperAdmin assigned to ${shop3.name}`);
   console.log('');
 
   // ==========================================
