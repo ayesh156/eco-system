@@ -5,7 +5,7 @@ import { Prisma, InvoiceStatus, PaymentMethod, SalesChannel, ReminderType } from
 import { sendInvoiceEmail, sendInvoiceWithPDF } from '../services/emailService';
 import { generateInvoicePDF, InvoicePDFData } from '../services/pdfService';
 // Import centralized type definitions
-import '../types/express.d';
+import '../types/express';
 
 // Helper function to get effective shopId for SuperAdmin shop viewing
 const getEffectiveShopId = (req: Request & { user?: { id: string; role?: string; shopId: string | null } }): string | null => {

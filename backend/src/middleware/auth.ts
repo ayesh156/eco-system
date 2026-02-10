@@ -3,7 +3,7 @@ import jwt, { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { AppError } from './errorHandler';
 import { jwtConfig } from '../config/security';
-import { AuthRequest, AuthUser } from '../types/express.d';
+import { AuthRequest, AuthUser } from '../types/express';
 
 // Use secure config instead of hardcoded fallback
 const getJwtSecret = () => jwtConfig.secret;
