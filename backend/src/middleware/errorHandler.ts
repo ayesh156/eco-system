@@ -67,9 +67,21 @@ export const errorHandler = (
     statusCode = 503;
     message = 'A critical database error occurred. Please try again.';
     console.error('🚨 Prisma Rust Panic:', err.message);
-  } else if (err.message?.includes('connect') && err.message?.includes('database')) {
+  } else if (
+    err.message?.includes('Can\'t reach database') ||
+    err.message?.includes('Connection refused') ||
+    err.message?.includes('ECONNREFUSED') ||
+    err.message?.includes('ECONNRESET') ||
+    err.message?.includes('ETIMEDOUT') ||
+    err.message?.includes('Connection terminated') ||
+    err.message?.includes('server closed the connection') ||
+    err.message?.includes('Server has closed the connection') ||
+    err.message?.includes('connect ETIMEDOUT') ||
+    (err.message?.includes('connect') && err.message?.includes('database'))
+  ) {
     statusCode = 503;
     message = 'Database connection failed. Please try again in a moment.';
+    console.error('🚨 DB Connection Error:', err.message?.substring(0, 300));
   }
 
   const response: ErrorResponse = {
