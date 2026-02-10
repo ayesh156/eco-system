@@ -29,7 +29,7 @@ import { notFound } from './middleware/notFound';
 import { apiRateLimiter } from './middleware/rateLimiter';
 import { sanitizeRequestBody } from './middleware/validation';
 import { corsConfig } from './config/security';
-import { connectWithRetry } from './lib/prisma';
+import { connectWithRetry, prisma } from './lib/prisma';
 
 // Route imports
 import authRoutes from './routes/auth.routes';
@@ -117,12 +117,27 @@ app.use((_req, res, next) => {
   next();
 });
 
-// Health check
-app.get('/health', (_req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
+// Health check (with database connectivity test)
+app.get('/health', async (_req, res) => {
+  let dbStatus = 'unknown';
+  let dbError = '';
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbStatus = 'connected';
+  } catch (err) {
+    dbStatus = 'disconnected';
+    dbError = err instanceof Error ? err.message : String(err);
+  }
+  
+  const status = dbStatus === 'connected' ? 'ok' : 'degraded';
+  res.status(dbStatus === 'connected' ? 200 : 503).json({ 
+    status,
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV 
+    environment: process.env.NODE_ENV,
+    database: dbStatus,
+    ...(dbError && { dbError: dbError.substring(0, 200) }),
+    databaseUrlSet: !!process.env.DATABASE_URL,
+    directUrlSet: !!process.env.DIRECT_URL,
   });
 });
 

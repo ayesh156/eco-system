@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { withDbRetry } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
 import { jwtConfig, passwordConfig } from '../config/security';
@@ -208,37 +209,23 @@ export const login = async (
       throw new AppError('Please provide email and password', 400);
     }
 
-    // Find user with password (with connection retry for cold starts)
+    // Find user with password (auto-retries on connection failure)
     let user;
     try {
-      user = await prisma.user.findUnique({
-        where: { email: email.toLowerCase() },
-        include: {
-          shop: {
-            select: { id: true, name: true, slug: true, logo: true },
-          },
-        },
-      });
-    } catch (dbError) {
-      // Retry with full reconnect on connection failure (common on Render cold starts)
-      console.warn('⚠️ Login DB query failed, force-reconnecting...', dbError instanceof Error ? dbError.message : dbError);
-      try {
-        // Force disconnect to kill stale pool, then reconnect fresh
-        try { await prisma.$disconnect(); } catch { /* ignore */ }
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
-        await prisma.$connect();
-        user = await prisma.user.findUnique({
+      user = await withDbRetry(
+        () => prisma.user.findUnique({
           where: { email: email.toLowerCase() },
           include: {
             shop: {
               select: { id: true, name: true, slug: true, logo: true },
             },
           },
-        });
-      } catch (retryError) {
-        console.error('❌ Login DB retry also failed:', retryError instanceof Error ? retryError.message : retryError);
-        throw new AppError('Service temporarily unavailable. Please try again in a moment.', 503);
-      }
+        }),
+        'Login user lookup'
+      );
+    } catch (dbError) {
+      console.error('❌ Login DB query failed after retry:', dbError instanceof Error ? dbError.message : dbError);
+      throw new AppError('Service temporarily unavailable. Please try again in a moment.', 503);
     }
 
     if (!user) {
