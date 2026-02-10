@@ -407,14 +407,18 @@ app.use(`${API_PREFIX}/grns`, grnRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
+// Pre-connect to database BEFORE accepting requests (important for Render free tier cold starts)
+connectWithRetry(3, 3000).then(() => {
+  console.log('📦 Database initialization complete');
+}).catch((err) => {
+  console.error('⚠️ Database pre-connect failed, will retry per-request:', err);
+});
+
 // Start server
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📡 API available at http://localhost:${PORT}${API_PREFIX}`);
-  
-  // Pre-connect to database (important for Render free tier cold starts)
-  await connectWithRetry(3, 2000);
 });
 
 export default app;

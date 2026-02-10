@@ -220,9 +220,12 @@ export const login = async (
         },
       });
     } catch (dbError) {
-      // Retry once on connection failure (common on Render cold starts)
-      console.warn('⚠️ Login DB query failed, retrying...', dbError instanceof Error ? dbError.message : dbError);
+      // Retry with full reconnect on connection failure (common on Render cold starts)
+      console.warn('⚠️ Login DB query failed, force-reconnecting...', dbError instanceof Error ? dbError.message : dbError);
       try {
+        // Force disconnect to kill stale pool, then reconnect fresh
+        try { await prisma.$disconnect(); } catch { /* ignore */ }
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
         await prisma.$connect();
         user = await prisma.user.findUnique({
           where: { email: email.toLowerCase() },
