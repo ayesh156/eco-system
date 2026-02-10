@@ -583,9 +583,9 @@ export const sendEmailWithPDF = async (
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // 180s timeout for email sending (SMTP can be very slow on Render.com free tier cold starts)
+    // 120s timeout (30s SMTP timeout × 2 attempts + PDF generation + network overhead)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000);
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -602,13 +602,14 @@ export const sendEmailWithPDF = async (
 
     const result = await response.json();
 
-    if (!response.ok && response.status !== 202) {
+    if (!response.ok) {
       throw new Error(result.message || result.error || 'Failed to send email');
     }
 
     return {
       success: true,
       sentTo: result.data?.sentTo || result.sentTo || 'Unknown',
+      messageId: result.data?.messageId || result.messageId,
       hasPdfAttachment: result.data?.hasPdfAttachment || result.hasPdfAttachment || false,
     };
   } catch (error) {

@@ -361,12 +361,12 @@ Thank you for your service! 🙏`;
       const result = await grnService.sendEmailWithPDF(grnId, pdfBase64, token, effectiveShopId);
 
       const successMessage = result.hasPdfAttachment
-        ? 'GRN is being sent with PDF attachment!'
-        : 'GRN is being sent!';
+        ? 'GRN sent with PDF attachment!'
+        : 'GRN email sent successfully!';
 
       toast.success(successMessage, {
         id: 'grn-email-pdf',
-        description: `GRN #${grn.grnNumber} email queued for ${result.sentTo}`,
+        description: `GRN #${grn.grnNumber} email sent to ${result.sentTo}`,
       });
       setShowActions(false);
     } catch (error) {

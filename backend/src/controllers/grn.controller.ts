@@ -593,31 +593,30 @@ export const sendGRNEmail = async (req: AuthRequest, res: Response, next: NextFu
       notes: grn.notes || undefined,
     };
 
-    // ASYNC: Return 202 immediately, send email in background
-    // This prevents timeout on Render.com Web Service (no serverless functions)
-    res.status(202).json({
+    // Send email synchronously (sendMailWithRetry has 30s hard timeout per attempt)
+    const emailResult = await sendGRNWithPDF(
+      emailData,
+      includeAttachment ? pdfBase64 : undefined
+    );
+
+    if (!emailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: `Failed to send email: ${emailResult.error || 'Unknown error'}`,
+      });
+    }
+
+    console.log(`✅ GRN email sent to ${grn.supplier.email} for GRN #${grn.grnNumber}`);
+
+    res.status(200).json({
       success: true,
-      message: 'GRN email is being sent',
+      message: 'GRN email sent successfully',
       data: {
         sentTo: grn.supplier.email,
         grnNumber: grn.grnNumber,
+        messageId: emailResult.messageId,
         hasPdfAttachment: !!(includeAttachment && pdfBase64),
-        status: 'queued',
       },
-    });
-
-    // Fire-and-forget: send email in background after response is sent
-    sendGRNWithPDF(
-      emailData,
-      includeAttachment ? pdfBase64 : undefined
-    ).then((result) => {
-      if (result.success) {
-        console.log(`✅ GRN email sent to ${grn.supplier!.email} for GRN #${grn.grnNumber}`);
-      } else {
-        console.error(`❌ GRN email failed for GRN #${grn.grnNumber}:`, result.error);
-      }
-    }).catch((err) => {
-      console.error(`❌ GRN email error for GRN #${grn.grnNumber}:`, err instanceof Error ? err.message : err);
     });
 
   } catch (error) {
