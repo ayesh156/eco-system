@@ -24,9 +24,9 @@ services:
       - key: DIRECT_URL
         sync: false
       - key: JWT_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_REFRESH_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: FRONTEND_URL
