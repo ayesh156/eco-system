@@ -49,6 +49,15 @@ const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
 
 // ===================================
+// TRUST PROXY - Required for Render.com (behind reverse proxy)
+// Enables correct client IP detection for rate limiting
+// ===================================
+if (isProduction) {
+  app.set('trust proxy', 1);
+  console.log('🔒 Trust proxy enabled for production (reverse proxy detected)');
+}
+
+// ===================================
 // SECURITY MIDDLEWARE - Order matters!
 // ===================================
 

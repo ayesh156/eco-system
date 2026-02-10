@@ -88,35 +88,64 @@ const resetTransporter = () => {
 };
 
 /**
+ * Wrap a promise with a timeout
+ */
+const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms / 1000}s`));
+    }, ms);
+    promise
+      .then((result) => { clearTimeout(timer); resolve(result); })
+      .catch((err) => { clearTimeout(timer); reject(err); });
+  });
+};
+
+/**
  * Send email with automatic retry on connection failures
  * Resets the SMTP transporter and retries once if the first attempt fails
+ * Each attempt has a hard 30s timeout to prevent hanging
  */
 const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string }> => {
-  let transport = getTransporter();
+  const SEND_TIMEOUT = 30000; // 30s hard timeout per attempt
   
+  // Attempt 1: Send directly (skip verify — it hangs on some cloud providers)
   try {
-    // Verify SMTP connection is alive before sending
-    try {
-      await transport.verify();
-    } catch (verifyError) {
-      console.warn('⚠️ SMTP verify failed, resetting transporter...');
-      resetTransporter();
-      transport = getTransporter();
-    }
-    
-    return await transport.sendMail(mailOptions);
+    console.log('📧 [Attempt 1] Sending email...');
+    const transport = getTransporter();
+    const result = await withTimeout(
+      transport.sendMail(mailOptions),
+      SEND_TIMEOUT,
+      'SMTP sendMail (attempt 1)'
+    );
+    console.log('✅ [Attempt 1] Email sent, messageId:', result.messageId);
+    return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.warn(`⚠️ Email send failed (attempt 1): ${errorMessage}. Retrying with fresh connection...`);
+    console.warn(`⚠️ [Attempt 1] Failed: ${errorMessage}`);
     
-    // Reset stale connection and retry once with a completely fresh transporter
+    // Reset stale connection for retry
     resetTransporter();
+  }
     
-    // Small delay before retry to let network settle
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+  // Attempt 2: Fresh transporter after small delay
+  console.log('📧 [Attempt 2] Retrying with fresh connection after 2s delay...');
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  try {
     const retryTransport = getTransporter();
-    return await retryTransport.sendMail(mailOptions);
+    const result = await withTimeout(
+      retryTransport.sendMail(mailOptions),
+      SEND_TIMEOUT,
+      'SMTP sendMail (attempt 2)'
+    );
+    console.log('✅ [Attempt 2] Email sent, messageId:', result.messageId);
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown';
+    console.error(`❌ [Attempt 2] Failed: ${errorMessage}`);
+    resetTransporter();
+    throw error;
   }
 };
 
