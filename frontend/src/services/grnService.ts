@@ -583,9 +583,9 @@ export const sendEmailWithPDF = async (
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // 90s timeout for email sending (SMTP can be slow on cloud deployments)
+    // 180s timeout for email sending (SMTP can be very slow on Render.com free tier cold starts)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
+    const timeoutId = setTimeout(() => controller.abort(), 180000);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -613,6 +613,10 @@ export const sendEmailWithPDF = async (
     };
   } catch (error) {
     console.error('Error sending GRN email:', error);
+    // Handle AbortError (timeout) with a user-friendly message
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Connection timeout - the server took too long to respond. Please try again.');
+    }
     throw error;
   }
 };

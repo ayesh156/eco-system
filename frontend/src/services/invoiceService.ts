@@ -362,12 +362,24 @@ export const invoiceService = {
    */
   async sendEmail(invoiceId: string, shopId?: string): Promise<{ messageId: string; sentTo: string; invoiceNumber: string; emailSentAt: string }> {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email${queryParams}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    const result = await handleResponse<APIResponse<{ messageId: string; sentTo: string; invoiceNumber: string; emailSentAt: string }>>(response);
-    return result.data;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000);
+    try {
+      const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email${queryParams}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const result = await handleResponse<APIResponse<{ messageId: string; sentTo: string; invoiceNumber: string; emailSentAt: string }>>(response);
+      return result.data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Connection timeout - the server took too long to respond. Please try again.');
+      }
+      throw error;
+    }
   },
 
   /**
@@ -440,29 +452,38 @@ export const invoiceService = {
     hasPdfAttachment: boolean;
   }> {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    // 90s timeout for email sending (SMTP can be slow on cloud deployments)
+    // 180s timeout for email sending (SMTP can be very slow on Render.com free tier cold starts)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
+    const timeoutId = setTimeout(() => controller.abort(), 180000);
 
-    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email-with-pdf${queryParams}`, {
-      method: 'POST',
-      headers: {
-        ...getAuthHeaders(),
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-      body: JSON.stringify({ pdfBase64 }),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email-with-pdf${queryParams}`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        body: JSON.stringify({ pdfBase64 }),
+      });
 
-    clearTimeout(timeoutId);
-    const result = await handleResponse<APIResponse<{ 
-      messageId: string; 
-      sentTo: string; 
-      invoiceNumber: string; 
-      emailSentAt: string;
-      hasPdfAttachment: boolean;
-    }>>(response);
-    return result.data;
+      clearTimeout(timeoutId);
+      const result = await handleResponse<APIResponse<{ 
+        messageId: string; 
+        sentTo: string; 
+        invoiceNumber: string; 
+        emailSentAt: string;
+        hasPdfAttachment: boolean;
+      }>>(response);
+      return result.data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      // Handle AbortError (timeout) with a user-friendly message
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Connection timeout - the server took too long to respond. Please try again.');
+      }
+      throw error;
+    }
   },
 
   /**
