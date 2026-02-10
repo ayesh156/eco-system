@@ -41,29 +41,35 @@ const getTransporter = (): Transporter => {
   if (!transporter) {
     const config = getEmailConfig();
     
-    // Add TLS options, timeouts, and pooling for Render.com deployment
+    // Determine if we should use direct SSL (port 465) or STARTTLS (port 587)
+    const useDirectSSL = config.port === 465;
+    
+    // Transport options optimized for cloud deployments (Render.com)
+    // DISABLE pooling - stale pooled connections cause timeouts after cold starts
     const transportOptions: any = {
       host: config.host,
       port: config.port,
-      secure: config.secure,
+      secure: useDirectSSL || config.secure, // true for port 465, false for 587 (STARTTLS)
       auth: config.auth,
-      // Connection pool - reuse connections for faster subsequent emails
-      pool: true,
-      maxConnections: 3,
-      maxMessages: 100,
-      // Timeouts (in ms) - critical for cloud deployments like Render
-      connectionTimeout: 30000,  // 30s to establish SMTP connection
+      // NO pooling - each send creates a fresh connection (avoids stale connections on Render)
+      pool: false,
+      // Timeouts (in ms) - generous for cloud deployments
+      connectionTimeout: 60000,  // 60s to establish SMTP connection
       greetingTimeout: 30000,    // 30s for SMTP greeting
-      socketTimeout: 60000,      // 60s for socket inactivity
+      socketTimeout: 120000,     // 120s for socket inactivity (large PDF attachments need time)
       tls: {
-        // Allow self-signed certs in all environments for SMTP compatibility
+        // Allow self-signed certs for SMTP compatibility
         rejectUnauthorized: false,
+        // Force TLS version for Gmail compatibility
+        minVersion: 'TLSv1.2',
       },
-      // DNS resolution options for cloud environments
-      dnsTimeout: 10000,
+      // DNS resolution options
+      dnsTimeout: 15000,
+      // Debug logging in non-production
+      ...(process.env.NODE_ENV !== 'production' && { logger: false, debug: false }),
     };
 
-    console.log(`📧 Creating SMTP transporter: ${config.host}:${config.port} (secure: ${config.secure})`);
+    console.log(`📧 Creating SMTP transporter: ${config.host}:${config.port} (secure: ${useDirectSSL || config.secure}, pool: false)`);
     transporter = nodemailer.createTransport(transportOptions);
   }
   return transporter;
@@ -86,15 +92,29 @@ const resetTransporter = () => {
  * Resets the SMTP transporter and retries once if the first attempt fails
  */
 const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string }> => {
-  const transport = getTransporter();
+  let transport = getTransporter();
+  
   try {
+    // Verify SMTP connection is alive before sending
+    try {
+      await transport.verify();
+    } catch (verifyError) {
+      console.warn('⚠️ SMTP verify failed, resetting transporter...');
+      resetTransporter();
+      transport = getTransporter();
+    }
+    
     return await transport.sendMail(mailOptions);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.warn(`⚠️ Email send failed (attempt 1): ${errorMessage}. Retrying...`);
+    console.warn(`⚠️ Email send failed (attempt 1): ${errorMessage}. Retrying with fresh connection...`);
     
-    // Reset stale connection and retry once
+    // Reset stale connection and retry once with a completely fresh transporter
     resetTransporter();
+    
+    // Small delay before retry to let network settle
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     const retryTransport = getTransporter();
     return await retryTransport.sendMail(mailOptions);
   }
