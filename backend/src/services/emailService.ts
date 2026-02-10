@@ -36,41 +36,46 @@ const getEmailConfig = (): EmailConfig => {
 
 // Create reusable transporter
 let transporter: Transporter | null = null;
+let currentPort: number | null = null;
 
-const getTransporter = (): Transporter => {
-  if (!transporter) {
-    const config = getEmailConfig();
-    
-    // Determine if we should use direct SSL (port 465) or STARTTLS (port 587)
-    const useDirectSSL = config.port === 465;
-    
-    // Transport options optimized for cloud deployments (Render.com)
-    // DISABLE pooling - stale pooled connections cause timeouts after cold starts
-    const transportOptions: any = {
-      host: config.host,
-      port: config.port,
-      secure: useDirectSSL || config.secure, // true for port 465, false for 587 (STARTTLS)
-      auth: config.auth,
-      // NO pooling - each send creates a fresh connection (avoids stale connections on Render)
-      pool: false,
-      // Timeouts (in ms) - generous for cloud deployments
-      connectionTimeout: 60000,  // 60s to establish SMTP connection
-      greetingTimeout: 30000,    // 30s for SMTP greeting
-      socketTimeout: 120000,     // 120s for socket inactivity (large PDF attachments need time)
-      tls: {
-        // Allow self-signed certs for SMTP compatibility
-        rejectUnauthorized: false,
-        // Force TLS version for Gmail compatibility
-        minVersion: 'TLSv1.2',
-      },
-      // DNS resolution options
-      dnsTimeout: 15000,
-      // Debug logging in non-production
-      ...(process.env.NODE_ENV !== 'production' && { logger: false, debug: false }),
-    };
+/**
+ * Create a transporter for a specific port.
+ * Port 587 = STARTTLS, Port 465 = Direct SSL
+ */
+const createTransporterForPort = (port: number): Transporter => {
+  const config = getEmailConfig();
+  const useDirectSSL = port === 465;
+  
+  const transportOptions: any = {
+    host: config.host,
+    port,
+    secure: useDirectSSL, // true for 465 (SSL), false for 587 (STARTTLS)
+    auth: config.auth,
+    pool: false,
+    // Tight timeouts — fail fast, don't hang
+    connectionTimeout: 15000,  // 15s to establish TCP connection
+    greetingTimeout: 10000,    // 10s for SMTP greeting
+    socketTimeout: 30000,      // 30s for socket inactivity
+    tls: {
+      rejectUnauthorized: false,
+      minVersion: 'TLSv1.2',
+    },
+    dnsTimeout: 10000,
+  };
 
-    console.log(`📧 Creating SMTP transporter: ${config.host}:${config.port} (secure: ${useDirectSSL || config.secure}, pool: false)`);
-    transporter = nodemailer.createTransport(transportOptions);
+  console.log(`📧 Creating SMTP transporter: ${config.host}:${port} (secure: ${useDirectSSL}, pool: false)`);
+  return nodemailer.createTransport(transportOptions);
+};
+
+const getTransporter = (forcePort?: number): Transporter => {
+  const config = getEmailConfig();
+  const requestedPort = forcePort || config.port;
+  
+  // If port changed or no transporter, create new
+  if (!transporter || currentPort !== requestedPort) {
+    resetTransporter();
+    transporter = createTransporterForPort(requestedPort);
+    currentPort = requestedPort;
   }
   return transporter;
 };
@@ -84,6 +89,7 @@ const resetTransporter = () => {
       // ignore close errors
     }
     transporter = null;
+    currentPort = null;
   }
 };
 
@@ -102,48 +108,50 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise
 };
 
 /**
- * Send email with automatic retry on connection failures
- * Resets the SMTP transporter and retries once if the first attempt fails
- * Each attempt has a hard 30s timeout to prevent hanging
+ * Send email with automatic retry on connection failures.
+ * Attempt 1: Uses configured port (typically 587/STARTTLS).
+ * Attempt 2: Falls back to port 465 (direct SSL) if attempt 1 fails.
+ * Each attempt has a 45s hard timeout.
  */
 const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string }> => {
-  const SEND_TIMEOUT = 30000; // 30s hard timeout per attempt
+  const SEND_TIMEOUT = 45000; // 45s hard timeout per attempt
+  const config = getEmailConfig();
+  const primaryPort = config.port;
+  const fallbackPort = primaryPort === 465 ? 587 : 465;
   
-  // Attempt 1: Send directly (skip verify — it hangs on some cloud providers)
+  // Attempt 1: Primary port (configured port, usually 587)
   try {
-    console.log('📧 [Attempt 1] Sending email...');
-    const transport = getTransporter();
+    console.log(`📧 [Attempt 1] Sending via port ${primaryPort}...`);
+    const transport = getTransporter(primaryPort);
     const result = await withTimeout(
       transport.sendMail(mailOptions),
       SEND_TIMEOUT,
-      'SMTP sendMail (attempt 1)'
+      `SMTP port ${primaryPort} (attempt 1)`
     );
     console.log('✅ [Attempt 1] Email sent, messageId:', result.messageId);
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.warn(`⚠️ [Attempt 1] Failed: ${errorMessage}`);
-    
-    // Reset stale connection for retry
+    console.warn(`⚠️ [Attempt 1] Port ${primaryPort} failed: ${errorMessage}`);
     resetTransporter();
   }
     
-  // Attempt 2: Fresh transporter after small delay
-  console.log('📧 [Attempt 2] Retrying with fresh connection after 2s delay...');
+  // Attempt 2: Fallback port (465 SSL if primary was 587, or vice versa)
+  console.log(`📧 [Attempt 2] Falling back to port ${fallbackPort} after 2s delay...`);
   await new Promise(resolve => setTimeout(resolve, 2000));
   
   try {
-    const retryTransport = getTransporter();
+    const retryTransport = getTransporter(fallbackPort);
     const result = await withTimeout(
       retryTransport.sendMail(mailOptions),
       SEND_TIMEOUT,
-      'SMTP sendMail (attempt 2)'
+      `SMTP port ${fallbackPort} (attempt 2)`
     );
-    console.log('✅ [Attempt 2] Email sent, messageId:', result.messageId);
+    console.log(`✅ [Attempt 2] Email sent via port ${fallbackPort}, messageId:`, result.messageId);
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.error(`❌ [Attempt 2] Failed: ${errorMessage}`);
+    console.error(`❌ [Attempt 2] Port ${fallbackPort} also failed: ${errorMessage}`);
     resetTransporter();
     throw error;
   }
