@@ -29,7 +29,7 @@ import { notFound } from './middleware/notFound';
 import { apiRateLimiter } from './middleware/rateLimiter';
 import { sanitizeRequestBody } from './middleware/validation';
 import { corsConfig } from './config/security';
-import { connectWithRetry, prisma } from './lib/prisma';
+import { connectWithRetry, checkDbHealth, isDbConnected } from './lib/prisma';
 
 // Route imports
 import authRoutes from './routes/auth.routes';
@@ -117,25 +117,19 @@ app.use((_req, res, next) => {
   next();
 });
 
-// Health check (with database connectivity test)
+// Health check - uses non-cascading DB check to avoid reconnection storms
 app.get('/health', async (_req, res) => {
-  let dbStatus = 'unknown';
-  let dbError = '';
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    dbStatus = 'connected';
-  } catch (err) {
-    dbStatus = 'disconnected';
-    dbError = err instanceof Error ? err.message : String(err);
-  }
+  const dbHealth = await checkDbHealth();
+  const status = dbHealth.connected ? 'ok' : 'degraded';
   
-  const status = dbStatus === 'connected' ? 'ok' : 'degraded';
-  res.status(dbStatus === 'connected' ? 200 : 503).json({ 
+  // Always return 200 on health check so Render doesn't kill the service
+  // during cold start reconnection. Report actual DB state in response body.
+  res.status(200).json({ 
     status,
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
-    database: dbStatus,
-    ...(dbError && { dbError: dbError.substring(0, 200) }),
+    database: dbHealth.connected ? 'connected' : 'disconnected',
+    ...(dbHealth.error && { dbError: dbHealth.error }),
     databaseUrlSet: !!process.env.DATABASE_URL,
     directUrlSet: !!process.env.DIRECT_URL,
   });
@@ -423,10 +417,11 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Pre-connect to database BEFORE accepting requests (important for Render free tier cold starts)
-connectWithRetry(3, 3000).then(() => {
+// Uses 5 retries with 5s base delay (progressive backoff: 5s, 10s, 15s, 20s, 25s)
+connectWithRetry(5, 5000).then(() => {
   console.log('📦 Database initialization complete');
 }).catch((err) => {
-  console.error('⚠️ Database pre-connect failed, will retry per-request:', err);
+  console.error('⚠️ Database pre-connect failed, will retry per-request:', err instanceof Error ? err.message : err);
 });
 
 // Start server
