@@ -20,9 +20,10 @@ function ensurePoolerParams(): void {
     if (!url.includes('pgbouncer=')) params.push('pgbouncer=true');
     if (!url.includes('connection_limit=')) params.push('connection_limit=1');
     if (!url.includes('pool_timeout=')) params.push('pool_timeout=20');
+    if (!url.includes('connect_timeout=')) params.push('connect_timeout=15');
     if (params.length > 0) {
       process.env.DATABASE_URL = url + separator + params.join('&');
-      console.log('🔧 Auto-added PgBouncer params to DATABASE_URL (connection_limit=1, pool_timeout=20)');
+      console.log('🔧 Auto-added PgBouncer params to DATABASE_URL');
     }
   }
 }
@@ -38,10 +39,16 @@ let isReconnecting = false;
 let reconnectPromise: Promise<void> | null = null;
 let isConnected = false;
 let lastConnectAttempt = 0;
+let lastHealthProbe = 0;
 
-// Minimum time between reconnection attempts (prevents storms)
-const RECONNECT_COOLDOWN_MS = 5000;
+// Flag to bypass $use middleware (used by health check)
+let bypassMiddleware = false;
+
+// Minimum time between reconnection attempts (30s prevents storms from health checks)
+const RECONNECT_COOLDOWN_MS = 30000;
 const RECONNECT_PAUSE_MS = 2000;
+// Minimum time between health check DB probes (60s)
+const HEALTH_PROBE_INTERVAL_MS = 60000;
 
 // ===================================
 // Connection Error Detection
@@ -95,6 +102,7 @@ function isConnectionError(error: any): boolean {
 /**
  * Reconnect with mutex to prevent concurrent reconnection storms.
  * If already reconnecting, all callers wait for the same promise.
+ * 30s cooldown between attempts.
  */
 async function reconnect(client: PrismaClient): Promise<void> {
   // If already reconnecting, wait for the existing attempt
@@ -102,11 +110,10 @@ async function reconnect(client: PrismaClient): Promise<void> {
     return reconnectPromise;
   }
 
-  // Cooldown: don't retry too fast
+  // Cooldown: don't retry if we attempted recently
   const now = Date.now();
   if (now - lastConnectAttempt < RECONNECT_COOLDOWN_MS) {
-    const waitTime = RECONNECT_COOLDOWN_MS - (now - lastConnectAttempt);
-    await new Promise(resolve => setTimeout(resolve, waitTime));
+    throw new Error(`Reconnect cooldown active (${Math.round((RECONNECT_COOLDOWN_MS - (now - lastConnectAttempt)) / 1000)}s remaining)`);
   }
 
   isReconnecting = true;
@@ -151,6 +158,11 @@ function createPrismaClient(): PrismaClient {
   // Global query middleware: auto-retry on connection failure
   // Uses mutex to prevent concurrent reconnection storms
   client.$use(async (params, next) => {
+    // Bypass flag: health check probes skip retry logic entirely
+    if (bypassMiddleware) {
+      return next(params);
+    }
+
     try {
       const result = await next(params);
       // If query succeeded, mark as connected
@@ -167,7 +179,7 @@ function createPrismaClient(): PrismaClient {
       console.warn(`⚠️ DB error on ${model}.${action}, will reconnect...`);
 
       try {
-        // Use mutex-based reconnect (prevents storms)
+        // Use mutex-based reconnect (prevents storms, 30s cooldown)
         await reconnect(client);
         // Retry the original query
         console.log(`🔁 Retrying ${model}.${action}...`);
@@ -189,38 +201,52 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // ===================================
-// Health Check Helper (no retry, no reconnect storms)
+// Health Check Helper (non-cascading)
 // ===================================
 
 /**
  * Check if the database is reachable.
- * Lightweight: if already reconnecting or recently checked, returns cached state.
- * Does NOT trigger cascading retries.
+ * - Uses `bypassMiddleware` flag so $queryRawUnsafe does NOT trigger
+ *   the $use() retry/reconnect logic (prevents health check storms).
+ * - Probes DB at most once per 60s.
+ * - When DB is down and a reconnect was tried recently, returns cached state.
+ * - NEVER triggers reconnection storms.
  */
 export async function checkDbHealth(): Promise<{ connected: boolean; error?: string }> {
-  // If already reconnecting, just report status (don't pile on DB calls)
+  // If currently reconnecting, just report status
   if (isReconnecting) {
     return { connected: false, error: 'Reconnecting...' };
   }
 
-  // If connected recently (within 30s), trust cached state to avoid pool pressure
-  if (isConnected && (Date.now() - lastConnectAttempt) < 30000) {
+  const now = Date.now();
+
+  // If connected and recently probed (<60s), trust cached state
+  if (isConnected && (now - lastHealthProbe) < HEALTH_PROBE_INTERVAL_MS) {
     return { connected: true };
   }
 
+  // If NOT connected and a reconnect was attempted recently (<30s), don't probe again
+  if (!isConnected && (now - lastConnectAttempt) < RECONNECT_COOLDOWN_MS) {
+    return { connected: false, error: 'Database unreachable (cooldown active)' };
+  }
+
+  // Actually probe the database, but bypass $use middleware to avoid storm
+  lastHealthProbe = now;
+  bypassMiddleware = true;
   try {
     await prisma.$queryRawUnsafe('SELECT 1');
     isConnected = true;
-    lastConnectAttempt = Date.now();
     return { connected: true };
   } catch (err) {
     isConnected = false;
     const msg = err instanceof Error ? err.message.substring(0, 200) : String(err);
 
-    // Trigger reconnect in background (non-blocking, won't cascade)
+    // Trigger ONE reconnect in background (non-blocking) — cooldown prevents repeats
     reconnect(prisma).catch(() => { /* handled inside reconnect */ });
 
     return { connected: false, error: msg };
+  } finally {
+    bypassMiddleware = false;
   }
 }
 
@@ -246,13 +272,20 @@ export const connectWithRetry = async (retries = 5, delay = 5000): Promise<void>
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       await prisma.$connect();
-      // Verify with a real query (bypasses $use middleware via $queryRawUnsafe)
-      await prisma.$queryRawUnsafe('SELECT 1');
+      // Verify with a real query (bypasses $use middleware)
+      bypassMiddleware = true;
+      try {
+        await prisma.$queryRawUnsafe('SELECT 1');
+      } finally {
+        bypassMiddleware = false;
+      }
       isConnected = true;
       lastConnectAttempt = Date.now();
+      lastHealthProbe = Date.now();
       console.log(`✅ Database connected (attempt ${attempt}/${retries})`);
       return;
     } catch (error) {
+      bypassMiddleware = false;
       isConnected = false;
       const msg = error instanceof Error ? error.message.substring(0, 150) : String(error);
       console.error(`❌ DB connect attempt ${attempt}/${retries}: ${msg}`);
