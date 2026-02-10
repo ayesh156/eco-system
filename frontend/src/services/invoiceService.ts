@@ -440,14 +440,21 @@ export const invoiceService = {
     hasPdfAttachment: boolean;
   }> {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
+    // 90s timeout for email sending (SMTP can be slow on cloud deployments)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
     const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email-with-pdf${queryParams}`, {
       method: 'POST',
       headers: {
         ...getAuthHeaders(),
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
       body: JSON.stringify({ pdfBase64 }),
     });
+
+    clearTimeout(timeoutId);
     const result = await handleResponse<APIResponse<{ 
       messageId: string; 
       sentTo: string; 

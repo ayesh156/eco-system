@@ -583,15 +583,22 @@ export const sendEmailWithPDF = async (
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    // 90s timeout for email sending (SMTP can be slow on cloud deployments)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
     const response = await fetch(url, {
       method: 'POST',
       headers,
       credentials: 'include',
+      signal: controller.signal,
       body: JSON.stringify({
         pdfBase64,
         includeAttachment: !!pdfBase64,
       }),
     });
+
+    clearTimeout(timeoutId);
 
     const result = await response.json();
 

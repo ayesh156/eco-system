@@ -41,21 +41,63 @@ const getTransporter = (): Transporter => {
   if (!transporter) {
     const config = getEmailConfig();
     
-    // Add TLS options for better compatibility with Gmail and other providers
+    // Add TLS options, timeouts, and pooling for Render.com deployment
     const transportOptions: any = {
       host: config.host,
       port: config.port,
       secure: config.secure,
       auth: config.auth,
+      // Connection pool - reuse connections for faster subsequent emails
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 100,
+      // Timeouts (in ms) - critical for cloud deployments like Render
+      connectionTimeout: 30000,  // 30s to establish SMTP connection
+      greetingTimeout: 30000,    // 30s for SMTP greeting
+      socketTimeout: 60000,      // 60s for socket inactivity
       tls: {
-        // Reject unauthorized certificates only in production
-        rejectUnauthorized: process.env.NODE_ENV === 'production',
+        // Allow self-signed certs in all environments for SMTP compatibility
+        rejectUnauthorized: false,
       },
+      // DNS resolution options for cloud environments
+      dnsTimeout: 10000,
     };
 
+    console.log(`📧 Creating SMTP transporter: ${config.host}:${config.port} (secure: ${config.secure})`);
     transporter = nodemailer.createTransport(transportOptions);
   }
   return transporter;
+};
+
+// Reset transporter on connection errors (stale connections)
+const resetTransporter = () => {
+  if (transporter) {
+    try {
+      (transporter as any).close?.();
+    } catch (e) {
+      // ignore close errors
+    }
+    transporter = null;
+  }
+};
+
+/**
+ * Send email with automatic retry on connection failures
+ * Resets the SMTP transporter and retries once if the first attempt fails
+ */
+const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string }> => {
+  const transport = getTransporter();
+  try {
+    return await transport.sendMail(mailOptions);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown';
+    console.warn(`⚠️ Email send failed (attempt 1): ${errorMessage}. Retrying...`);
+    
+    // Reset stale connection and retry once
+    resetTransporter();
+    const retryTransport = getTransporter();
+    return await retryTransport.sendMail(mailOptions);
+  }
 };
 
 // ===================================
@@ -434,7 +476,6 @@ export const sendInvoiceEmail = async (data: InvoiceEmailData): Promise<{ succes
       return { success: false, error: 'Email service not configured' };
     }
 
-    const transport = getTransporter();
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
     const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
 
@@ -448,19 +489,14 @@ export const sendInvoiceEmail = async (data: InvoiceEmailData): Promise<{ succes
       html: generateInvoiceEmailHTML(data),
     };
 
-    const result = await transport.sendMail(mailOptions);
+    const result = await sendMailWithRetry(mailOptions);
     console.log('✅ Invoice email sent successfully to:', data.email);
     
     return { success: true, messageId: result.messageId };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown email error';
     console.error('❌ Failed to send invoice email:', errorMessage);
-    
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('📧 [DEV MODE - FALLBACK] Invoice email would be sent to:', data.email);
-      return { success: true, messageId: 'dev-fallback-logged' };
-    }
-    
+    resetTransporter();
     return { success: false, error: errorMessage };
   }
 };
@@ -485,7 +521,6 @@ export const sendInvoiceWithPDF = async (
       return { success: false, error: 'Email service not configured' };
     }
 
-    const transport = getTransporter();
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
     const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
 
@@ -506,19 +541,14 @@ export const sendInvoiceWithPDF = async (
       ],
     };
 
-    const result = await transport.sendMail(mailOptions);
+    const result = await sendMailWithRetry(mailOptions);
     console.log('✅ Invoice email with PDF sent successfully to:', data.email);
     
     return { success: true, messageId: result.messageId };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown email error';
     console.error('❌ Failed to send invoice email with PDF:', errorMessage);
-    
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('📧 [DEV MODE - FALLBACK] Invoice email with PDF would be sent to:', data.email);
-      return { success: true, messageId: 'dev-fallback-logged' };
-    }
-    
+    resetTransporter();
     return { success: false, error: errorMessage };
   }
 };
@@ -728,7 +758,6 @@ export const sendPasswordResetOTP = async (data: OTPEmailData): Promise<SendOTPR
       return { success: false, error: 'Email service not configured' };
     }
 
-    const transport = getTransporter();
     const fromName = process.env.SMTP_FROM_NAME || 'ECOTEC System';
     const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
 
@@ -742,20 +771,14 @@ export const sendPasswordResetOTP = async (data: OTPEmailData): Promise<SendOTPR
       html: generateOTPEmailHTML(data),
     };
 
-    const result = await transport.sendMail(mailOptions);
+    const result = await sendMailWithRetry(mailOptions);
     console.log('✅ OTP email sent successfully to:', data.email);
     
     return { success: true, messageId: result.messageId };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown email error';
     console.error('❌ Failed to send OTP email:', errorMessage);
-    
-    // In development, still log the OTP and return success for testing
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('📧 [DEV MODE - FALLBACK] Password Reset OTP for', data.email, ':', data.otp);
-      return { success: true, messageId: 'dev-fallback-otp-logged' };
-    }
-    
+    resetTransporter();
     return { success: false, error: errorMessage };
   }
 };
@@ -1137,7 +1160,6 @@ export const sendGRNWithPDF = async (
       return { success: false, error: 'Email service not configured' };
     }
 
-    const transport = getTransporter();
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
     const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
 
@@ -1177,19 +1199,14 @@ export const sendGRNWithPDF = async (
       ];
     }
 
-    const result = await transport.sendMail(mailOptions);
+    const result = await sendMailWithRetry(mailOptions);
     console.log('✅ GRN email sent successfully to:', data.email);
     
     return { success: true, messageId: result.messageId, hasPdfAttachment: !!pdfBase64 };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown email error';
     console.error('❌ Failed to send GRN email:', errorMessage);
-    
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('📧 [DEV MODE - FALLBACK] GRN email would be sent to:', data.email);
-      return { success: true, messageId: 'dev-fallback-logged', hasPdfAttachment: !!pdfBase64 };
-    }
-    
+    resetTransporter();
     return { success: false, error: errorMessage };
   }
 };
