@@ -726,15 +726,15 @@ export const sendInvoiceEmail = async (data: InvoiceEmailData): Promise<{ succes
  */
 export const sendInvoiceWithPDF = async (
   data: InvoiceEmailData,
-  pdfBuffer: Buffer
-): Promise<{ success: boolean; messageId?: string; error?: string }> => {
+  pdfBufferOrBase64?: Buffer | string
+): Promise<{ success: boolean; messageId?: string; error?: string; hasPdfAttachment?: boolean }> => {
   try {
     // Check if ANY email provider is configured (Resend OR SMTP)
     if (!isEmailConfigured()) {
       console.error('❌ No email provider configured. Cannot send invoice email with PDF.');
       if (process.env.NODE_ENV !== 'production') {
         console.log('📧 [DEV MODE] Invoice email with PDF would be sent to:', data.email);
-        return { success: true, messageId: 'dev-mode-no-email-sent' };
+        return { success: true, messageId: 'dev-mode-no-email-sent', hasPdfAttachment: !!pdfBufferOrBase64 };
       }
       return { success: false, error: 'Email service not configured. Set RESEND_API_KEY or SMTP credentials.' };
     }
@@ -742,27 +742,53 @@ export const sendInvoiceWithPDF = async (
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
     const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@system.com';
 
-    console.log(`📤 Sending invoice email with PDF attachment to: ${data.email}`);
+    console.log(`📤 Sending invoice email to: ${data.email} (with${pdfBufferOrBase64 ? '' : 'out'} PDF)`);
 
-    const mailOptions = {
+    const hasPdfAttachment = !!pdfBufferOrBase64;
+
+    const mailOptions: {
+      from: string;
+      to: string;
+      subject: string;
+      text: string;
+      html: string;
+      attachments?: Array<{
+        filename: string;
+        content: Buffer;
+        contentType: string;
+      }>;
+    } = {
       from: `"${fromName}" <${fromEmail}>`,
       to: data.email,
       subject: `📄 Invoice #${data.invoiceNumber} from ${data.shopName}`,
       text: generateInvoiceEmailText(data),
       html: generateInvoiceEmailHTML(data),
-      attachments: [
+    };
+
+    // Add PDF attachment if provided (accepts Buffer or base64 string)
+    if (pdfBufferOrBase64) {
+      let pdfBuffer: Buffer;
+      if (typeof pdfBufferOrBase64 === 'string') {
+        // base64 string from client - remove data URL prefix if present
+        const base64Data = pdfBufferOrBase64.replace(/^data:application\/pdf;base64,/, '');
+        pdfBuffer = Buffer.from(base64Data, 'base64');
+      } else {
+        pdfBuffer = pdfBufferOrBase64;
+      }
+
+      mailOptions.attachments = [
         {
           filename: `Invoice-${data.invoiceNumber}.pdf`,
           content: pdfBuffer,
           contentType: 'application/pdf',
         },
-      ],
-    };
+      ];
+    }
 
     const result = await sendMailWithRetry(mailOptions);
-    console.log('✅ Invoice email with PDF sent successfully to:', data.email);
+    console.log('✅ Invoice email sent successfully to:', data.email);
     
-    return { success: true, messageId: result.messageId };
+    return { success: true, messageId: result.messageId, hasPdfAttachment };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown email error';
     console.error('❌ Failed to send invoice email with PDF:', errorMessage);

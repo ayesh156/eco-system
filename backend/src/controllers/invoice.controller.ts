@@ -1649,7 +1649,8 @@ export const downloadInvoicePDF = async (
  * Send Invoice via Email with PDF Attachment
  * POST /api/v1/invoices/:id/send-email-with-pdf
  * 
- * Sends the invoice email with PDF attachment to the customer.
+ * Sends the invoice email with optional PDF attachment to the customer.
+ * Accepts client-generated pdfBase64 (same pattern as GRN emails).
  * Updates emailSent and emailSentAt fields in the database.
  */
 export const sendInvoiceEmailWithPDF = async (
@@ -1659,6 +1660,7 @@ export const sendInvoiceEmailWithPDF = async (
 ) => {
   try {
     const { id } = req.params;
+    const { pdfBase64, includeAttachment } = req.body;
     const shopId = getEffectiveShopId(req);
 
     if (!shopId) {
@@ -1699,53 +1701,7 @@ export const sendInvoiceEmailWithPDF = async (
       throw new AppError('Customer does not have an email address', 400);
     }
 
-    // Prepare PDF data
-    const pdfData: InvoicePDFData = {
-      invoiceNumber: invoice.invoiceNumber,
-      customerName: invoice.customerName || invoice.customer?.name || 'Walk-in Customer',
-      customerPhone: invoice.customer?.phone || undefined,
-      customerEmail: invoice.customer?.email || undefined,
-      customerAddress: invoice.customer?.address || undefined,
-      date: invoice.date.toISOString(),
-      dueDate: invoice.dueDate.toISOString(),
-      items: invoice.items.map((item) => ({
-        productName: item.product?.name || item.productName || 'Unknown Product',
-        quantity: item.quantity,
-        unitPrice: Number(item.unitPrice),
-        originalPrice: item.originalPrice ? Number(item.originalPrice) : undefined,
-        total: Number(item.unitPrice) * item.quantity,
-        // Get warranty from product if available
-        warranty: item.product?.warranty || undefined,
-      })),
-      subtotal: Number(invoice.subtotal),
-      tax: Number(invoice.tax),
-      discount: Number(invoice.discount),
-      total: Number(invoice.total),
-      paidAmount: Number(invoice.paidAmount),
-      dueAmount: Number(invoice.dueAmount),
-      status: invoice.status,
-      notes: invoice.notes || undefined,
-      // Shop branding
-      shopName: invoice.shop?.name || 'Shop',
-      shopSubName: invoice.shop?.subName || undefined,
-      shopAddress: invoice.shop?.address || undefined,
-      shopPhone: invoice.shop?.phone || undefined,
-      shopEmail: invoice.shop?.email || undefined,
-      shopLogo: invoice.shop?.logo || undefined,
-    };
-
-    // Generate PDF
-    const pdfBuffer = await generateInvoicePDF(pdfData);
-
-    // Prepare invoice email data with warranty codes
-    const invoiceItems = invoice.items.map((item) => ({
-      productName: item.product?.name || item.productName || 'Unknown Product',
-      quantity: item.quantity,
-      unitPrice: Number(item.unitPrice),
-      total: Number(item.unitPrice) * item.quantity,
-      warranty: item.product?.warranty || undefined,
-    }));
-
+    // Prepare invoice email data
     const emailData = {
       email: invoice.customer.email,
       customerName: invoice.customer.name,
@@ -1760,7 +1716,13 @@ export const sendInvoiceEmailWithPDF = async (
         month: 'short', 
         year: 'numeric' 
       }),
-      items: invoiceItems,
+      items: invoice.items.map((item) => ({
+        productName: item.product?.name || item.productName || 'Unknown Product',
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        total: Number(item.unitPrice) * item.quantity,
+        warranty: item.product?.warranty || undefined,
+      })),
       subtotal: Number(invoice.subtotal),
       tax: Number(invoice.tax),
       discount: Number(invoice.discount),
@@ -1778,11 +1740,15 @@ export const sendInvoiceEmailWithPDF = async (
       notes: invoice.notes || undefined,
     };
 
-    // Send the email with PDF attachment
-    const emailResult = { emailData, pdfBuffer, invoiceId: invoice.id, customerEmail: invoice.customer.email, invoiceNumber: invoice.invoiceNumber };
+    // Use client-side pdfBase64 if provided (same pattern as GRN emails)
+    // includeAttachment defaults to true if pdfBase64 is present
+    const shouldIncludePdf = includeAttachment !== false && !!pdfBase64;
 
-    // Send email with PDF synchronously (sendMailWithRetry has 30s hard timeout per attempt)
-    const sendResult = await sendInvoiceWithPDF(emailResult.emailData, emailResult.pdfBuffer);
+    // Send email with optional PDF (sendInvoiceWithPDF handles base64 → Buffer conversion)
+    const sendResult = await sendInvoiceWithPDF(
+      emailData,
+      shouldIncludePdf ? pdfBase64 : undefined
+    );
 
     if (!sendResult.success) {
       return res.status(500).json({
@@ -1791,19 +1757,19 @@ export const sendInvoiceEmailWithPDF = async (
       });
     }
 
-    console.log(`✅ Invoice email sent to ${emailResult.customerEmail} for Invoice #${emailResult.invoiceNumber}`);
+    console.log(`✅ Invoice email sent to ${invoice.customer.email} for Invoice #${invoice.invoiceNumber}`);
 
     // Update invoice with email sent status
     try {
       await prisma.invoice.update({
-        where: { id: emailResult.invoiceId },
+        where: { id: invoice.id },
         data: {
           emailSent: true,
           emailSentAt: new Date(),
         },
       });
     } catch (dbErr) {
-      console.error(`⚠️ Failed to update emailSent status for Invoice #${emailResult.invoiceNumber}:`, dbErr);
+      console.error(`⚠️ Failed to update emailSent status for Invoice #${invoice.invoiceNumber}:`, dbErr);
     }
 
     res.status(200).json({
@@ -1814,7 +1780,7 @@ export const sendInvoiceEmailWithPDF = async (
         sentTo: invoice.customer.email,
         invoiceNumber: invoice.invoiceNumber,
         emailSentAt: new Date(),
-        hasPdfAttachment: true,
+        hasPdfAttachment: sendResult.hasPdfAttachment || false,
       },
     });
   } catch (error) {

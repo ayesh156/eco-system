@@ -464,7 +464,10 @@ export const invoiceService = {
           'Content-Type': 'application/json',
         },
         signal: controller.signal,
-        body: JSON.stringify({ pdfBase64 }),
+        body: JSON.stringify({ 
+          pdfBase64,
+          includeAttachment: !!pdfBase64,
+        }),
       });
 
       clearTimeout(timeoutId);
