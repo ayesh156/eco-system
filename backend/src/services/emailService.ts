@@ -981,8 +981,10 @@ export interface GRNEmailData {
 /**
  * Generate GRN Email HTML - Clean B&W Professional Design
  * Matches the PrintableGRN frontend component design
+ * @param data - GRN email data
+ * @param includePdfAttachment - Whether PDF is attached (shows notice if true)
  */
-const generateGRNEmailHTML = (data: GRNEmailData): string => {
+const generateGRNEmailHTML = (data: GRNEmailData, includePdfAttachment: boolean = false): string => {
   const currentYear = new Date().getFullYear();
   const statusColor = data.paymentStatus === 'PAID' ? '#10b981' : data.paymentStatus === 'PARTIAL' ? '#f59e0b' : '#ef4444';
   const statusText = data.paymentStatus === 'PAID' ? 'Paid' : data.paymentStatus === 'PARTIAL' ? 'Partially Paid' : 'Unpaid';
@@ -1196,7 +1198,8 @@ const generateGRNEmailHTML = (data: GRNEmailData): string => {
                   </td>
                 </tr>
                 
-                <!-- PDF Attachment Notice -->
+                <!-- PDF Attachment Notice (conditional) -->
+                ${includePdfAttachment ? `
                 <tr>
                   <td style="padding: 0 32px 32px 32px; text-align: center;">
                     <div style="background: #f1f5f9; border-radius: 10px; padding: 14px;">
@@ -1206,6 +1209,7 @@ const generateGRNEmailHTML = (data: GRNEmailData): string => {
                     </div>
                   </td>
                 </tr>
+                ` : ''}
                 
               </table>
             </td>
@@ -1299,6 +1303,8 @@ export const sendGRNWithPDF = async (
 
     console.log(`📤 Sending GRN email to: ${data.email}`);
 
+    const hasPdfAttachment = !!pdfBase64;
+
     const mailOptions: {
       from: string;
       to: string;
@@ -1315,7 +1321,7 @@ export const sendGRNWithPDF = async (
       to: data.email,
       subject: `📦 GRN #${data.grnNumber} from ${data.shopName}`,
       text: generateGRNEmailText(data),
-      html: generateGRNEmailHTML(data),
+      html: generateGRNEmailHTML(data, hasPdfAttachment),
     };
 
     // Add PDF attachment if provided

@@ -313,7 +313,45 @@ Thank you for your service! 🙏`;
     }
   };
 
-  // Send GRN via email to supplier - Direct send without print preview
+  // Send GRN via email to supplier - Quick send WITHOUT PDF attachment (faster, more reliable)
+  const handleSendEmailQuick = async () => {
+    // Check for supplier email
+    const supplierEmail = supplier?.email;
+    if (!supplierEmail) {
+      toast.error('Supplier email not found!', {
+        description: 'Please add an email address to the supplier profile.',
+      });
+      return;
+    }
+
+    setIsSendingEmail(true);
+
+    try {
+      toast.loading('Sending email...', { id: 'grn-email-quick' });
+
+      // Send email WITHOUT PDF attachment (faster, more reliable)
+      const grnId = grn.apiId || grn.id;
+      console.log('📧 Sending GRN email (no PDF), grnId:', grnId);
+      const token = getAccessToken();
+      const result = await grnService.sendEmailWithPDF(grnId, undefined, token, effectiveShopId);
+
+      toast.success('GRN email sent successfully!', {
+        id: 'grn-email-quick',
+        description: `GRN #${grn.grnNumber} email sent to ${result.sentTo}`,
+      });
+      setShowActions(false);
+    } catch (error) {
+      console.error('❌ Failed to send GRN email:', error);
+      toast.error('Failed to send email', {
+        id: 'grn-email-quick',
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // Send GRN via email to supplier with PDF - Auto-retries without PDF on timeout
   const handleSendEmail = async () => {
     // Check for supplier email
     const supplierEmail = supplier?.email;
@@ -352,23 +390,49 @@ Thank you for your service! 🙏`;
         pdfBase64 = undefined;
       }
 
-      toast.loading('Sending email...', { id: 'grn-email-pdf' });
+      toast.loading('Sending email with PDF...', { id: 'grn-email-pdf' });
 
       // Step 2: Send email via backend with fresh token (use apiId - the database UUID)
       const grnId = grn.apiId || grn.id;
       console.log('📧 Sending GRN email, grnId:', grnId, 'apiId:', grn.apiId, 'id:', grn.id);
       const token = getAccessToken();
-      const result = await grnService.sendEmailWithPDF(grnId, pdfBase64, token, effectiveShopId);
+      
+      try {
+        const result = await grnService.sendEmailWithPDF(grnId, pdfBase64, token, effectiveShopId);
 
-      const successMessage = result.hasPdfAttachment
-        ? 'GRN sent with PDF attachment!'
-        : 'GRN email sent successfully!';
+        const successMessage = result.hasPdfAttachment
+          ? 'GRN sent with PDF attachment!'
+          : 'GRN email sent successfully!';
 
-      toast.success(successMessage, {
-        id: 'grn-email-pdf',
-        description: `GRN #${grn.grnNumber} email sent to ${result.sentTo}`,
-      });
-      setShowActions(false);
+        toast.success(successMessage, {
+          id: 'grn-email-pdf',
+          description: `GRN #${grn.grnNumber} email sent to ${result.sentTo}`,
+        });
+        setShowActions(false);
+      } catch (sendError) {
+        // Check if it's a timeout error - retry without PDF
+        const errorMessage = sendError instanceof Error ? sendError.message : '';
+        const isTimeout = errorMessage.toLowerCase().includes('timeout') || 
+                          errorMessage.toLowerCase().includes('timed out') ||
+                          errorMessage.toLowerCase().includes('connection');
+        
+        if (isTimeout && pdfBase64) {
+          console.log('⚠️ Email with PDF timed out, retrying without PDF...');
+          toast.loading('Retrying without PDF attachment...', { id: 'grn-email-pdf' });
+          
+          // Retry without PDF
+          const retryResult = await grnService.sendEmailWithPDF(grnId, undefined, token, effectiveShopId);
+          
+          toast.success('GRN email sent successfully!', {
+            id: 'grn-email-pdf',
+            description: `GRN #${grn.grnNumber} sent to ${retryResult.sentTo} (without PDF due to slow connection)`,
+          });
+          setShowActions(false);
+        } else {
+          // Re-throw if not a timeout error or already tried without PDF
+          throw sendError;
+        }
+      }
     } catch (error) {
       console.error('❌ Failed to send GRN email:', error);
       toast.error('Failed to send email', {
@@ -617,7 +681,28 @@ Thank you for your service! 🙏`;
                     }`}
                   >
                     <Mail className="w-4 h-4 text-purple-500" />
-                    <span>{isSendingEmail ? 'Sending...' : 'Email PDF to Supplier'}</span>
+                    <span>{isSendingEmail ? 'Sending...' : 'Email with PDF'}</span>
+                  </button>
+
+                  {/* Quick Email (No PDF) - Faster, more reliable */}
+                  <button 
+                    onClick={() => {
+                      handleSendEmailQuick();
+                    }}
+                    disabled={isSendingEmail}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                      isSendingEmail ? 'opacity-50 cursor-not-allowed' : ''
+                    } ${
+                      theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <Mail className="w-4 h-4 text-emerald-500" />
+                    <div className="flex flex-col">
+                      <span>{isSendingEmail ? 'Sending...' : 'Quick Email (No PDF)'}</span>
+                      <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Faster & more reliable
+                      </span>
+                    </div>
                   </button>
 
                   {/* Divider */}
