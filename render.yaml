@@ -11,7 +11,7 @@ services:
     region: singapore
     plan: free
     rootDir: backend
-    buildCommand: npm install --include=dev && npx puppeteer browsers install chrome && npx prisma generate && npx tsc
+    buildCommand: npm install --include=dev && npx prisma generate && npx tsc
     startCommand: node dist/index.js
     healthCheckPath: /health
     envVars:
@@ -45,6 +45,8 @@ services:
         sync: false
       - key: SMTP_FROM_EMAIL
         sync: false
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"
 
   # ==========================================
   # Frontend (Static Site - React + Vite)

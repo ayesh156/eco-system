@@ -1,73 +1,152 @@
 /**
  * PDF Generation Service
- * Generates invoice and GRN PDFs using Puppeteer - MATCHES FRONTEND EXACTLY
+ * Generates invoice and GRN PDFs using puppeteer-core + @sparticuz/chromium
+ * MATCHES FRONTEND EXACTLY
  *
- * Render.com Notes:
- * - Full `puppeteer` package downloads Chromium automatically during npm install.
- * - Render's Node runtime includes most Chrome deps, but we must pass --no-sandbox
- *   and --disable-dev-shm-usage for the container environment.
- * - On Render free tier (512MB RAM), each PDF generation can spike to ~200-300MB.
- *   Always close the browser in `finally` to prevent leaks.
+ * Render.com Optimization Notes:
+ * - Uses `puppeteer-core` (no bundled Chromium — saves ~300MB disk).
+ * - Uses `@sparticuz/chromium` in production (minimal Chromium binary ~50MB compressed).
+ * - RAM usage: ~100-150MB per PDF generation (down from ~200-300MB with full puppeteer).
+ * - Concurrency semaphore ensures only ONE PDF generates at a time to prevent OOM.
+ * - Browser instance is created and destroyed per-request with try/finally safety.
  */
 
-import puppeteer from 'puppeteer';
-import { execSync } from 'child_process';
+import puppeteer from 'puppeteer-core';
 
 // ===================================
-// Puppeteer Launch Configuration for Cloud Environments (Render, Railway, etc.)
+// Concurrency Control — Prevent OOM on Render Free Tier (512MB)
+// ===================================
+
+/**
+ * Simple Semaphore to limit concurrent PDF generations.
+ * On Render's 512MB free tier, even ONE Chromium instance uses ~100-150MB.
+ * Two concurrent instances = instant OOM crash.
+ */
+class PdfSemaphore {
+  private queue: Array<() => void> = [];
+  private running = 0;
+
+  constructor(private readonly maxConcurrent: number) {}
+
+  async acquire(): Promise<void> {
+    if (this.running < this.maxConcurrent) {
+      this.running++;
+      return;
+    }
+    // Wait in queue until a slot opens
+    return new Promise<void>((resolve) => {
+      this.queue.push(resolve);
+    });
+  }
+
+  release(): void {
+    this.running--;
+    const next = this.queue.shift();
+    if (next) {
+      this.running++;
+      next();
+    }
+  }
+
+  /** Number of requests currently waiting */
+  get pending(): number {
+    return this.queue.length;
+  }
+}
+
+// Only 1 concurrent PDF generation allowed (Render 512MB RAM safety)
+const pdfSemaphore = new PdfSemaphore(1);
+
+// ===================================
+// Chromium Path Detection (Multi-Environment)
 // ===================================
 
 /**
  * Detect Chrome/Chromium executable path for the current environment.
  * Priority:
  *   1. PUPPETEER_EXECUTABLE_PATH env var (explicit override)
- *   2. Puppeteer's bundled Chromium (default `puppeteer` behavior)
- *   3. System-installed google-chrome / chromium-browser (fallback for Docker / buildpacks)
+ *   2. @sparticuz/chromium (production — lightweight Chrome for containers)
+ *   3. System Chrome / Chromium (fallback)
+ *   4. Common Windows Chrome paths (development)
  */
-function getChromiumPath(): string | undefined {
-  // 1. Explicit env var (used in Docker / custom Render setup)
+async function getChromiumExecutable(): Promise<string> {
+  // 1. Explicit env var override (Docker / custom Render setup)
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     console.log(`🔧 Using PUPPETEER_EXECUTABLE_PATH: ${process.env.PUPPETEER_EXECUTABLE_PATH}`);
     return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
 
-  // 2. Let Puppeteer use its bundled Chromium (works on Render's Node runtime)
-  //    Returning undefined tells puppeteer.launch() to use its own binary.
-  if (process.env.NODE_ENV !== 'production') {
-    return undefined;
+  // 2. Production: Use @sparticuz/chromium (minimal headless Chrome, ~50MB compressed)
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      const chromium = await import('@sparticuz/chromium');
+      // Configure for minimal resource usage
+      chromium.default.setHeadlessMode = true;
+      chromium.default.setGraphicsMode = false;
+      const execPath = await chromium.default.executablePath();
+      console.log(`🔧 Using @sparticuz/chromium: ${execPath}`);
+      return execPath;
+    } catch (e) {
+      console.warn('⚠️  @sparticuz/chromium not available, trying system Chrome...');
+    }
   }
 
-  // 3. In production, try system Chrome as fallback (e.g., if buildpack installed it)
-  const candidates = [
+  // 3. System Chrome (Linux containers, CI/CD)
+  const linuxPaths = [
     '/usr/bin/google-chrome-stable',
     '/usr/bin/google-chrome',
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
   ];
+
+  // 4. Windows paths (local development)
+  const winPaths = [
+    process.env.LOCALAPPDATA && `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  ].filter(Boolean) as string[];
+
+  const candidates = process.platform === 'win32' ? winPaths : linuxPaths;
+
   try {
-    const { existsSync } = require('fs');
+    const fs = await import('fs');
     for (const candidate of candidates) {
-      if (existsSync(candidate)) {
+      if (fs.existsSync(candidate)) {
         console.log(`🔧 Found system Chrome at: ${candidate}`);
         return candidate;
       }
     }
   } catch {
-    // fs not available or error — fall through
+    // fs error — fall through
   }
 
-  // No system Chrome found — puppeteer will use its bundled one
-  return undefined;
+  // 5. Last resort: try puppeteer's cache (if `puppeteer` devDependency installed Chrome)
+  try {
+    const fullPuppeteer = await import('puppeteer');
+    const execPath = (fullPuppeteer as any).executablePath?.();
+    if (execPath) {
+      console.log(`🔧 Using puppeteer's bundled Chrome: ${execPath}`);
+      return execPath;
+    }
+  } catch {
+    // puppeteer not installed — that's fine in production
+  }
+
+  throw new Error(
+    'No Chrome/Chromium found. Set PUPPETEER_EXECUTABLE_PATH env var, ' +
+    'install @sparticuz/chromium, or install Chrome on the system.'
+  );
 }
 
 /**
  * Launch args optimized for containerized cloud environments.
- * - --no-sandbox: Required inside Docker/Render containers (no user namespaces)
- * - --disable-dev-shm-usage: /dev/shm is tiny on containers; use /tmp instead
- * - --disable-gpu: No GPU on cloud servers
- * - --single-process: Reduces memory footprint (~50MB savings)
- * - --disable-extensions: No extensions needed for PDF generation
- * - --font-render-hinting=none: Consistent font rendering across environments
+ * Aggressively disables features to minimize RAM on Render's 512MB tier.
+ * 
+ * Key savings:
+ * - --single-process + --no-zygote: ~50MB savings (no child process overhead)
+ * - --disable-dev-shm-usage: Prevents /dev/shm exhaustion in containers
+ * - --disable-gpu + --disable-software-rasterizer: No GPU memory allocation
+ * - --js-flags=--max-old-space-size=128: Cap V8 heap inside Chromium
  */
 const PUPPETEER_ARGS = [
   '--no-sandbox',
@@ -79,12 +158,28 @@ const PUPPETEER_ARGS = [
   '--no-zygote',
   '--disable-extensions',
   '--disable-background-networking',
+  '--disable-background-timer-throttling',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-breakpad',
+  '--disable-component-extensions-with-background-pages',
+  '--disable-component-update',
   '--disable-default-apps',
+  '--disable-domain-reliability',
+  '--disable-features=TranslateUI',
+  '--disable-hang-monitor',
+  '--disable-ipc-flooding-protection',
+  '--disable-popup-blocking',
+  '--disable-prompt-on-repost',
+  '--disable-renderer-backgrounding',
   '--disable-sync',
   '--disable-translate',
+  '--metrics-recording-only',
+  '--no-first-run',
+  '--safebrowsing-disable-auto-update',
   '--font-render-hinting=none',
   '--hide-scrollbars',
   '--mute-audio',
+  '--js-flags=--max-old-space-size=128',
 ];
 
 /** Max time to wait for page.setContent + page.pdf combined */
@@ -836,23 +931,44 @@ const generateInvoiceHTML = (data: InvoicePDFData): string => {
 /**
  * Generate PDF from invoice data
  * Returns a Buffer containing the PDF
+ * 
+ * Concurrency: Only 1 PDF generates at a time (semaphore-controlled)
+ * Memory: Browser is created & destroyed per request with aggressive cleanup
  */
 export const generateInvoicePDF = async (data: InvoicePDFData): Promise<Buffer> => {
+  if (pdfSemaphore.pending > 0) {
+    console.log(`⏳ PDF queue: ${pdfSemaphore.pending} requests waiting...`);
+  }
+
+  // Acquire semaphore — blocks if another PDF is being generated
+  await pdfSemaphore.acquire();
+
   let browser = null;
   
   try {
-    const executablePath = getChromiumPath();
-    console.log('📄 Launching Puppeteer for Invoice PDF...');
+    const executablePath = await getChromiumExecutable();
+    console.log('📄 Launching Chromium for Invoice PDF...');
     
     browser = await puppeteer.launch({
       headless: true,
-      executablePath,  // undefined = use bundled Chromium
+      executablePath,
       args: PUPPETEER_ARGS,
       timeout: PDF_GENERATION_TIMEOUT_MS,
       protocolTimeout: PDF_GENERATION_TIMEOUT_MS,
     });
     
     const page = await browser.newPage();
+
+    // Disable images/CSS we don't need to reduce memory
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      const resourceType = request.resourceType();
+      if (['image', 'media', 'font'].includes(resourceType)) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
     
     // Set the HTML content — use 'load' instead of 'networkidle0' for reliability
     // on cloud environments. 'networkidle0' waits for zero network activity for
@@ -864,7 +980,7 @@ export const generateInvoicePDF = async (data: InvoicePDFData): Promise<Buffer> 
     });
     
     // Brief pause for CSS rendering to complete
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 150));
     
     // Generate PDF
     const pdfBuffer = await page.pdf({
@@ -879,19 +995,29 @@ export const generateInvoicePDF = async (data: InvoicePDFData): Promise<Buffer> 
       timeout: PDF_GENERATION_TIMEOUT_MS,
     });
     
-    console.log(`✅ Invoice PDF generated (${Buffer.from(pdfBuffer).length} bytes)`);
-    return Buffer.from(pdfBuffer);
+    const result = Buffer.from(pdfBuffer);
+    console.log(`✅ Invoice PDF generated (${result.length} bytes)`);
+    return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`❌ Invoice PDF generation failed: ${message}`);
     throw new Error(`PDF generation failed: ${message}`);
   } finally {
+    // CRITICAL: Always close browser AND release semaphore
     if (browser) {
       try {
         await browser.close();
       } catch {
         // Browser may already be closed on error
       }
+      browser = null;
+    }
+
+    pdfSemaphore.release();
+
+    // Hint GC to reclaim Chromium memory before next operation (email sending)
+    if (global.gc) {
+      try { global.gc(); } catch {}
     }
   }
 };
@@ -1724,23 +1850,44 @@ const generateGRNHTML = (data: GRNPDFData): string => {
 /**
  * Generate PDF from GRN data
  * Returns a Buffer containing the PDF
+ * 
+ * Concurrency: Only 1 PDF generates at a time (semaphore-controlled)
+ * Memory: Browser is created & destroyed per request with aggressive cleanup
  */
 export const generateGRNPDF = async (data: GRNPDFData): Promise<Buffer> => {
+  if (pdfSemaphore.pending > 0) {
+    console.log(`⏳ PDF queue: ${pdfSemaphore.pending} requests waiting...`);
+  }
+
+  // Acquire semaphore — blocks if another PDF is being generated
+  await pdfSemaphore.acquire();
+
   let browser = null;
   
   try {
-    const executablePath = getChromiumPath();
-    console.log('📄 Launching Puppeteer for GRN PDF...');
+    const executablePath = await getChromiumExecutable();
+    console.log('📄 Launching Chromium for GRN PDF...');
     
     browser = await puppeteer.launch({
       headless: true,
-      executablePath,  // undefined = use bundled Chromium
+      executablePath,
       args: PUPPETEER_ARGS,
       timeout: PDF_GENERATION_TIMEOUT_MS,
       protocolTimeout: PDF_GENERATION_TIMEOUT_MS,
     });
     
     const page = await browser.newPage();
+
+    // Disable unnecessary resource loading to reduce memory
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      const resourceType = request.resourceType();
+      if (['image', 'media', 'font'].includes(resourceType)) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
     
     // Set the HTML content — use 'load' instead of 'networkidle0'
     const html = generateGRNHTML(data);
@@ -1750,7 +1897,7 @@ export const generateGRNPDF = async (data: GRNPDFData): Promise<Buffer> => {
     });
     
     // Brief pause for CSS rendering to complete
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 150));
     
     // Generate PDF
     const pdfBuffer = await page.pdf({
@@ -1765,19 +1912,29 @@ export const generateGRNPDF = async (data: GRNPDFData): Promise<Buffer> => {
       timeout: PDF_GENERATION_TIMEOUT_MS,
     });
     
-    console.log(`✅ GRN PDF generated (${Buffer.from(pdfBuffer).length} bytes)`);
-    return Buffer.from(pdfBuffer);
+    const result = Buffer.from(pdfBuffer);
+    console.log(`✅ GRN PDF generated (${result.length} bytes)`);
+    return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`❌ GRN PDF generation failed: ${message}`);
     throw new Error(`PDF generation failed: ${message}`);
   } finally {
+    // CRITICAL: Always close browser AND release semaphore
     if (browser) {
       try {
         await browser.close();
       } catch {
         // Browser may already be closed on error
       }
+      browser = null;
+    }
+
+    pdfSemaphore.release();
+
+    // Hint GC to reclaim Chromium memory before next operation
+    if (global.gc) {
+      try { global.gc(); } catch {}
     }
   }
 };

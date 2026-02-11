@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { protect, requireShop } from '../middleware/auth';
+import { routeTimeout } from '../middleware/timeout';
 import {
   createInvoice,
   getAllInvoices,
@@ -51,16 +52,17 @@ router.route('/:id/item-history')
   .get(getInvoiceItemHistory)
   .post(createInvoiceItemHistory);
 
-// PDF routes - Download invoice as PDF
+// PDF routes - Download invoice as PDF (timeout: 60s for Chromium PDF generation)
 router.route('/:id/pdf')
-  .get(downloadInvoicePDF);
+  .get(routeTimeout(60000, 'PDF generation timed out. Please try again.'), downloadInvoicePDF);
 
-// Email routes - Send invoice to customer email
+// Email routes - Send invoice to customer email (timeout: 120s for SMTP retries)
 router.route('/:id/send-email')
-  .post(sendInvoiceViaEmail);
+  .post(routeTimeout(120000, 'Email sending timed out. The SMTP server may be unreachable.'), sendInvoiceViaEmail);
 
+// Email with PDF (timeout: 180s — PDF generation + SMTP retries)
 router.route('/:id/send-email-with-pdf')
-  .post(sendInvoiceEmailWithPDF);
+  .post(routeTimeout(180000, 'Email with PDF timed out. Please try again.'), sendInvoiceEmailWithPDF);
 
 router.route('/:id/email-status')
   .get(getInvoiceEmailStatus);

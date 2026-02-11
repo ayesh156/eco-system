@@ -3,6 +3,7 @@ import { protect, requireShop, authorize } from '../middleware/auth';
 import type { AuthRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import { routeTimeout } from '../middleware/timeout';
 import { 
   createGRN, 
   getGRNs, 
@@ -20,7 +21,7 @@ router.use(protect, requireShop);
 router.post('/', createGRN);
 router.get('/', getGRNs);
 router.get('/:id', getGRNById);
-router.get('/:id/pdf', generateGRNPDFController);  // PDF generation endpoint
+router.get('/:id/pdf', routeTimeout(60000, 'PDF generation timed out. Please try again.'), generateGRNPDFController);
 router.put('/:id', updateGRN);
 router.delete('/:id', authorize('ADMIN', 'MANAGER'), deleteGRN);
 
@@ -265,8 +266,8 @@ router.post('/:id/payment', async (req: Request, res: Response, next: NextFuncti
 // GRN Email Route
 // ==========================================
 
-// POST /grns/:id/send-email - Send GRN email to supplier
-router.post('/:id/send-email', sendGRNEmail);
+// POST /grns/:id/send-email - Send GRN email to supplier (timeout: 120s for SMTP retries)
+router.post('/:id/send-email', routeTimeout(120000, 'Email sending timed out. The SMTP server may be unreachable.'), sendGRNEmail);
 
 // ==========================================
 // GRN Reminder Routes
