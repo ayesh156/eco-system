@@ -39,46 +39,44 @@ const generateRefreshToken = (payload: { id: string }): string => {
   return jwt.sign(payload, getRefreshSecret(), { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
 };
 
-// Store refresh tokens in database for token invalidation support
-// This is a simple in-memory store for demo - in production use Redis or DB
-const refreshTokenStore = new Map<string, { userId: string; expiresAt: Date }>();
+// Store refresh tokens in database for persistence across server restarts
+// This ensures users stay logged in even when Render.com cold-starts the service
 
 const storeRefreshToken = async (userId: string, token: string): Promise<void> => {
   const decoded = jwt.decode(token) as { exp: number };
   const expiresAt = new Date(decoded.exp * 1000);
   
-  // In production, store in database:
-  // await prisma.refreshToken.create({ data: { token, userId, expiresAt } });
+  await prisma.refreshToken.create({
+    data: { token, userId, expiresAt },
+  });
   
-  // For now, using in-memory (works for single serverless instance)
-  refreshTokenStore.set(token, { userId, expiresAt });
+  // Clean up expired tokens for this user (housekeeping)
+  await prisma.refreshToken.deleteMany({
+    where: { userId, expiresAt: { lt: new Date() } },
+  }).catch(() => {}); // Non-critical, ignore errors
 };
 
 const validateRefreshToken = async (token: string): Promise<string | null> => {
-  // In production, validate against database:
-  // const storedToken = await prisma.refreshToken.findUnique({ where: { token } });
-  // if (!storedToken || storedToken.expiresAt < new Date()) return null;
-  // return storedToken.userId;
+  const stored = await prisma.refreshToken.findUnique({
+    where: { token },
+  });
   
-  const stored = refreshTokenStore.get(token);
   if (!stored || stored.expiresAt < new Date()) {
+    // Clean up expired token if found
+    if (stored) {
+      await prisma.refreshToken.delete({ where: { token } }).catch(() => {});
+    }
     return null;
   }
   return stored.userId;
 };
 
 const revokeRefreshToken = async (token: string): Promise<void> => {
-  // In production: await prisma.refreshToken.delete({ where: { token } });
-  refreshTokenStore.delete(token);
+  await prisma.refreshToken.delete({ where: { token } }).catch(() => {});
 };
 
 const revokeAllUserRefreshTokens = async (userId: string): Promise<void> => {
-  // In production: await prisma.refreshToken.deleteMany({ where: { userId } });
-  for (const [token, data] of refreshTokenStore.entries()) {
-    if (data.userId === userId) {
-      refreshTokenStore.delete(token);
-    }
-  }
+  await prisma.refreshToken.deleteMany({ where: { userId } });
 };
 
 // ===================================

@@ -5,6 +5,7 @@ import {
   onTokenChange,
   getAccessToken,
   setAccessToken,
+  getRefreshToken,
 } from '../services/authService';
 import type { 
   User, 
@@ -330,6 +331,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Show loading spinner while checking auth
   if (isLoading) {
+    // Check if we have a refresh token — show warm-up message for Render cold starts
+    const hasRefreshToken = !!getRefreshToken();
     return fallback || (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="text-center">
@@ -339,7 +342,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
           </div>
-          <p className="text-slate-400">Loading...</p>
+          <p className="text-slate-400">{hasRefreshToken ? 'Restoring session...' : 'Loading...'}</p>
+          {hasRefreshToken && (
+            <p className="text-slate-500 text-sm mt-2">Server may be warming up, please wait...</p>
+          )}
         </div>
       </div>
     );
