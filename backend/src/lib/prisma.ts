@@ -18,9 +18,12 @@ function ensurePoolerParams(): void {
     const separator = url.includes('?') ? '&' : '?';
     const params: string[] = [];
     if (!url.includes('pgbouncer=')) params.push('pgbouncer=true');
-    if (!url.includes('connection_limit=')) params.push('connection_limit=1');
-    if (!url.includes('pool_timeout=')) params.push('pool_timeout=20');
-    if (!url.includes('connect_timeout=')) params.push('connect_timeout=15');
+    // Using connection_limit=10 for Render Web Service (long-running process)
+    // Supabase Transaction Pooler (port 6543) enables multiplexing, but client needs 
+    // >1 TCP connection to handle concurrent requests without serialization bottleneck.
+    if (!url.includes('connection_limit=')) params.push('connection_limit=10');
+    if (!url.includes('pool_timeout=')) params.push('pool_timeout=30');
+    if (!url.includes('connect_timeout=')) params.push('connect_timeout=30');
     if (params.length > 0) {
       process.env.DATABASE_URL = url + separator + params.join('&');
       console.log('🔧 Auto-added PgBouncer params to DATABASE_URL');

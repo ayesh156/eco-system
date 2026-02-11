@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient, UserRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { prisma } from '../lib/prisma';
 import type { AuthRequest } from '../types/express';
-
-const prisma = new PrismaClient();
 
 // Helper to generate slug from shop name
 function generateSlug(name: string): string {
