@@ -1,10 +1,16 @@
 /**
- * Email Service for Password Reset OTP
+ * Email Service for Password Reset OTP & GRN/Invoice emails
  * Uses nodemailer with modern HTML email templates
+ * 
+ * RENDER.COM FIX: Uses port 587 (STARTTLS) instead of port 465 (SSL)
+ * because Render's network often blocks/throttles outbound port 465.
+ * Also forces IPv4 via custom DNS lookup to bypass IPv6 routing issues.
  */
 
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import dns from 'dns';
+import { promisify } from 'util';
 
 // ===================================
 // Email Configuration
@@ -29,63 +35,123 @@ const getEmailConfig = (): EmailConfig => {
 // Create reusable transporter
 let transporter: Transporter | null = null;
 
+// Promisified DNS resolve for IPv4
+const resolve4 = promisify(dns.resolve4);
+
 /**
- * Create Gmail transporter using built-in 'service: gmail' setting.
- * This is more reliable on cloud platforms like Render.com because:
- * 1. Nodemailer handles all the Gmail-specific settings automatically
- * 2. No need to manually configure host, port, or secure settings
- * 3. Better compatibility with Gmail's OAuth and App Password auth
- *
- * RENDER.COM OPTIMIZATIONS:
- * - IPv4 forced to avoid Render's IPv6 routing issues
- * - Extended timeouts for high-latency cloud connections
- * - TLS settings for proxy compatibility
+ * Resolve smtp.gmail.com to an IPv4 address.
+ * This completely bypasses Node's default DNS which may return IPv6 first.
+ * Falls back to the hostname if resolution fails.
  */
-const createGmailTransporter = (): Transporter => {
+const resolveGmailIPv4 = async (): Promise<string> => {
+  try {
+    const addresses = await resolve4('smtp.gmail.com');
+    if (addresses && addresses.length > 0) {
+      console.log(`🔍 DNS resolved smtp.gmail.com → ${addresses[0]} (IPv4)`);
+      return addresses[0];
+    }
+  } catch (err) {
+    console.warn(`⚠️ DNS resolve4 failed, using hostname fallback:`, err);
+  }
+  return 'smtp.gmail.com';
+};
+
+/**
+ * Create Gmail transporter using EXPLICIT host/port (NOT service: 'gmail').
+ * 
+ * WHY NOT service: 'gmail'?
+ * - service: 'gmail' uses port 465 (direct SSL)
+ * - Render.com and many cloud providers block/throttle port 465
+ * - Port 587 (STARTTLS) is the IETF submission standard and rarely blocked
+ * 
+ * RENDER.COM FIXES:
+ * 1. Port 587 with STARTTLS (not port 465 SSL)
+ * 2. Custom DNS-resolved IPv4 address (bypasses IPv6 entirely)
+ * 3. No connection pooling (fresh connection per email = more reliable)
+ * 4. Extended timeouts for cloud network latency
+ * 5. TLS hardened for cloud proxy compatibility
+ */
+const createGmailTransporter = (host: string = 'smtp.gmail.com'): Transporter => {
   const config = getEmailConfig();
   
   const transportOptions: any = {
-    // ─── Use Gmail Service ────────────────────────────────────────────
-    service: 'gmail',
-    
+    // ─── Explicit SMTP config (NOT service: 'gmail') ──────────────────
+    // Port 587 = STARTTLS (starts plain, upgrades to TLS)
+    // Port 465 = Direct SSL (often blocked by cloud providers)
+    host: host,
+    port: 587,
+    secure: false,  // false = STARTTLS on port 587 (upgrades after EHLO)
+
     // ─── Authentication ───────────────────────────────────────────────
     auth: {
       user: config.user,
       pass: config.pass,
     },
 
-    // ─── FIX #1: Force IPv4 (CRITICAL for Render.com) ─────────────────
-    // Render's outbound IPv6 routing to Google is misconfigured/firewalled,
-    // causing TCP SYN to hang until OS-level timeout (~75-120s).
-    // `family: 4` forces dns.lookup() to return only the A (IPv4) record.
+    // ─── Force IPv4 ───────────────────────────────────────────────────
+    // Belt-and-suspenders: even when host is already an IPv4 IP,
+    // this ensures any internal DNS lookups use IPv4.
     family: 4,
 
-    // ─── FIX #2: Connection Pooling ───────────────────────────────────
-    // Reuse SMTP connections instead of opening new ones each time.
-    // maxConnections: 1 prevents hitting Gmail rate limits.
-    pool: true,
-    maxConnections: 1,
-    rateDelta: 20000,
-    rateLimit: 5,
+    // ─── NO connection pooling ────────────────────────────────────────
+    // Pooling can cause stale connections on cloud platforms.
+    // Each email gets a fresh TCP connection (more reliable).
+    pool: false,
 
-    // ─── FIX #3: Cloud-friendly timeouts ──────────────────────────────
-    connectionTimeout: 30000,  // 30s to establish TCP + TLS connection
-    greetingTimeout: 20000,    // 20s for SMTP EHLO/greeting exchange
-    socketTimeout: 60000,      // 60s for socket inactivity (large PDF attachments)
+    // ─── Extended timeouts for cloud latency ──────────────────────────
+    connectionTimeout: 30000,  // 30s TCP + TLS handshake
+    greetingTimeout: 30000,    // 30s for SMTP EHLO/greeting exchange
+    socketTimeout: 120000,     // 120s for socket inactivity (large PDFs)
 
-    // ─── FIX #4: TLS options ──────────────────────────────────────────
+    // ─── TLS settings ─────────────────────────────────────────────────
+    // servername is required when connecting to an IP address
+    // (tells TLS which certificate to expect)
     tls: {
+      servername: 'smtp.gmail.com',
       rejectUnauthorized: false,
       minVersion: 'TLSv1.2',
       ciphers: 'HIGH:!aNULL:!MD5',
     },
 
-    // ─── FIX #5: Debug logging (ALWAYS ON for Render diagnostics) ─────
+    // ─── Debug logging (always on for Render diagnostics) ─────────────
     logger: true,
     debug: true,
   };
 
-  console.log(`📧 Creating Gmail transporter (service: gmail, user: ${config.user || 'NOT SET'}, IPv4-only, pool: true, connTimeout: 30s)`);
+  console.log(`📧 Creating SMTP transporter (host: ${host}, port: 587, STARTTLS, user: ${config.user || 'NOT SET'})`);
+  return nodemailer.createTransport(transportOptions);
+};
+
+/**
+ * Create a fallback transporter using port 465 (direct SSL).
+ * Used if port 587 fails (e.g., port 587 is blocked but 465 isn't).
+ */
+const createGmailTransporterSSL = (host: string = 'smtp.gmail.com'): Transporter => {
+  const config = getEmailConfig();
+  
+  const transportOptions: any = {
+    host: host,
+    port: 465,
+    secure: true,  // Direct SSL
+    auth: {
+      user: config.user,
+      pass: config.pass,
+    },
+    family: 4,
+    pool: false,
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 120000,
+    tls: {
+      servername: 'smtp.gmail.com',
+      rejectUnauthorized: false,
+      minVersion: 'TLSv1.2',
+    },
+    logger: true,
+    debug: true,
+  };
+
+  console.log(`📧 Creating SSL transporter (host: ${host}, port: 465, SSL, user: ${config.user || 'NOT SET'})`);
   return nodemailer.createTransport(transportOptions);
 };
 
@@ -123,81 +189,82 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise
 };
 
 /**
- * Send email with automatic retry on connection failures.
- * Uses `service: 'gmail'` which handles host/port automatically.
+ * Send email with multi-strategy retry.
  * 
- * Retry strategy (3 attempts):
- * - Attempt 1: Use cached transporter
- * - Attempt 2: Fresh transporter after 3s delay (handles stale connections)
- * - Attempt 3: Fresh transporter after 5s delay (handles transient network issues)
+ * Strategy (4 attempts across 2 ports):
  * 
- * Each attempt has a 60s hard timeout.
+ * Attempt 1: Port 587 (STARTTLS) with hostname
+ * Attempt 2: Port 587 (STARTTLS) with resolved IPv4 IP address
+ * Attempt 3: Port 465 (SSL) with hostname 
+ * Attempt 4: Port 465 (SSL) with resolved IPv4 IP address
+ * 
+ * Each attempt has a 45s hard timeout.
  */
 const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string }> => {
-  const SEND_TIMEOUT = 60000; // 60s hard timeout per attempt
+  const SEND_TIMEOUT = 45000; // 45s hard timeout per attempt
   const config = getEmailConfig();
+
+  // Pre-resolve Gmail's IPv4 address
+  const gmailIPv4 = await resolveGmailIPv4();
   
-  // Attempt 1: Use cached transporter
-  try {
-    console.log(`📧 [Attempt 1/3] Sending via Gmail service...`);
-    const transport = getTransporter();
-    const result = await withTimeout(
-      transport.sendMail(mailOptions),
-      SEND_TIMEOUT,
-      `Gmail service (attempt 1)`
-    );
-    console.log('✅ [Attempt 1/3] Email sent, messageId:', result.messageId);
-    return result;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.warn(`⚠️ [Attempt 1/3] Failed: ${errorMessage}`);
-    resetTransporter();
-  }
+  // Define all strategies to try
+  const strategies = [
+    { label: 'Port 587 STARTTLS (hostname)', factory: () => createGmailTransporter('smtp.gmail.com') },
+    { label: 'Port 587 STARTTLS (IPv4 direct)', factory: () => createGmailTransporter(gmailIPv4) },
+    { label: 'Port 465 SSL (hostname)', factory: () => createGmailTransporterSSL('smtp.gmail.com') },
+    { label: 'Port 465 SSL (IPv4 direct)', factory: () => createGmailTransporterSSL(gmailIPv4) },
+  ];
+
+  for (let i = 0; i < strategies.length; i++) {
+    const { label, factory } = strategies[i];
+    const attemptNum = i + 1;
     
-  // Attempt 2: Fresh transporter after delay
-  console.log(`📧 [Attempt 2/3] Retrying with fresh transporter after 3s delay...`);
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  
-  try {
-    const freshTransport = createGmailTransporter();
-    const result = await withTimeout(
-      freshTransport.sendMail(mailOptions),
-      SEND_TIMEOUT,
-      `Gmail service (attempt 2 - fresh)`
-    );
-    console.log(`✅ [Attempt 2/3] Email sent via fresh transporter, messageId:`, result.messageId);
-    transporter = freshTransport; // Update cache
-    return result;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.warn(`⚠️ [Attempt 2/3] Failed: ${errorMessage}`);
-    resetTransporter();
+    if (i > 0) {
+      const delay = i * 2000; // 2s, 4s, 6s between retries
+      console.log(`📧 [Attempt ${attemptNum}/${strategies.length}] Waiting ${delay / 1000}s before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    try {
+      console.log(`📧 [Attempt ${attemptNum}/${strategies.length}] ${label}...`);
+      const transport = factory();
+      
+      const result = await withTimeout(
+        transport.sendMail(mailOptions),
+        SEND_TIMEOUT,
+        label
+      );
+      
+      console.log(`✅ [Attempt ${attemptNum}/${strategies.length}] Email sent! messageId: ${result.messageId}`);
+      
+      // Close this one-off transport
+      try { (transport as any).close?.(); } catch (_) {}
+      
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown';
+      console.warn(`⚠️ [Attempt ${attemptNum}/${strategies.length}] Failed (${label}): ${errorMessage}`);
+      
+      // Continue to next strategy
+    }
   }
 
-  // Attempt 3: Final retry with longer delay
-  console.log(`📧 [Attempt 3/3] Final attempt with fresh transporter after 5s...`);
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  // All strategies failed
+  console.error(`❌ All ${strategies.length} email strategies failed!`);
+  console.error(`🚨 SMTP Diagnostics:`);
+  console.error(`   User: ${config.user || 'NOT SET'}`);
+  console.error(`   Pass: ${config.pass ? '***SET***' : 'NOT SET'}`);
+  console.error(`   Gmail IPv4: ${gmailIPv4}`);
+  console.error(`🚨 Possible causes:`);
+  console.error(`   1. SMTP_USER / SMTP_PASS env vars not set on Render`);
+  console.error(`   2. Using regular Gmail password instead of App Password`);
+  console.error(`   3. Render's network blocks outbound SMTP entirely`);
+  console.error(`   4. Gmail is blocking connections from this IP`);
+  console.error(`🚨 Generate App Password at: https://myaccount.google.com/apppasswords`);
+  console.error(`🚨 If SMTP is blocked, consider using Resend.com (HTTP API, free tier)`);
   
-  try {
-    const freshTransport = createGmailTransporter();
-    const result = await withTimeout(
-      freshTransport.sendMail(mailOptions),
-      SEND_TIMEOUT,
-      `Gmail service (attempt 3 - final)`
-    );
-    console.log(`✅ [Attempt 3/3] Email sent via fresh transporter, messageId:`, result.messageId);
-    transporter = freshTransport; // Update cache
-    return result;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.error(`❌ [Attempt 3/3] All attempts failed. Last error: ${errorMessage}`);
-    console.error(`🚨 SMTP Diagnostics: service=gmail, user=${config.user || 'NOT SET'}`);
-    console.error(`🚨 Make sure SMTP_USER and SMTP_PASS env vars are set on Render.`);
-    console.error(`🚨 IMPORTANT: Use a Gmail App Password, NOT your regular password!`);
-    console.error(`🚨 Generate App Password at: https://myaccount.google.com/apppasswords`);
-    resetTransporter();
-    throw new Error(`Failed to send email: Connection timeout (all 3 attempts failed). Check SMTP configuration.`);
-  }
+  resetTransporter();
+  throw new Error(`Failed to send email: Connection timeout (all ${strategies.length} attempts failed). Check SMTP configuration.`);
 };
 
 // ===================================
