@@ -29,7 +29,7 @@ import { notFound } from './middleware/notFound';
 import { apiRateLimiter } from './middleware/rateLimiter';
 import { sanitizeRequestBody } from './middleware/validation';
 import { corsConfig } from './config/security';
-import { connectWithRetry, checkDbHealth, isDbConnected } from './lib/prisma';
+import { connectWithRetry, isDbConnected } from './lib/prisma';
 
 // Route imports
 import authRoutes from './routes/auth.routes';
@@ -126,21 +126,16 @@ app.use((_req, res, next) => {
   next();
 });
 
-// Health check - uses non-cascading DB check to avoid reconnection storms
-app.get('/health', async (_req, res) => {
-  const dbHealth = await checkDbHealth();
-  const status = dbHealth.connected ? 'ok' : 'degraded';
+// Health check — MUST be instant. Render sends these every 5s from multiple IPs.
+// NEVER open a DB connection here. Use cached state from real queries.
+app.get('/health', (_req, res) => {
+  const dbConnected = isDbConnected();
   
-  // Always return 200 on health check so Render doesn't kill the service
-  // during cold start reconnection. Report actual DB state in response body.
+  // Always return 200 so Render doesn't kill the service during cold start.
   res.status(200).json({ 
-    status,
+    status: dbConnected ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    database: dbHealth.connected ? 'connected' : 'disconnected',
-    ...(dbHealth.error && { dbError: dbHealth.error }),
-    databaseUrlSet: !!process.env.DATABASE_URL,
-    directUrlSet: !!process.env.DIRECT_URL,
+    database: dbConnected ? 'connected' : 'disconnected',
   });
 });
 

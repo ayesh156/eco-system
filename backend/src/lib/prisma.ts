@@ -18,12 +18,15 @@ function ensurePoolerParams(): void {
     const separator = url.includes('?') ? '&' : '?';
     const params: string[] = [];
     if (!url.includes('pgbouncer=')) params.push('pgbouncer=true');
-    // Using connection_limit=10 for Render Web Service (long-running process)
-    // Supabase Transaction Pooler (port 6543) enables multiplexing, but client needs 
-    // >1 TCP connection to handle concurrent requests without serialization bottleneck.
-    if (!url.includes('connection_limit=')) params.push('connection_limit=10');
-    if (!url.includes('pool_timeout=')) params.push('pool_timeout=30');
-    if (!url.includes('connect_timeout=')) params.push('connect_timeout=30');
+    // connection_limit=3: Supabase free tier has ~15 pooled connections total.
+    // Keep Prisma's internal pool small so we don't exhaust Supabase's pool.
+    // PgBouncer in transaction mode multiplexes queries over these connections.
+    if (!url.includes('connection_limit=')) params.push('connection_limit=3');
+    if (!url.includes('pool_timeout=')) params.push('pool_timeout=15');
+    if (!url.includes('connect_timeout=')) params.push('connect_timeout=10');
+    // statement_cache_size=0: PgBouncer in transaction mode doesn't support
+    // prepared statements. Without this, you get 'prepared statement' errors.
+    if (!url.includes('statement_cache_size=')) params.push('statement_cache_size=0');
     if (params.length > 0) {
       process.env.DATABASE_URL = url + separator + params.join('&');
       console.log('🔧 Auto-added PgBouncer params to DATABASE_URL');
@@ -43,15 +46,18 @@ let reconnectPromise: Promise<void> | null = null;
 let isConnected = false;
 let lastConnectAttempt = 0;
 let lastHealthProbe = 0;
+let lastSuccessfulQuery = 0;
 
 // Flag to bypass $use middleware (used by health check)
 let bypassMiddleware = false;
 
-// Minimum time between reconnection attempts (30s prevents storms from health checks)
-const RECONNECT_COOLDOWN_MS = 30000;
-const RECONNECT_PAUSE_MS = 2000;
-// Minimum time between health check DB probes (60s)
-const HEALTH_PROBE_INTERVAL_MS = 60000;
+// Minimum time between reconnection attempts (60s prevents storms)
+const RECONNECT_COOLDOWN_MS = 60000;
+const RECONNECT_PAUSE_MS = 3000;
+// Minimum time between health check DB probes (5 minutes - health checks should be lightweight)
+const HEALTH_PROBE_INTERVAL_MS = 300000;
+// Consider DB "recently active" if a query succeeded within this window
+const RECENT_ACTIVITY_MS = 120000;
 
 // ===================================
 // Connection Error Detection
@@ -116,7 +122,9 @@ async function reconnect(client: PrismaClient): Promise<void> {
   // Cooldown: don't retry if we attempted recently
   const now = Date.now();
   if (now - lastConnectAttempt < RECONNECT_COOLDOWN_MS) {
-    throw new Error(`Reconnect cooldown active (${Math.round((RECONNECT_COOLDOWN_MS - (now - lastConnectAttempt)) / 1000)}s remaining)`);
+    const remaining = Math.round((RECONNECT_COOLDOWN_MS - (now - lastConnectAttempt)) / 1000);
+    console.log(`⏳ Reconnect cooldown active (${remaining}s remaining)`);
+    throw new Error(`Reconnect cooldown active (${remaining}s remaining)`);
   }
 
   isReconnecting = true;
@@ -125,11 +133,21 @@ async function reconnect(client: PrismaClient): Promise<void> {
   reconnectPromise = (async () => {
     try {
       console.log('🔄 Reconnecting to database...');
-      try { await client.$disconnect(); } catch { /* ignore */ }
+      // Do NOT call $disconnect() — it destroys all active connections in the pool,
+      // killing any in-flight queries from other requests. Instead, just try to connect.
+      // Prisma will recycle stale connections internally.
       await new Promise(resolve => setTimeout(resolve, RECONNECT_PAUSE_MS));
-      await client.$connect();
-      isConnected = true;
-      console.log('✅ Database reconnected successfully');
+      
+      // Try a lightweight query to test connectivity
+      bypassMiddleware = true;
+      try {
+        await client.$queryRawUnsafe('SELECT 1');
+        isConnected = true;
+        lastSuccessfulQuery = Date.now();
+        console.log('✅ Database reconnected successfully');
+      } finally {
+        bypassMiddleware = false;
+      }
     } catch (err) {
       isConnected = false;
       console.error('❌ Database reconnection failed:', err instanceof Error ? err.message.substring(0, 200) : err);
@@ -168,8 +186,9 @@ function createPrismaClient(): PrismaClient {
 
     try {
       const result = await next(params);
-      // If query succeeded, mark as connected
-      if (!isConnected) isConnected = true;
+      // If query succeeded, mark as connected and track time
+      isConnected = true;
+      lastSuccessfulQuery = Date.now();
       return result;
     } catch (error) {
       if (!isConnectionError(error)) {
@@ -179,18 +198,14 @@ function createPrismaClient(): PrismaClient {
       isConnected = false;
       const model = params.model || 'unknown';
       const action = params.action || 'unknown';
-      console.warn(`⚠️ DB error on ${model}.${action}, will reconnect...`);
+      console.warn(`⚠️ DB error on ${model}.${action}: ${(error as Error).message?.substring(0, 100)}`);
 
-      try {
-        // Use mutex-based reconnect (prevents storms, 30s cooldown)
-        await reconnect(client);
-        // Retry the original query
-        console.log(`🔁 Retrying ${model}.${action}...`);
-        return await next(params);
-      } catch (retryError) {
-        console.error(`❌ Retry failed for ${model}.${action}`);
-        throw retryError;
-      }
+      // Schedule reconnect in background but DON'T wait for it —
+      // fail fast to the caller so the HTTP request doesn't hang.
+      reconnect(client).catch(() => { /* handled inside reconnect */ });
+      
+      // Rethrow original error — let errorHandler.ts return a proper 503
+      throw error;
     }
   });
 
@@ -216,35 +231,51 @@ if (process.env.NODE_ENV !== 'production') {
  * - NEVER triggers reconnection storms.
  */
 export async function checkDbHealth(): Promise<{ connected: boolean; error?: string }> {
-  // If currently reconnecting, just report status
+  // LIGHTWEIGHT: Health checks should NEVER open new DB connections.
+  // Render sends health checks every 5s from MULTIPLE IPs — if each one
+  // probes the DB, we exhaust Supabase's limited connection pool.
+  //
+  // Strategy:
+  //   1. If a real user query succeeded recently, trust that → connected
+  //   2. If we're reconnecting, report that
+  //   3. Only probe DB if no activity for a long time AND not in cooldown
+
+  const now = Date.now();
+
+  // If a real query succeeded recently, DB is definitely up
+  if (isConnected && (now - lastSuccessfulQuery) < RECENT_ACTIVITY_MS) {
+    return { connected: true };
+  }
+
+  // If currently reconnecting, report status without touching DB
   if (isReconnecting) {
     return { connected: false, error: 'Reconnecting...' };
   }
 
-  const now = Date.now();
-
-  // If connected and recently probed (<60s), trust cached state
+  // If connected and recently probed, trust cached state
   if (isConnected && (now - lastHealthProbe) < HEALTH_PROBE_INTERVAL_MS) {
     return { connected: true };
   }
 
-  // If NOT connected and a reconnect was attempted recently (<30s), don't probe again
+  // If NOT connected and a reconnect was attempted recently, don't probe
   if (!isConnected && (now - lastConnectAttempt) < RECONNECT_COOLDOWN_MS) {
     return { connected: false, error: 'Database unreachable (cooldown active)' };
   }
 
-  // Actually probe the database, but bypass $use middleware to avoid storm
+  // Only probe DB if there has been NO activity for a long time
+  // This is rare — only happens if server has been idle for 5+ minutes
   lastHealthProbe = now;
   bypassMiddleware = true;
   try {
     await prisma.$queryRawUnsafe('SELECT 1');
     isConnected = true;
+    lastSuccessfulQuery = now;
     return { connected: true };
   } catch (err) {
     isConnected = false;
     const msg = err instanceof Error ? err.message.substring(0, 200) : String(err);
 
-    // Trigger ONE reconnect in background (non-blocking) — cooldown prevents repeats
+    // Trigger ONE reconnect in background (non-blocking)
     reconnect(prisma).catch(() => { /* handled inside reconnect */ });
 
     return { connected: false, error: msg };
@@ -285,6 +316,7 @@ export const connectWithRetry = async (retries = 5, delay = 5000): Promise<void>
       isConnected = true;
       lastConnectAttempt = Date.now();
       lastHealthProbe = Date.now();
+      lastSuccessfulQuery = Date.now();
       console.log(`✅ Database connected (attempt ${attempt}/${retries})`);
       return;
     } catch (error) {
