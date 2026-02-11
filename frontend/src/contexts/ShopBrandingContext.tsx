@@ -153,7 +153,10 @@ export const ShopBrandingProvider: React.FC<ShopBrandingProviderProps> = ({ chil
       const shopId = effectiveShopId;
       const token = getAccessToken();
 
+      // Skip API call if no shop ID (e.g. SUPER_ADMIN without a shop)
       if (!shopId || !token) {
+        setBranding(DEFAULT_BRANDING);
+        setOriginalBranding(DEFAULT_BRANDING);
         return;
       }
 

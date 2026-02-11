@@ -31,23 +31,19 @@ router.use(protect, authorize('SUPER_ADMIN'));
  */
 router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const [totalShops, totalUsers, activeShops, totalInvoices, totalCustomers, totalProducts] = await Promise.all([
-      prisma.shop.count(),
-      prisma.user.count(),
-      prisma.shop.count({ where: { isActive: true } }),
-      prisma.invoice.count(),
-      prisma.customer.count(),
-      prisma.product.count(),
-    ]);
-
-    // Recent registrations (last 7 days)
+    // Run counts sequentially to avoid exhausting Supabase's limited connection pool.
+    // Each count() is fast (<50ms), so sequential is fine for an admin dashboard.
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const [recentShops, recentUsers] = await Promise.all([
-      prisma.shop.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-      prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-    ]);
+    const totalShops = await prisma.shop.count();
+    const activeShops = await prisma.shop.count({ where: { isActive: true } });
+    const totalUsers = await prisma.user.count();
+    const totalInvoices = await prisma.invoice.count();
+    const totalCustomers = await prisma.customer.count();
+    const totalProducts = await prisma.product.count();
+    const recentShops = await prisma.shop.count({ where: { createdAt: { gte: sevenDaysAgo } } });
+    const recentUsers = await prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } });
 
     res.json({
       success: true,

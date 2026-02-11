@@ -21,7 +21,7 @@ function ensurePoolerParams(): void {
     // connection_limit=3: Supabase free tier has ~15 pooled connections total.
     // Keep Prisma's internal pool small so we don't exhaust Supabase's pool.
     // PgBouncer in transaction mode multiplexes queries over these connections.
-    if (!url.includes('connection_limit=')) params.push('connection_limit=3');
+    if (!url.includes('connection_limit=')) params.push('connection_limit=5');
     if (!url.includes('pool_timeout=')) params.push('pool_timeout=15');
     if (!url.includes('connect_timeout=')) params.push('connect_timeout=10');
     // statement_cache_size=0: PgBouncer in transaction mode doesn't support

@@ -84,9 +84,10 @@ export const WhatsAppSettingsProvider: React.FC<{ children: ReactNode }> = ({ ch
   // Load settings from API
   const loadSettings = useCallback(async () => {
     if (!effectiveShopId) {
-      console.log('📝 No shop ID, using default WhatsApp settings');
+      // SUPER_ADMIN may not have a shop — skip API call entirely to avoid 403/500
       setSettings(mockWhatsAppSettings);
       setShopDetails(DEFAULT_SHOP_DETAILS);
+      setIsLoading(false);
       return;
     }
 
