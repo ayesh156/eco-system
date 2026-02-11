@@ -155,23 +155,25 @@ apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError<ApiError>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number };
+    const status = error.response?.status;
+    const isNetworkError = !error.response && error.code !== 'ERR_CANCELED';
     
-    // Handle 502/503 (Render cold start) - retry with backoff
+    // Handle 502/503/network errors (Render cold start takes 30-60s) - retry ALL routes with backoff
+    // 5 retries: 3s, 6s, 9s, 12s, 15s = ~45s total coverage
     if (
-      (error.response?.status === 503 || error.response?.status === 502) &&
-      !originalRequest.url?.includes('/auth/refresh') && // restoreSession handles its own retries
-      (originalRequest._retryCount || 0) < 2
+      (status === 503 || status === 502 || isNetworkError) &&
+      (originalRequest._retryCount || 0) < 5
     ) {
       originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
-      const delay = 2000 * originalRequest._retryCount;
-      console.log(`⏳ Server waking up (${error.response?.status})... retrying in ${delay / 1000}s`);
+      const delay = 3000 * originalRequest._retryCount;
+      console.log(`⏳ Server waking up (${status || 'network error'})... retry ${originalRequest._retryCount}/5 in ${delay / 1000}s`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return apiClient(originalRequest);
     }
     
     // Check if it's a 401 error and not a refresh request itself
     if (
-      error.response?.status === 401 &&
+      status === 401 &&
       !originalRequest._retry &&
       !originalRequest.url?.includes('/auth/refresh') &&
       !originalRequest.url?.includes('/auth/login')
@@ -336,33 +338,22 @@ export const authService = {
   /**
    * Try to restore session on app load
    * Uses refresh token cookie to get new access token
-   * Retries with exponential backoff for 503/network errors (Render cold start)
+   * Note: 503 retries are handled by the axios interceptor (5 retries over ~45s)
    */
   restoreSession: async (): Promise<User | null> => {
-    const maxRetries = 3;
-    const baseDelay = 2000; // 2s, 4s, 8s
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const response = await authService.refresh();
-        return response.data.user;
-      } catch (error: unknown) {
-        const axiosErr = error as { response?: { status?: number }; code?: string };
-        const status = axiosErr?.response?.status;
-        const isRetryable = status === 503 || status === 502 || !axiosErr?.response; // 503, 502, or network error
-
-        if (isRetryable && attempt < maxRetries) {
-          const delay = baseDelay * Math.pow(2, attempt);
-          console.log(`⏳ Server waking up... retrying in ${delay / 1000}s (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-
-        // Non-retryable error or max retries exhausted
-        return null;
-      }
+    // Only attempt if we have a refresh token
+    const storedToken = getRefreshToken();
+    if (!storedToken) {
+      return null;
     }
-    return null;
+
+    try {
+      // Axios interceptor handles 503 retries automatically
+      const response = await authService.refresh();
+      return response.data.user;
+    } catch {
+      return null;
+    }
   },
 };
 

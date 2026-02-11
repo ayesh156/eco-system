@@ -177,9 +177,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(response.data.user);
       console.log('✅ Login successful:', response.data.user.email);
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Login failed. Please try again.';
-      setError(message);
-      throw new Error(message);
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string } }; code?: string };
+      const status = axiosErr?.response?.status;
+      
+      // Friendly message for server cold-start (503 after all retries exhausted)
+      if (status === 503 || status === 502 || (!axiosErr?.response && axiosErr?.code !== 'ERR_CANCELED')) {
+        setError('Service is starting up. Please try again in a few seconds.');
+      } else {
+        const message = axiosErr?.response?.data?.message || 'Login failed. Please try again.';
+        setError(message);
+      }
+      throw err;
     } finally {
       setIsLoading(false);
     }

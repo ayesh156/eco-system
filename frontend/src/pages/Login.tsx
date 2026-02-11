@@ -123,9 +123,17 @@ export const Login: React.FC = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-red-400">{error}</p>
+          <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 ${
+            error.includes('starting up')
+              ? 'bg-amber-500/10 border border-amber-500/20'
+              : 'bg-red-500/10 border border-red-500/20'
+          }`}>
+            <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${
+              error.includes('starting up') ? 'text-amber-400' : 'text-red-400'
+            }`} />
+            <p className={`text-sm ${
+              error.includes('starting up') ? 'text-amber-400' : 'text-red-400'
+            }`}>{error}</p>
           </div>
         )}
 
