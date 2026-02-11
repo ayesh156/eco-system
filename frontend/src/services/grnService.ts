@@ -609,7 +609,6 @@ export const sendEmailWithPDF = async (
     return {
       success: true,
       sentTo: result.data?.sentTo || result.sentTo || 'Unknown',
-      messageId: result.data?.messageId || result.messageId,
       hasPdfAttachment: result.data?.hasPdfAttachment || result.hasPdfAttachment || false,
     };
   } catch (error) {
