@@ -1,12 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 
 // ===================================
-// Supabase PgBouncer Auto-Configuration
+// Supabase PgBouncer Auto-Configuration for Render (Long-Running Server)
 // ===================================
 
 /**
- * Auto-append pgbouncer=true & connection_limit=1 to DATABASE_URL
+ * Auto-append PgBouncer and TCP keep-alive parameters to DATABASE_URL
  * when using Supabase's connection pooler (port 6543).
+ * 
+ * For Render (long-running servers), we need:
+ * - TCP keep-alive to prevent idle connection drops
+ * - Smaller connection limit to not exhaust Supabase's pool
+ * - Longer timeouts to handle network latency
+ * 
  * This MUST run before PrismaClient is created.
  */
 function ensurePoolerParams(): void {
@@ -17,19 +23,34 @@ function ensurePoolerParams(): void {
   if (url.includes('pooler.supabase.com') || url.includes(':6543')) {
     const separator = url.includes('?') ? '&' : '?';
     const params: string[] = [];
+    
+    // PgBouncer mode flag
     if (!url.includes('pgbouncer=')) params.push('pgbouncer=true');
-    // connection_limit=3: Supabase free tier has ~15 pooled connections total.
-    // Keep Prisma's internal pool small so we don't exhaust Supabase's pool.
-    // PgBouncer in transaction mode multiplexes queries over these connections.
-    if (!url.includes('connection_limit=')) params.push('connection_limit=5');
-    if (!url.includes('pool_timeout=')) params.push('pool_timeout=15');
-    if (!url.includes('connect_timeout=')) params.push('connect_timeout=10');
-    // statement_cache_size=0: PgBouncer in transaction mode doesn't support
-    // prepared statements. Without this, you get 'prepared statement' errors.
+    
+    // Connection pool settings:
+    // - connection_limit=3: Supabase free tier has ~15-20 pooled connections.
+    //   Keep Prisma's internal pool SMALL so we don't exhaust Supabase's global limit.
+    // - Using 3 (not 1) allows some concurrency without hogging the pool.
+    if (!url.includes('connection_limit=')) params.push('connection_limit=3');
+    
+    // Timeout settings (generous for cross-region network latency):
+    if (!url.includes('pool_timeout=')) params.push('pool_timeout=30');
+    if (!url.includes('connect_timeout=')) params.push('connect_timeout=30');
+    
+    // PgBouncer transaction mode doesn't support prepared statements
     if (!url.includes('statement_cache_size=')) params.push('statement_cache_size=0');
+    
+    // TCP Keep-Alive settings to prevent idle connection drops:
+    // These are CRITICAL for Render's long-running servers.
+    // Supabase's pooler may close idle connections; keep-alive prevents this.
+    if (!url.includes('keepalives=')) params.push('keepalives=1');
+    if (!url.includes('keepalives_idle=')) params.push('keepalives_idle=30');
+    if (!url.includes('keepalives_interval=')) params.push('keepalives_interval=10');
+    if (!url.includes('keepalives_count=')) params.push('keepalives_count=3');
+    
     if (params.length > 0) {
       process.env.DATABASE_URL = url + separator + params.join('&');
-      console.log('🔧 Auto-added PgBouncer params to DATABASE_URL');
+      console.log('🔧 Auto-added PgBouncer + TCP keep-alive params to DATABASE_URL');
     }
   }
 }
@@ -47,17 +68,19 @@ let isConnected = false;
 let lastConnectAttempt = 0;
 let lastHealthProbe = 0;
 let lastSuccessfulQuery = 0;
+let keepAliveInterval: NodeJS.Timeout | null = null;
 
-// Flag to bypass $use middleware (used by health check)
+// Flag to bypass $use middleware (used by health check and keep-alive)
 let bypassMiddleware = false;
 
-// Minimum time between reconnection attempts (60s prevents storms)
-const RECONNECT_COOLDOWN_MS = 60000;
-const RECONNECT_PAUSE_MS = 3000;
-// Minimum time between health check DB probes (5 minutes - health checks should be lightweight)
+// Timing constants tuned for Render + Supabase:
+// - Shorter cooldown (20s) since Supabase connection drops are usually transient
+// - Keep-alive ping every 25s to prevent idle connection closure
+const RECONNECT_COOLDOWN_MS = 20000;
+const RECONNECT_PAUSE_MS = 2000;
 const HEALTH_PROBE_INTERVAL_MS = 300000;
-// Consider DB "recently active" if a query succeeded within this window
-const RECENT_ACTIVITY_MS = 120000;
+const RECENT_ACTIVITY_MS = 60000;
+const KEEP_ALIVE_INTERVAL_MS = 25000;
 
 // ===================================
 // Connection Error Detection
@@ -292,11 +315,66 @@ export function isDbConnected(): boolean {
 }
 
 // ===================================
+// Keep-Alive Ping (Critical for Render + Supabase)
+// ===================================
+
+/**
+ * Periodic ping to keep database connections warm.
+ * Supabase's PgBouncer may close idle connections; this prevents that.
+ * Only pings if no recent query activity (to avoid unnecessary load).
+ */
+async function keepAlivePing(): Promise<void> {
+  // Skip if a reconnect is in progress or recent query activity
+  if (isReconnecting) return;
+  if (Date.now() - lastSuccessfulQuery < KEEP_ALIVE_INTERVAL_MS) return;
+
+  bypassMiddleware = true;
+  try {
+    await prisma.$queryRawUnsafe('SELECT 1');
+    lastSuccessfulQuery = Date.now();
+    if (!isConnected) {
+      isConnected = true;
+      console.log('💓 Keep-alive: Connection restored');
+    }
+  } catch (err) {
+    // Don't spam logs — just mark as disconnected
+    if (isConnected) {
+      isConnected = false;
+      console.warn('💔 Keep-alive: Connection lost, will reconnect on next request');
+    }
+  } finally {
+    bypassMiddleware = false;
+  }
+}
+
+/**
+ * Start the keep-alive interval. Call this after successful connection.
+ */
+function startKeepAlive(): void {
+  if (keepAliveInterval) return; // Already running
+  
+  keepAliveInterval = setInterval(keepAlivePing, KEEP_ALIVE_INTERVAL_MS);
+  console.log(`💓 Keep-alive started (every ${KEEP_ALIVE_INTERVAL_MS / 1000}s)`);
+}
+
+/**
+ * Stop the keep-alive interval (for graceful shutdown).
+ */
+export function stopKeepAlive(): void {
+  if (keepAliveInterval) {
+    clearInterval(keepAliveInterval);
+    keepAliveInterval = null;
+    console.log('💓 Keep-alive stopped');
+  }
+}
+
+// ===================================
 // Startup Connection with Retry
 // ===================================
 
 /**
  * Connect on startup with retry. Uses longer delays for Supabase pooler warmup.
+ * Starts keep-alive ping after successful connection.
  */
 export const connectWithRetry = async (retries = 5, delay = 5000): Promise<void> => {
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -318,6 +396,9 @@ export const connectWithRetry = async (retries = 5, delay = 5000): Promise<void>
       lastHealthProbe = Date.now();
       lastSuccessfulQuery = Date.now();
       console.log(`✅ Database connected (attempt ${attempt}/${retries})`);
+      
+      // Start keep-alive ping to prevent idle connection closure
+      startKeepAlive();
       return;
     } catch (error) {
       bypassMiddleware = false;
@@ -334,6 +415,9 @@ export const connectWithRetry = async (retries = 5, delay = 5000): Promise<void>
   console.error('🚨 All startup connection attempts failed.');
   console.error('🚨 DATABASE_URL set:', !!process.env.DATABASE_URL);
   console.error('🚨 URL prefix:', process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 40) + '...' : 'NOT SET');
+  
+  // Even if initial connection fails, start keep-alive to attempt recovery
+  startKeepAlive();
 };
 
 export default prisma;
