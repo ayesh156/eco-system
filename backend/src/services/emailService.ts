@@ -46,52 +46,46 @@ const createGmailTransporter = (): Transporter => {
   
   const transportOptions: any = {
     // ─── Use Gmail Service ────────────────────────────────────────────
-    // This tells Nodemailer to use pre-configured Gmail SMTP settings
-    // (smtp.gmail.com:465 with SSL). More reliable than manual config.
     service: 'gmail',
     
     // ─── Authentication ───────────────────────────────────────────────
-    // Use App Password (not regular password) for Gmail
-    // Generate at: https://myaccount.google.com/apppasswords
     auth: {
       user: config.user,
       pass: config.pass,
     },
 
-    // ─── FIX #1: Force IPv4 ───────────────────────────────────────────
-    // Render (and most cloud providers) resolve smtp.gmail.com to both
-    // IPv4 (142.251.x.x) and IPv6 (2607:f8b0:...) addresses.
-    // Node's dns.lookup() may return the IPv6 address first, but Render's
-    // outbound IPv6 routing to Google is often misconfigured or firewalled,
-    // causing the TCP SYN to hang until the OS-level timeout (~75-120s).
+    // ─── FIX #1: Force IPv4 (CRITICAL for Render.com) ─────────────────
+    // Render's outbound IPv6 routing to Google is misconfigured/firewalled,
+    // causing TCP SYN to hang until OS-level timeout (~75-120s).
     // `family: 4` forces dns.lookup() to return only the A (IPv4) record.
     family: 4,
 
-    // ─── FIX #2: Cloud-friendly timeouts ──────────────────────────────
-    // Render Singapore → Gmail SMTP has ~100-300ms RTT. The TLS handshake
-    // alone can take 3-5s. These generous timeouts prevent premature aborts.
+    // ─── FIX #2: Connection Pooling ───────────────────────────────────
+    // Reuse SMTP connections instead of opening new ones each time.
+    // maxConnections: 1 prevents hitting Gmail rate limits.
+    pool: true,
+    maxConnections: 1,
+    rateDelta: 20000,
+    rateLimit: 5,
+
+    // ─── FIX #3: Cloud-friendly timeouts ──────────────────────────────
     connectionTimeout: 30000,  // 30s to establish TCP + TLS connection
     greetingTimeout: 20000,    // 20s for SMTP EHLO/greeting exchange
     socketTimeout: 60000,      // 60s for socket inactivity (large PDF attachments)
 
-    // ─── FIX #3: TLS options ──────────────────────────────────────────
-    // Some cloud proxies inject their own TLS certificates.
-    // These settings ensure compatibility while maintaining security.
+    // ─── FIX #4: TLS options ──────────────────────────────────────────
     tls: {
       rejectUnauthorized: false,
       minVersion: 'TLSv1.2',
       ciphers: 'HIGH:!aNULL:!MD5',
     },
 
-    // ─── FIX #4: Debug logging ────────────────────────────────────────
-    // Set SMTP_DEBUG=true in Render env vars to enable logging
-    ...(( process.env.NODE_ENV !== 'production' || process.env.SMTP_DEBUG === 'true' ) && {
-      debug: true,
-      logger: true,
-    }),
+    // ─── FIX #5: Debug logging (ALWAYS ON for Render diagnostics) ─────
+    logger: true,
+    debug: true,
   };
 
-  console.log(`📧 Creating Gmail transporter (service: gmail, user: ${config.user || 'NOT SET'}, IPv4-only, connTimeout: 30s, socketTimeout: 60s)`);
+  console.log(`📧 Creating Gmail transporter (service: gmail, user: ${config.user || 'NOT SET'}, IPv4-only, pool: true, connTimeout: 30s)`);
   return nodemailer.createTransport(transportOptions);
 };
 
