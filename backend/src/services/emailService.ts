@@ -11,19 +11,11 @@ import type { Transporter } from 'nodemailer';
 // ===================================
 
 interface EmailConfig {
-  host: string;
-  port: number;
-  secure: boolean;
-  auth: {
-    user: string;
-    pass: string;
-  };
+  user: string;
+  pass: string;
 }
 
 const getEmailConfig = (): EmailConfig => {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = parseInt(process.env.SMTP_PORT || '587');
-  const secure = process.env.SMTP_SECURE === 'true';
   const user = process.env.SMTP_USER || '';
   const pass = process.env.SMTP_PASS || '';
 
@@ -31,33 +23,40 @@ const getEmailConfig = (): EmailConfig => {
     console.warn('⚠️  WARNING: SMTP credentials not configured. Email sending will fail.');
   }
 
-  return { host, port, secure, auth: { user, pass } };
+  return { user, pass };
 };
 
 // Create reusable transporter
 let transporter: Transporter | null = null;
-let currentPort: number | null = null;
 
 /**
- * Create a transporter for a specific port.
- * Port 587 = STARTTLS, Port 465 = Direct SSL
+ * Create Gmail transporter using built-in 'service: gmail' setting.
+ * This is more reliable on cloud platforms like Render.com because:
+ * 1. Nodemailer handles all the Gmail-specific settings automatically
+ * 2. No need to manually configure host, port, or secure settings
+ * 3. Better compatibility with Gmail's OAuth and App Password auth
  *
- * RENDER.COM TIMEOUTS:
- * Render's Singapore servers have higher latency to Gmail SMTP (~100-300ms RTT).
- * The TLS handshake alone can take 3-5s. 15s connectionTimeout was cutting it
- * too close — any DNS hiccup or cold SMTP connection caused instant timeout.
- * New values: 30s connection, 20s greeting, 45s socket, 15s DNS.
+ * RENDER.COM OPTIMIZATIONS:
+ * - IPv4 forced to avoid Render's IPv6 routing issues
+ * - Extended timeouts for high-latency cloud connections
+ * - TLS settings for proxy compatibility
  */
-const createTransporterForPort = (port: number): Transporter => {
+const createGmailTransporter = (): Transporter => {
   const config = getEmailConfig();
-  const useDirectSSL = port === 465;
   
   const transportOptions: any = {
-    host: config.host,
-    port,
-    secure: useDirectSSL, // true for 465 (SSL), false for 587 (STARTTLS)
-    auth: config.auth,
-    pool: false,
+    // ─── Use Gmail Service ────────────────────────────────────────────
+    // This tells Nodemailer to use pre-configured Gmail SMTP settings
+    // (smtp.gmail.com:465 with SSL). More reliable than manual config.
+    service: 'gmail',
+    
+    // ─── Authentication ───────────────────────────────────────────────
+    // Use App Password (not regular password) for Gmail
+    // Generate at: https://myaccount.google.com/apppasswords
+    auth: {
+      user: config.user,
+      pass: config.pass,
+    },
 
     // ─── FIX #1: Force IPv4 ───────────────────────────────────────────
     // Render (and most cloud providers) resolve smtp.gmail.com to both
@@ -65,61 +64,40 @@ const createTransporterForPort = (port: number): Transporter => {
     // Node's dns.lookup() may return the IPv6 address first, but Render's
     // outbound IPv6 routing to Google is often misconfigured or firewalled,
     // causing the TCP SYN to hang until the OS-level timeout (~75-120s).
-    // `family: 4` forces dns.lookup() to return only the A (IPv4) record,
-    // bypassing the broken IPv6 path entirely.
+    // `family: 4` forces dns.lookup() to return only the A (IPv4) record.
     family: 4,
 
     // ─── FIX #2: Cloud-friendly timeouts ──────────────────────────────
     // Render Singapore → Gmail SMTP has ~100-300ms RTT. The TLS handshake
-    // alone can take 3-5s. These generous timeouts prevent premature aborts
-    // while still failing fast enough to allow retries within Render's
-    // 30s request timeout window.
+    // alone can take 3-5s. These generous timeouts prevent premature aborts.
     connectionTimeout: 30000,  // 30s to establish TCP + TLS connection
     greetingTimeout: 20000,    // 20s for SMTP EHLO/greeting exchange
-    socketTimeout: 45000,      // 45s for socket inactivity (large PDF attachments)
+    socketTimeout: 60000,      // 60s for socket inactivity (large PDF attachments)
 
     // ─── FIX #3: TLS options ──────────────────────────────────────────
-    // `rejectUnauthorized: false` — some cloud egress proxies/firewalls
-    //   inject their own TLS certificates (e.g., Render's NAT gateway),
-    //   causing DEPTH_ZERO_SELF_SIGNED_CERT or UNABLE_TO_VERIFY_LEAF_SIGNATURE.
-    //   In production with Gmail, the cert chain is valid, but this prevents
-    //   edge-case handshake failures behind intermediary proxies.
-    // `minVersion: TLSv1.2` — Gmail requires TLS 1.2+; explicitly setting
-    //   it prevents fallback to TLS 1.0/1.1 which Gmail rejects.
-    // `ciphers: 'HIGH:!aNULL:!MD5'` — ensures strong cipher negotiation;
-    //   avoids the rare case where Node picks a cipher Gmail doesn't support.
+    // Some cloud proxies inject their own TLS certificates.
+    // These settings ensure compatibility while maintaining security.
     tls: {
       rejectUnauthorized: false,
       minVersion: 'TLSv1.2',
       ciphers: 'HIGH:!aNULL:!MD5',
     },
 
-    dnsTimeout: 15000,         // 15s for DNS resolution on cloud
-
     // ─── FIX #4: Debug logging ────────────────────────────────────────
-    // In production on Render, enable logging so SMTP handshake details
-    // appear in render logs (Dashboard → Logs). This reveals exactly
-    // where the timeout occurs: DNS, TCP connect, STARTTLS, or AUTH.
-    // Set SMTP_DEBUG=true in Render env vars to enable without redeploying.
+    // Set SMTP_DEBUG=true in Render env vars to enable logging
     ...(( process.env.NODE_ENV !== 'production' || process.env.SMTP_DEBUG === 'true' ) && {
       debug: true,
       logger: true,
     }),
   };
 
-  console.log(`📧 Creating SMTP transporter: ${config.host}:${port} (secure: ${useDirectSSL}, IPv4-only, connTimeout: 30s, socketTimeout: 45s)`);
+  console.log(`📧 Creating Gmail transporter (service: gmail, user: ${config.user || 'NOT SET'}, IPv4-only, connTimeout: 30s, socketTimeout: 60s)`);
   return nodemailer.createTransport(transportOptions);
 };
 
-const getTransporter = (forcePort?: number): Transporter => {
-  const config = getEmailConfig();
-  const requestedPort = forcePort || config.port;
-  
-  // If port changed or no transporter, create new
-  if (!transporter || currentPort !== requestedPort) {
-    resetTransporter();
-    transporter = createTransporterForPort(requestedPort);
-    currentPort = requestedPort;
+const getTransporter = (): Transporter => {
+  if (!transporter) {
+    transporter = createGmailTransporter();
   }
   return transporter;
 };
@@ -133,7 +111,6 @@ const resetTransporter = () => {
       // ignore close errors
     }
     transporter = null;
-    currentPort = null;
   }
 };
 
@@ -153,82 +130,77 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise
 
 /**
  * Send email with automatic retry on connection failures.
- * Attempt 1: Uses configured port (typically 587/STARTTLS).
- * Attempt 2: Falls back to alternate port (465 SSL or vice versa).
- * Attempt 3: Retries the primary port with a completely fresh transporter.
+ * Uses `service: 'gmail'` which handles host/port automatically.
+ * 
+ * Retry strategy (3 attempts):
+ * - Attempt 1: Use cached transporter
+ * - Attempt 2: Fresh transporter after 3s delay (handles stale connections)
+ * - Attempt 3: Fresh transporter after 5s delay (handles transient network issues)
+ * 
  * Each attempt has a 60s hard timeout.
- *
- * The 3-attempt strategy handles:
- * - Transient DNS issues (attempt 1 fails, attempt 2 or 3 succeeds)
- * - Stale TLS sessions (reset transporter between attempts)
- * - Port-specific blocking (some cloud providers block 587 but allow 465)
  */
 const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string }> => {
-  const SEND_TIMEOUT = 60000; // 60s hard timeout per attempt (was 45s — too tight for Render)
+  const SEND_TIMEOUT = 60000; // 60s hard timeout per attempt
   const config = getEmailConfig();
-  const primaryPort = config.port;
-  const fallbackPort = primaryPort === 465 ? 587 : 465;
   
-  // Attempt 1: Primary port (configured port, usually 587)
+  // Attempt 1: Use cached transporter
   try {
-    console.log(`📧 [Attempt 1/3] Sending via port ${primaryPort}...`);
-    const transport = getTransporter(primaryPort);
+    console.log(`📧 [Attempt 1/3] Sending via Gmail service...`);
+    const transport = getTransporter();
     const result = await withTimeout(
       transport.sendMail(mailOptions),
       SEND_TIMEOUT,
-      `SMTP port ${primaryPort} (attempt 1)`
+      `Gmail service (attempt 1)`
     );
     console.log('✅ [Attempt 1/3] Email sent, messageId:', result.messageId);
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.warn(`⚠️ [Attempt 1/3] Port ${primaryPort} failed: ${errorMessage}`);
+    console.warn(`⚠️ [Attempt 1/3] Failed: ${errorMessage}`);
     resetTransporter();
   }
     
-  // Attempt 2: Fallback port (465 SSL if primary was 587, or vice versa)
-  console.log(`📧 [Attempt 2/3] Falling back to port ${fallbackPort} after 3s delay...`);
+  // Attempt 2: Fresh transporter after delay
+  console.log(`📧 [Attempt 2/3] Retrying with fresh transporter after 3s delay...`);
   await new Promise(resolve => setTimeout(resolve, 3000));
   
   try {
-    const retryTransport = getTransporter(fallbackPort);
-    const result = await withTimeout(
-      retryTransport.sendMail(mailOptions),
-      SEND_TIMEOUT,
-      `SMTP port ${fallbackPort} (attempt 2)`
-    );
-    console.log(`✅ [Attempt 2/3] Email sent via port ${fallbackPort}, messageId:`, result.messageId);
-    return result;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.warn(`⚠️ [Attempt 2/3] Port ${fallbackPort} failed: ${errorMessage}`);
-    resetTransporter();
-  }
-
-  // Attempt 3: Retry primary port with completely fresh transporter
-  // This handles stale DNS cache / TLS session issues on long-running Render servers
-  console.log(`📧 [Attempt 3/3] Retrying port ${primaryPort} with fresh transporter after 3s...`);
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  
-  try {
-    // Force-create a brand new transporter (bypasses cache)
-    const freshTransport = createTransporterForPort(primaryPort);
+    const freshTransport = createGmailTransporter();
     const result = await withTimeout(
       freshTransport.sendMail(mailOptions),
       SEND_TIMEOUT,
-      `SMTP port ${primaryPort} (attempt 3 - fresh)`
+      `Gmail service (attempt 2 - fresh)`
+    );
+    console.log(`✅ [Attempt 2/3] Email sent via fresh transporter, messageId:`, result.messageId);
+    transporter = freshTransport; // Update cache
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown';
+    console.warn(`⚠️ [Attempt 2/3] Failed: ${errorMessage}`);
+    resetTransporter();
+  }
+
+  // Attempt 3: Final retry with longer delay
+  console.log(`📧 [Attempt 3/3] Final attempt with fresh transporter after 5s...`);
+  await new Promise(resolve => setTimeout(resolve, 5000));
+  
+  try {
+    const freshTransport = createGmailTransporter();
+    const result = await withTimeout(
+      freshTransport.sendMail(mailOptions),
+      SEND_TIMEOUT,
+      `Gmail service (attempt 3 - final)`
     );
     console.log(`✅ [Attempt 3/3] Email sent via fresh transporter, messageId:`, result.messageId);
-    // Update the cached transporter to this working one
-    transporter = freshTransport;
-    currentPort = primaryPort;
+    transporter = freshTransport; // Update cache
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown';
     console.error(`❌ [Attempt 3/3] All attempts failed. Last error: ${errorMessage}`);
-    console.error(`🚨 SMTP Diagnostics: host=${config.host}, ports tried=${primaryPort},${fallbackPort},${primaryPort}`);
-    console.error(`🚨 Make sure SMTP_HOST, SMTP_USER, SMTP_PASS env vars are set on Render.`);
-    console.error(`🚨 If using Gmail, ensure you\'re using an App Password (not account password).`);
+    console.error(`🚨 SMTP Diagnostics: service=gmail, user=${config.user || 'NOT SET'}`);
+    console.error(`🚨 Make sure SMTP_USER and SMTP_PASS env vars are set on Render.`);
+    console.error(`🚨 IMPORTANT: Use a Gmail App Password, NOT your regular password!`);
+    console.error(`🚨 Generate App Password at: https://myaccount.google.com/apppasswords`);
     resetTransporter();
     throw new Error(`Failed to send email: Connection timeout (all 3 attempts failed). Check SMTP configuration.`);
   }
@@ -601,7 +573,7 @@ export const sendInvoiceEmail = async (data: InvoiceEmailData): Promise<{ succes
     const config = getEmailConfig();
     
     // Check if SMTP is configured
-    if (!config.auth.user || !config.auth.pass) {
+    if (!config.user || !config.pass) {
       console.error('❌ SMTP not configured. Cannot send invoice email.');
       if (process.env.NODE_ENV !== 'production') {
         console.log('📧 [DEV MODE] Invoice email would be sent to:', data.email);
@@ -611,7 +583,7 @@ export const sendInvoiceEmail = async (data: InvoiceEmailData): Promise<{ succes
     }
 
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
-    const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
 
     console.log(`📤 Sending invoice email to: ${data.email}`);
 
@@ -646,7 +618,7 @@ export const sendInvoiceWithPDF = async (
     const config = getEmailConfig();
     
     // Check if SMTP is configured
-    if (!config.auth.user || !config.auth.pass) {
+    if (!config.user || !config.pass) {
       console.error('❌ SMTP not configured. Cannot send invoice email with PDF.');
       if (process.env.NODE_ENV !== 'production') {
         console.log('📧 [DEV MODE] Invoice email with PDF would be sent to:', data.email);
@@ -656,7 +628,7 @@ export const sendInvoiceWithPDF = async (
     }
 
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
-    const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
 
     console.log(`📤 Sending invoice email with PDF attachment to: ${data.email}`);
 
@@ -882,7 +854,7 @@ export const sendPasswordResetOTP = async (data: OTPEmailData): Promise<SendOTPR
     const config = getEmailConfig();
     
     // Check if SMTP is configured
-    if (!config.auth.user || !config.auth.pass) {
+    if (!config.user || !config.pass) {
       console.error('❌ SMTP not configured. Cannot send email.');
       // In development, log the OTP to console
       if (process.env.NODE_ENV !== 'production') {
@@ -893,7 +865,7 @@ export const sendPasswordResetOTP = async (data: OTPEmailData): Promise<SendOTPR
     }
 
     const fromName = process.env.SMTP_FROM_NAME || 'ECOTEC System';
-    const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
 
     console.log(`📤 Attempting to send OTP email to: ${data.email}`);
 
@@ -931,7 +903,7 @@ export const generateOTP = (): string => {
 export const verifyEmailConnection = async (): Promise<boolean> => {
   try {
     const config = getEmailConfig();
-    if (!config.auth.user || !config.auth.pass) {
+    if (!config.user || !config.pass) {
       console.warn('⚠️  SMTP credentials not set. Email verification skipped.');
       return false;
     }
@@ -1289,7 +1261,7 @@ export const sendGRNWithPDF = async (
     const config = getEmailConfig();
     
     // Check if SMTP is configured
-    if (!config.auth.user || !config.auth.pass) {
+    if (!config.user || !config.pass) {
       console.error('❌ SMTP not configured. Cannot send GRN email.');
       if (process.env.NODE_ENV !== 'production') {
         console.log('📧 [DEV MODE] GRN email would be sent to:', data.email);
@@ -1299,7 +1271,7 @@ export const sendGRNWithPDF = async (
     }
 
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
-    const fromEmail = process.env.SMTP_FROM_EMAIL || config.auth.user;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
 
     console.log(`📤 Sending GRN email to: ${data.email}`);
 
