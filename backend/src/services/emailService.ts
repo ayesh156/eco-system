@@ -1,16 +1,19 @@
 /**
  * Email Service for Password Reset OTP & GRN/Invoice emails
- * Uses nodemailer with modern HTML email templates
  * 
- * RENDER.COM FIX: Uses port 587 (STARTTLS) instead of port 465 (SSL)
- * because Render's network often blocks/throttles outbound port 465.
- * Also forces IPv4 via custom DNS lookup to bypass IPv6 routing issues.
+ * MULTI-PROVIDER EMAIL SYSTEM:
+ * 1. PRIMARY: Resend HTTP API (works on ALL cloud platforms including Render.com)
+ * 2. FALLBACK: Gmail SMTP (for local development)
+ * 
+ * WHY NOT SMTP ON RENDER?
+ * Render.com (and most cloud providers) block outbound SMTP ports (465, 587).
+ * HTTP-based email APIs use port 443 (HTTPS) which is NEVER blocked.
+ * 
+ * SETUP: Set RESEND_API_KEY env var on Render (free at resend.com)
  */
 
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import dns from 'dns';
-import { promisify } from 'util';
 
 // ===================================
 // Email Configuration
@@ -32,107 +35,133 @@ const getEmailConfig = (): EmailConfig => {
   return { user, pass };
 };
 
-// Create reusable transporter
+// Create reusable transporter (SMTP fallback only)
 let transporter: Transporter | null = null;
 
-// Promisified DNS resolve for IPv4
-const resolve4 = promisify(dns.resolve4);
+// ===================================
+// Provider Detection
+// ===================================
 
-/**
- * Resolve smtp.gmail.com to an IPv4 address.
- * This completely bypasses Node's default DNS which may return IPv6 first.
- * Falls back to the hostname if resolution fails.
- */
-const resolveGmailIPv4 = async (): Promise<string> => {
-  try {
-    const addresses = await resolve4('smtp.gmail.com');
-    if (addresses && addresses.length > 0) {
-      console.log(`🔍 DNS resolved smtp.gmail.com → ${addresses[0]} (IPv4)`);
-      return addresses[0];
-    }
-  } catch (err) {
-    console.warn(`⚠️ DNS resolve4 failed, using hostname fallback:`, err);
+type EmailProvider = 'resend' | 'smtp';
+
+const getEmailProvider = (): EmailProvider => {
+  if (process.env.RESEND_API_KEY) {
+    return 'resend';
   }
-  return 'smtp.gmail.com';
+  return 'smtp';
 };
 
+// ===================================
+// 🚀 PRIMARY: Resend HTTP API
+// ===================================
+// Resend uses HTTPS (port 443) — NEVER blocked by any cloud provider.
+// Free tier: 100 emails/day, no domain verification needed.
+// Sign up: https://resend.com → get API key → set RESEND_API_KEY env var.
+
+interface ResendAttachment {
+  filename: string;
+  content: string; // base64 encoded
+}
+
+interface ResendPayload {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+  text?: string;
+  attachments?: ResendAttachment[];
+}
+
 /**
- * Create Gmail transporter using EXPLICIT host/port (NOT service: 'gmail').
- * 
- * WHY NOT service: 'gmail'?
- * - service: 'gmail' uses port 465 (direct SSL)
- * - Render.com and many cloud providers block/throttle port 465
- * - Port 587 (STARTTLS) is the IETF submission standard and rarely blocked
- * 
- * RENDER.COM FIXES:
- * 1. Port 587 with STARTTLS (not port 465 SSL)
- * 2. Custom DNS-resolved IPv4 address (bypasses IPv6 entirely)
- * 3. No connection pooling (fresh connection per email = more reliable)
- * 4. Extended timeouts for cloud network latency
- * 5. TLS hardened for cloud proxy compatibility
+ * Send email via Resend HTTP API.
+ * This is the PRIMARY method for production/cloud environments.
+ * Uses native fetch() — no extra packages needed.
  */
-const createGmailTransporter = (host: string = 'smtp.gmail.com'): Transporter => {
-  const config = getEmailConfig();
+const sendViaResend = async (mailOptions: any): Promise<{ messageId: string }> => {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY not set');
+  }
+
+  // Parse "from" field - extract email and name
+  // Formats: '"Name" <email>' or 'Name <email>' or 'email'
+  let fromField = mailOptions.from || '';
   
-  const transportOptions: any = {
-    // ─── Explicit SMTP config (NOT service: 'gmail') ──────────────────
-    // Port 587 = STARTTLS (starts plain, upgrades to TLS)
-    // Port 465 = Direct SSL (often blocked by cloud providers)
-    host: host,
-    port: 587,
-    secure: false,  // false = STARTTLS on port 587 (upgrades after EHLO)
+  // Resend free tier requires sending from 'onboarding@resend.dev'
+  // unless you have a verified domain. We'll use the from name with Resend's email.
+  // If RESEND_FROM is set (verified domain), use that instead.
+  const resendFrom = process.env.RESEND_FROM || '';
+  
+  if (resendFrom) {
+    // User has a verified domain on Resend
+    // Keep the display name from original but use the verified email
+    const nameMatch = fromField.match(/"([^"]+)"|^([^<]+)</);
+    const displayName = nameMatch ? (nameMatch[1] || nameMatch[2])?.trim() : '';
+    fromField = displayName ? `${displayName} <${resendFrom}>` : resendFrom;
+  } else {
+    // Free tier: must send from onboarding@resend.dev
+    const nameMatch = fromField.match(/"([^"]+)"|^([^<]+)</);
+    const displayName = nameMatch ? (nameMatch[1] || nameMatch[2])?.trim() : 'Eco System';
+    fromField = `${displayName} <onboarding@resend.dev>`;
+  }
 
-    // ─── Authentication ───────────────────────────────────────────────
-    auth: {
-      user: config.user,
-      pass: config.pass,
-    },
-
-    // ─── Force IPv4 ───────────────────────────────────────────────────
-    // Belt-and-suspenders: even when host is already an IPv4 IP,
-    // this ensures any internal DNS lookups use IPv4.
-    family: 4,
-
-    // ─── NO connection pooling ────────────────────────────────────────
-    // Pooling can cause stale connections on cloud platforms.
-    // Each email gets a fresh TCP connection (more reliable).
-    pool: false,
-
-    // ─── Extended timeouts for cloud latency ──────────────────────────
-    connectionTimeout: 30000,  // 30s TCP + TLS handshake
-    greetingTimeout: 30000,    // 30s for SMTP EHLO/greeting exchange
-    socketTimeout: 120000,     // 120s for socket inactivity (large PDFs)
-
-    // ─── TLS settings ─────────────────────────────────────────────────
-    // servername is required when connecting to an IP address
-    // (tells TLS which certificate to expect)
-    tls: {
-      servername: 'smtp.gmail.com',
-      rejectUnauthorized: false,
-      minVersion: 'TLSv1.2',
-      ciphers: 'HIGH:!aNULL:!MD5',
-    },
-
-    // ─── Debug logging (always on for Render diagnostics) ─────────────
-    logger: true,
-    debug: true,
+  // Build Resend payload
+  const payload: ResendPayload = {
+    from: fromField,
+    to: Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to],
+    subject: mailOptions.subject,
+    html: mailOptions.html,
   };
 
-  console.log(`📧 Creating SMTP transporter (host: ${host}, port: 587, STARTTLS, user: ${config.user || 'NOT SET'})`);
-  return nodemailer.createTransport(transportOptions);
+  if (mailOptions.text) {
+    payload.text = mailOptions.text;
+  }
+
+  // Convert attachments (Buffer → base64)
+  if (mailOptions.attachments && mailOptions.attachments.length > 0) {
+    payload.attachments = mailOptions.attachments.map((att: any) => ({
+      filename: att.filename,
+      content: Buffer.isBuffer(att.content) 
+        ? att.content.toString('base64') 
+        : att.content, // already base64
+    }));
+  }
+
+  console.log(`📧 [Resend] Sending to: ${payload.to.join(', ')} | Subject: ${payload.subject.substring(0, 50)}...`);
+  console.log(`📧 [Resend] From: ${payload.from} | Attachments: ${payload.attachments?.length || 0}`);
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const errorMsg = (data as any)?.message || (data as any)?.error || JSON.stringify(data);
+    console.error(`❌ [Resend] API Error (${response.status}): ${errorMsg}`);
+    throw new Error(`Resend API error (${response.status}): ${errorMsg}`);
+  }
+
+  const messageId = (data as any).id || 'resend-' + Date.now();
+  console.log(`✅ [Resend] Email sent successfully! ID: ${messageId}`);
+  return { messageId };
 };
 
-/**
- * Create a fallback transporter using port 465 (direct SSL).
- * Used if port 587 fails (e.g., port 587 is blocked but 465 isn't).
- */
-const createGmailTransporterSSL = (host: string = 'smtp.gmail.com'): Transporter => {
+// ===================================
+// 📧 FALLBACK: Gmail SMTP
+// ===================================
+// Used for local development where SMTP ports are available.
+
+const createGmailTransporter = (): Transporter => {
   const config = getEmailConfig();
   
   const transportOptions: any = {
-    host: host,
-    port: 465,
-    secure: true,  // Direct SSL
+    service: 'gmail',
     auth: {
       user: config.user,
       pass: config.pass,
@@ -140,18 +169,17 @@ const createGmailTransporterSSL = (host: string = 'smtp.gmail.com'): Transporter
     family: 4,
     pool: false,
     connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 120000,
+    greetingTimeout: 20000,
+    socketTimeout: 60000,
     tls: {
-      servername: 'smtp.gmail.com',
       rejectUnauthorized: false,
       minVersion: 'TLSv1.2',
     },
-    logger: true,
-    debug: true,
+    logger: process.env.SMTP_DEBUG === 'true',
+    debug: process.env.SMTP_DEBUG === 'true',
   };
 
-  console.log(`📧 Creating SSL transporter (host: ${host}, port: 465, SSL, user: ${config.user || 'NOT SET'})`);
+  console.log(`📧 Creating Gmail SMTP transporter (user: ${config.user || 'NOT SET'})`);
   return nodemailer.createTransport(transportOptions);
 };
 
@@ -162,109 +190,111 @@ const getTransporter = (): Transporter => {
   return transporter;
 };
 
-// Reset transporter on connection errors (stale connections)
 const resetTransporter = () => {
   if (transporter) {
-    try {
-      (transporter as any).close?.();
-    } catch (e) {
-      // ignore close errors
-    }
+    try { (transporter as any).close?.(); } catch (_) {}
     transporter = null;
   }
 };
 
 /**
- * Wrap a promise with a timeout
+ * Send email via Gmail SMTP with retry.
+ * Only used when Resend is not configured.
  */
-const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${ms / 1000}s`));
-    }, ms);
-    promise
-      .then((result) => { clearTimeout(timer); resolve(result); })
-      .catch((err) => { clearTimeout(timer); reject(err); });
-  });
-};
-
-/**
- * Send email with multi-strategy retry.
- * 
- * Strategy (4 attempts across 2 ports):
- * 
- * Attempt 1: Port 587 (STARTTLS) with hostname
- * Attempt 2: Port 587 (STARTTLS) with resolved IPv4 IP address
- * Attempt 3: Port 465 (SSL) with hostname 
- * Attempt 4: Port 465 (SSL) with resolved IPv4 IP address
- * 
- * Each attempt has a 45s hard timeout.
- */
-const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string }> => {
-  const SEND_TIMEOUT = 45000; // 45s hard timeout per attempt
+const sendViaSMTP = async (mailOptions: any): Promise<{ messageId: string }> => {
+  const SEND_TIMEOUT = 45000;
   const config = getEmailConfig();
 
-  // Pre-resolve Gmail's IPv4 address
-  const gmailIPv4 = await resolveGmailIPv4();
-  
-  // Define all strategies to try
-  const strategies = [
-    { label: 'Port 587 STARTTLS (hostname)', factory: () => createGmailTransporter('smtp.gmail.com') },
-    { label: 'Port 587 STARTTLS (IPv4 direct)', factory: () => createGmailTransporter(gmailIPv4) },
-    { label: 'Port 465 SSL (hostname)', factory: () => createGmailTransporterSSL('smtp.gmail.com') },
-    { label: 'Port 465 SSL (IPv4 direct)', factory: () => createGmailTransporterSSL(gmailIPv4) },
-  ];
-
-  for (let i = 0; i < strategies.length; i++) {
-    const { label, factory } = strategies[i];
-    const attemptNum = i + 1;
-    
-    if (i > 0) {
-      const delay = i * 2000; // 2s, 4s, 6s between retries
-      console.log(`📧 [Attempt ${attemptNum}/${strategies.length}] Waiting ${delay / 1000}s before retry...`);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (attempt > 1) {
+      const delay = attempt * 2000;
+      console.log(`📧 [SMTP Attempt ${attempt}/3] Waiting ${delay / 1000}s...`);
       await new Promise(resolve => setTimeout(resolve, delay));
+      resetTransporter();
     }
 
     try {
-      console.log(`📧 [Attempt ${attemptNum}/${strategies.length}] ${label}...`);
-      const transport = factory();
+      console.log(`📧 [SMTP Attempt ${attempt}/3] Sending via Gmail...`);
+      const transport = getTransporter();
       
-      const result = await withTimeout(
-        transport.sendMail(mailOptions),
-        SEND_TIMEOUT,
-        label
-      );
+      const result = await new Promise<{ messageId: string }>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(new Error(`SMTP timed out after ${SEND_TIMEOUT / 1000}s`));
+        }, SEND_TIMEOUT);
+        
+        transport.sendMail(mailOptions)
+          .then((r: any) => { clearTimeout(timer); resolve(r); })
+          .catch((e: any) => { clearTimeout(timer); reject(e); });
+      });
       
-      console.log(`✅ [Attempt ${attemptNum}/${strategies.length}] Email sent! messageId: ${result.messageId}`);
-      
-      // Close this one-off transport
-      try { (transport as any).close?.(); } catch (_) {}
-      
+      console.log(`✅ [SMTP Attempt ${attempt}/3] Sent! messageId: ${result.messageId}`);
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown';
-      console.warn(`⚠️ [Attempt ${attemptNum}/${strategies.length}] Failed (${label}): ${errorMessage}`);
-      
-      // Continue to next strategy
+      const msg = error instanceof Error ? error.message : 'Unknown';
+      console.warn(`⚠️ [SMTP Attempt ${attempt}/3] Failed: ${msg}`);
     }
   }
 
-  // All strategies failed
-  console.error(`❌ All ${strategies.length} email strategies failed!`);
-  console.error(`🚨 SMTP Diagnostics:`);
-  console.error(`   User: ${config.user || 'NOT SET'}`);
-  console.error(`   Pass: ${config.pass ? '***SET***' : 'NOT SET'}`);
-  console.error(`   Gmail IPv4: ${gmailIPv4}`);
-  console.error(`🚨 Possible causes:`);
-  console.error(`   1. SMTP_USER / SMTP_PASS env vars not set on Render`);
-  console.error(`   2. Using regular Gmail password instead of App Password`);
-  console.error(`   3. Render's network blocks outbound SMTP entirely`);
-  console.error(`   4. Gmail is blocking connections from this IP`);
-  console.error(`🚨 Generate App Password at: https://myaccount.google.com/apppasswords`);
-  console.error(`🚨 If SMTP is blocked, consider using Resend.com (HTTP API, free tier)`);
-  
   resetTransporter();
-  throw new Error(`Failed to send email: Connection timeout (all ${strategies.length} attempts failed). Check SMTP configuration.`);
+  throw new Error(`SMTP: All 3 attempts failed. User: ${config.user || 'NOT SET'}`);
+};
+
+// ===================================
+// 🔀 Unified Email Sender
+// ===================================
+
+/**
+ * Send email using the best available provider:
+ * 1. Resend HTTP API (if RESEND_API_KEY is set) — works on ALL platforms
+ * 2. Gmail SMTP (fallback) — works on local dev, blocked on most cloud hosts
+ * 
+ * This is the ONLY function that all email-sending functions should call.
+ */
+const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string }> => {
+  const provider = getEmailProvider();
+  
+  console.log(`📧 Email provider: ${provider.toUpperCase()}`);
+  
+  // ── PRIMARY: Resend HTTP API ──────────────────────────────────────
+  if (provider === 'resend') {
+    try {
+      return await sendViaResend(mailOptions);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown';
+      console.error(`❌ [Resend] Failed: ${msg}`);
+      
+      // If Resend fails AND SMTP is configured, try SMTP as last resort
+      const config = getEmailConfig();
+      if (config.user && config.pass) {
+        console.log(`📧 Resend failed, attempting SMTP fallback...`);
+        try {
+          return await sendViaSMTP(mailOptions);
+        } catch (smtpError) {
+          const smtpMsg = smtpError instanceof Error ? smtpError.message : 'Unknown';
+          console.error(`❌ [SMTP Fallback] Also failed: ${smtpMsg}`);
+        }
+      }
+      
+      throw new Error(`Failed to send email via Resend: ${msg}. Configure RESEND_API_KEY correctly.`);
+    }
+  }
+  
+  // ── FALLBACK: Gmail SMTP ──────────────────────────────────────────
+  try {
+    return await sendViaSMTP(mailOptions);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown';
+    console.error(`❌ [SMTP] All attempts failed: ${msg}`);
+    console.error(`🚨 ════════════════════════════════════════════════════`);
+    console.error(`🚨 SMTP is blocked on this platform!`);
+    console.error(`🚨 SOLUTION: Use Resend (free HTTP email API)`);
+    console.error(`🚨 1. Sign up at https://resend.com (free)`);
+    console.error(`🚨 2. Get your API key`);
+    console.error(`🚨 3. Add RESEND_API_KEY env var on Render`);
+    console.error(`🚨 4. (Optional) Add RESEND_FROM for custom sender`);
+    console.error(`🚨 ════════════════════════════════════════════════════`);
+    throw new Error(`Failed to send email: SMTP connection timeout. Set RESEND_API_KEY for cloud deployment.`);
+  }
 };
 
 // ===================================
