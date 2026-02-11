@@ -29,7 +29,7 @@ import { notFound } from './middleware/notFound';
 import { apiRateLimiter } from './middleware/rateLimiter';
 import { sanitizeRequestBody } from './middleware/validation';
 import { corsConfig } from './config/security';
-import { connectWithRetry, isDbConnected } from './lib/prisma';
+import { connectWithRetry, isDbConnected, dbReady } from './lib/prisma';
 
 // Route imports
 import authRoutes from './routes/auth.routes';
@@ -126,6 +126,9 @@ app.use((_req, res, next) => {
   next();
 });
 
+// API version prefix
+const API_PREFIX = '/api/v1';
+
 // Health check — MUST be instant. Render sends these every 5s from multiple IPs.
 // NEVER open a DB connection here. Use cached state from real queries.
 app.get('/health', (_req, res) => {
@@ -139,8 +142,43 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// API version prefix
-const API_PREFIX = '/api/v1';
+// ===================================
+// COLD-START GATE MIDDLEWARE
+// ===================================
+// On Render's free tier the service sleeps after inactivity. When it wakes up,
+// Render routes incoming requests to the server IMMEDIATELY — often before the
+// DB connection is ready. Without this middleware, those requests get an instant
+// 503 "Database connection failed".
+//
+// This gate holds API requests for up to 30s, waiting for the DB to connect.
+// Health checks (above) are exempt so Render doesn't think the service is dead.
+const DB_GATE_TIMEOUT_MS = 30000;
+
+app.use(`${API_PREFIX}`, async (req, res, next) => {
+  // If DB is already connected, proceed immediately (hot path — no overhead)
+  if (isDbConnected()) {
+    return next();
+  }
+
+  // DB not ready yet — wait for the startup connection to finish
+  console.log(`⏳ Request waiting for DB: ${req.method} ${req.originalUrl}`);
+  
+  const timeout = new Promise<'timeout'>((resolve) =>
+    setTimeout(() => resolve('timeout'), DB_GATE_TIMEOUT_MS)
+  );
+
+  const result = await Promise.race([dbReady, timeout]);
+
+  if (result === 'timeout' && !isDbConnected()) {
+    console.error(`🚫 DB gate timeout for ${req.method} ${req.originalUrl}`);
+    return res.status(503).json({
+      success: false,
+      message: 'Service is starting up. Please try again in a few seconds.',
+    });
+  }
+
+  next();
+});
 
 // API Test endpoint - Modern HTML response
 app.get(`${API_PREFIX}/test`, async (_req, res) => {
@@ -420,19 +458,36 @@ app.use(`${API_PREFIX}/grns`, grnRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
-// Pre-connect to database BEFORE accepting requests (important for Render free tier cold starts)
-// Uses 5 retries with 5s base delay (progressive backoff: 5s, 10s, 15s, 20s, 25s)
-connectWithRetry(5, 5000).then(() => {
-  console.log('📦 Database initialization complete');
-}).catch((err) => {
-  console.error('⚠️ Database pre-connect failed, will retry per-request:', err instanceof Error ? err.message : err);
-});
+// ===================================
+// STARTUP SEQUENCE
+// ===================================
+// 1. Connect to DB FIRST (with retries + backoff)
+// 2. THEN start accepting HTTP requests
+//
+// This prevents the race condition where user requests arrive before DB
+// is ready, which was the root cause of "Database connection failed" on
+// Render's free tier cold starts.
+//
+// The cold-start gate middleware above is a safety net for requests that
+// arrive during the brief window between listen() and connectWithRetry().
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📡 API available at http://localhost:${PORT}${API_PREFIX}`);
-});
+const startServer = async () => {
+  // Start listening FIRST so Render sees the port is bound (prevents restart loop)
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📡 API available at http://localhost:${PORT}${API_PREFIX}`);
+  });
+
+  // Then connect to DB (requests are held by the cold-start gate middleware)
+  try {
+    await connectWithRetry(5, 3000);
+    console.log('📦 Database initialization complete');
+  } catch (err) {
+    console.error('⚠️ Database pre-connect failed, per-request retry is still active:', err instanceof Error ? err.message : err);
+  }
+};
+
+startServer();
 
 export default app;

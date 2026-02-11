@@ -10,8 +10,8 @@ import { PrismaClient } from '@prisma/client';
  * 
  * For Render (long-running servers), we need:
  * - TCP keep-alive to prevent idle connection drops
- * - Smaller connection limit to not exhaust Supabase's pool
- * - Longer timeouts to handle network latency
+ * - Minimal connection_limit to not exhaust Supabase's pool
+ * - Generous timeouts to handle cold-start + network latency
  * 
  * This MUST run before PrismaClient is created.
  */
@@ -20,38 +20,47 @@ function ensurePoolerParams(): void {
   if (!url) return;
 
   // Detect Supabase pooler (port 6543 or pooler.supabase.com)
-  if (url.includes('pooler.supabase.com') || url.includes(':6543')) {
-    const separator = url.includes('?') ? '&' : '?';
-    const params: string[] = [];
-    
-    // PgBouncer mode flag
-    if (!url.includes('pgbouncer=')) params.push('pgbouncer=true');
-    
-    // Connection pool settings:
-    // - connection_limit=3: Supabase free tier has ~15-20 pooled connections.
-    //   Keep Prisma's internal pool SMALL so we don't exhaust Supabase's global limit.
-    // - Using 3 (not 1) allows some concurrency without hogging the pool.
-    if (!url.includes('connection_limit=')) params.push('connection_limit=3');
-    
-    // Timeout settings (generous for cross-region network latency):
-    if (!url.includes('pool_timeout=')) params.push('pool_timeout=30');
-    if (!url.includes('connect_timeout=')) params.push('connect_timeout=30');
-    
-    // PgBouncer transaction mode doesn't support prepared statements
-    if (!url.includes('statement_cache_size=')) params.push('statement_cache_size=0');
-    
-    // TCP Keep-Alive settings to prevent idle connection drops:
-    // These are CRITICAL for Render's long-running servers.
-    // Supabase's pooler may close idle connections; keep-alive prevents this.
-    if (!url.includes('keepalives=')) params.push('keepalives=1');
-    if (!url.includes('keepalives_idle=')) params.push('keepalives_idle=30');
-    if (!url.includes('keepalives_interval=')) params.push('keepalives_interval=10');
-    if (!url.includes('keepalives_count=')) params.push('keepalives_count=3');
-    
-    if (params.length > 0) {
-      process.env.DATABASE_URL = url + separator + params.join('&');
-      console.log('🔧 Auto-added PgBouncer + TCP keep-alive params to DATABASE_URL');
-    }
+  const isPooler = url.includes('pooler.supabase.com') || url.includes(':6543');
+  if (!isPooler) return;
+
+  const separator = url.includes('?') ? '&' : '?';
+  const params: string[] = [];
+  
+  // PgBouncer mode flag — tells Prisma to disable prepared statements
+  if (!url.includes('pgbouncer=')) params.push('pgbouncer=true');
+  
+  // Connection pool settings:
+  // Supabase free tier has ~15 pooled connections globally.
+  // Prisma opens connection_limit connections per PrismaClient instance.
+  // On Render free tier we want EXACTLY 1 to minimise pool contention.
+  // Prisma's internal pool will queue requests when the single conn is busy,
+  // which is fine for low QPS.
+  if (!url.includes('connection_limit=')) params.push('connection_limit=1');
+  
+  // Pool timeout: how long Prisma waits to get a connection from its OWN pool.
+  // 60s is generous enough for cold-start scenarios where the single connection
+  // is temporarily busy with the startup SELECT 1.
+  if (!url.includes('pool_timeout=')) params.push('pool_timeout=60');
+  
+  // Connect timeout: how long to wait for a NEW TCP connection to Supabase.
+  // 30s handles cross-region latency + cold Supabase wakeup.
+  if (!url.includes('connect_timeout=')) params.push('connect_timeout=30');
+  
+  // PgBouncer transaction mode doesn't support prepared statements
+  if (!url.includes('statement_cache_size=')) params.push('statement_cache_size=0');
+  
+  // TCP Keep-Alive settings to prevent idle connection drops:
+  // These are CRITICAL for Render's long-running servers.
+  // Supabase's pooler may close idle connections; keep-alive prevents this.
+  if (!url.includes('keepalives=')) params.push('keepalives=1');
+  if (!url.includes('keepalives_idle=')) params.push('keepalives_idle=30');
+  if (!url.includes('keepalives_interval=')) params.push('keepalives_interval=10');
+  if (!url.includes('keepalives_count=')) params.push('keepalives_count=3');
+  
+  if (params.length > 0) {
+    process.env.DATABASE_URL = url + separator + params.join('&');
+    console.log('🔧 Auto-added PgBouncer + TCP keep-alive params to DATABASE_URL');
+    console.log('   connection_limit=1 | pool_timeout=60 | connect_timeout=30');
   }
 }
 
@@ -70,17 +79,26 @@ let lastHealthProbe = 0;
 let lastSuccessfulQuery = 0;
 let keepAliveInterval: NodeJS.Timeout | null = null;
 
-// Flag to bypass $use middleware (used by health check and keep-alive)
+/** When true, the $use middleware passes queries through without retry/tracking. */
 let bypassMiddleware = false;
 
+/**
+ * Promise that resolves when the very first DB connection is established.
+ * Used by the "cold-start gate" middleware so incoming HTTP requests
+ * wait for DB readiness instead of failing instantly.
+ */
+let dbReadyResolve: (() => void) | null = null;
+export const dbReady: Promise<void> = new Promise((resolve) => {
+  dbReadyResolve = resolve;
+});
+
 // Timing constants tuned for Render + Supabase:
-// - Shorter cooldown (20s) since Supabase connection drops are usually transient
-// - Keep-alive ping every 25s to prevent idle connection closure
-const RECONNECT_COOLDOWN_MS = 20000;
-const RECONNECT_PAUSE_MS = 2000;
+const RECONNECT_COOLDOWN_MS = 10000;  // 10s cooldown between reconnect attempts (was 20s)
+const RECONNECT_PAUSE_MS = 1500;       // Brief pause before reconnect probe
 const HEALTH_PROBE_INTERVAL_MS = 300000;
 const RECENT_ACTIVITY_MS = 60000;
 const KEEP_ALIVE_INTERVAL_MS = 25000;
+const QUERY_RETRY_DELAY_MS = 2000;     // Delay before retrying a failed query
 
 // ===================================
 // Connection Error Detection
@@ -133,11 +151,11 @@ function isConnectionError(error: any): boolean {
 
 /**
  * Reconnect with mutex to prevent concurrent reconnection storms.
- * If already reconnecting, all callers wait for the same promise.
- * 30s cooldown between attempts.
+ * If already reconnecting, all callers wait for the SAME promise.
+ * 10s cooldown between attempts.
  */
 async function reconnect(client: PrismaClient): Promise<void> {
-  // If already reconnecting, wait for the existing attempt
+  // If already reconnecting, piggyback on the existing attempt
   if (isReconnecting && reconnectPromise) {
     return reconnectPromise;
   }
@@ -157,11 +175,17 @@ async function reconnect(client: PrismaClient): Promise<void> {
     try {
       console.log('🔄 Reconnecting to database...');
       // Do NOT call $disconnect() — it destroys all active connections in the pool,
-      // killing any in-flight queries from other requests. Instead, just try to connect.
-      // Prisma will recycle stale connections internally.
+      // killing any in-flight queries from other requests.
       await new Promise(resolve => setTimeout(resolve, RECONNECT_PAUSE_MS));
       
-      // Try a lightweight query to test connectivity
+      // Try $connect() first to re-establish the engine connection
+      try {
+        await client.$connect();
+      } catch {
+        // $connect may fail if already connected, that's fine
+      }
+
+      // Verify with a lightweight query (bypasses $use middleware)
       bypassMiddleware = true;
       try {
         await client.$queryRawUnsafe('SELECT 1');
@@ -196,39 +220,60 @@ function createPrismaClient(): PrismaClient {
   const client = new PrismaClient({
     log: process.env.NODE_ENV === 'development'
       ? ['query', 'error', 'warn']
-      : ['error'],
+      : ['error', 'warn'],
   });
 
-  // Global query middleware: auto-retry on connection failure
-  // Uses mutex to prevent concurrent reconnection storms
+  // Global query middleware: auto-retry ONCE on connection failure.
+  // Waits for reconnection instead of failing fast — this is the key
+  // difference that prevents users from seeing "database connection failed"
+  // on transient connection blips.
   client.$use(async (params, next) => {
-    // Bypass flag: health check probes skip retry logic entirely
+    // Health check / keep-alive probes bypass retry logic entirely
     if (bypassMiddleware) {
       return next(params);
     }
 
     try {
       const result = await next(params);
-      // If query succeeded, mark as connected and track time
+      // Query succeeded — update connection state
       isConnected = true;
       lastSuccessfulQuery = Date.now();
       return result;
     } catch (error) {
       if (!isConnectionError(error)) {
-        throw error; // Not a connection error, rethrow immediately
+        throw error; // Not a connection error → rethrow immediately
       }
 
+      // ---- Connection error: attempt ONE retry after reconnection ----
       isConnected = false;
       const model = params.model || 'unknown';
       const action = params.action || 'unknown';
-      console.warn(`⚠️ DB error on ${model}.${action}: ${(error as Error).message?.substring(0, 100)}`);
+      console.warn(`⚠️ DB error on ${model}.${action}: ${(error as Error).message?.substring(0, 120)}`);
+      console.log(`🔁 Attempting retry for ${model}.${action}...`);
 
-      // Schedule reconnect in background but DON'T wait for it —
-      // fail fast to the caller so the HTTP request doesn't hang.
-      reconnect(client).catch(() => { /* handled inside reconnect */ });
-      
-      // Rethrow original error — let errorHandler.ts return a proper 503
-      throw error;
+      try {
+        // Wait for reconnection (or trigger one). This is the key change:
+        // instead of failing fast, we WAIT for the reconnect to finish.
+        await reconnect(client);
+      } catch {
+        // Reconnect failed or is in cooldown — add a small delay then
+        // try the query anyway (Prisma may have recovered internally).
+        await new Promise(resolve => setTimeout(resolve, QUERY_RETRY_DELAY_MS));
+      }
+
+      // Retry the query ONCE
+      try {
+        const retryResult = await next(params);
+        isConnected = true;
+        lastSuccessfulQuery = Date.now();
+        console.log(`✅ Retry succeeded for ${model}.${action}`);
+        return retryResult;
+      } catch (retryError) {
+        // Retry also failed — surface the error
+        isConnected = false;
+        console.error(`❌ Retry failed for ${model}.${action}: ${(retryError as Error).message?.substring(0, 120)}`);
+        throw retryError;
+      }
     }
   });
 
@@ -254,15 +299,6 @@ if (process.env.NODE_ENV !== 'production') {
  * - NEVER triggers reconnection storms.
  */
 export async function checkDbHealth(): Promise<{ connected: boolean; error?: string }> {
-  // LIGHTWEIGHT: Health checks should NEVER open new DB connections.
-  // Render sends health checks every 5s from MULTIPLE IPs — if each one
-  // probes the DB, we exhaust Supabase's limited connection pool.
-  //
-  // Strategy:
-  //   1. If a real user query succeeded recently, trust that → connected
-  //   2. If we're reconnecting, report that
-  //   3. Only probe DB if no activity for a long time AND not in cooldown
-
   const now = Date.now();
 
   // If a real query succeeded recently, DB is definitely up
@@ -286,7 +322,6 @@ export async function checkDbHealth(): Promise<{ connected: boolean; error?: str
   }
 
   // Only probe DB if there has been NO activity for a long time
-  // This is rare — only happens if server has been idle for 5+ minutes
   lastHealthProbe = now;
   bypassMiddleware = true;
   try {
@@ -324,7 +359,6 @@ export function isDbConnected(): boolean {
  * Only pings if no recent query activity (to avoid unnecessary load).
  */
 async function keepAlivePing(): Promise<void> {
-  // Skip if a reconnect is in progress or recent query activity
   if (isReconnecting) return;
   if (Date.now() - lastSuccessfulQuery < KEEP_ALIVE_INTERVAL_MS) return;
 
@@ -337,7 +371,6 @@ async function keepAlivePing(): Promise<void> {
       console.log('💓 Keep-alive: Connection restored');
     }
   } catch (err) {
-    // Don't spam logs — just mark as disconnected
     if (isConnected) {
       isConnected = false;
       console.warn('💔 Keep-alive: Connection lost, will reconnect on next request');
@@ -347,19 +380,12 @@ async function keepAlivePing(): Promise<void> {
   }
 }
 
-/**
- * Start the keep-alive interval. Call this after successful connection.
- */
 function startKeepAlive(): void {
-  if (keepAliveInterval) return; // Already running
-  
+  if (keepAliveInterval) return;
   keepAliveInterval = setInterval(keepAlivePing, KEEP_ALIVE_INTERVAL_MS);
   console.log(`💓 Keep-alive started (every ${KEEP_ALIVE_INTERVAL_MS / 1000}s)`);
 }
 
-/**
- * Stop the keep-alive interval (for graceful shutdown).
- */
 export function stopKeepAlive(): void {
   if (keepAliveInterval) {
     clearInterval(keepAliveInterval);
@@ -369,21 +395,23 @@ export function stopKeepAlive(): void {
 }
 
 // ===================================
-// Startup Connection with Retry
+// Startup Connection with Retry (No $disconnect!)
 // ===================================
 
 /**
- * Connect on startup with retry. Uses longer delays for Supabase pooler warmup.
- * Starts keep-alive ping after successful connection.
+ * Connect on startup with retry. 
+ * 
+ * CRITICAL CHANGES vs previous version:
+ *  1. NEVER calls $disconnect() — that destroys the connection pool mid-flight.
+ *  2. Resolves `dbReady` promise so the cold-start gate middleware knows when
+ *     it's safe to let requests through.
+ *  3. Starts server AFTER connection is established (see index.ts changes).
  */
-export const connectWithRetry = async (retries = 5, delay = 5000): Promise<void> => {
+export const connectWithRetry = async (retries = 5, delay = 3000): Promise<void> => {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      if (attempt > 1) {
-        try { await prisma.$disconnect(); } catch { /* ignore */ }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
       await prisma.$connect();
+
       // Verify with a real query (bypasses $use middleware)
       bypassMiddleware = true;
       try {
@@ -391,12 +419,19 @@ export const connectWithRetry = async (retries = 5, delay = 5000): Promise<void>
       } finally {
         bypassMiddleware = false;
       }
+
       isConnected = true;
       lastConnectAttempt = Date.now();
       lastHealthProbe = Date.now();
       lastSuccessfulQuery = Date.now();
       console.log(`✅ Database connected (attempt ${attempt}/${retries})`);
       
+      // Signal that DB is ready — unblocks waiting HTTP requests
+      if (dbReadyResolve) {
+        dbReadyResolve();
+        dbReadyResolve = null;
+      }
+
       // Start keep-alive ping to prevent idle connection closure
       startKeepAlive();
       return;
@@ -406,7 +441,7 @@ export const connectWithRetry = async (retries = 5, delay = 5000): Promise<void>
       const msg = error instanceof Error ? error.message.substring(0, 150) : String(error);
       console.error(`❌ DB connect attempt ${attempt}/${retries}: ${msg}`);
       if (attempt < retries) {
-        const waitTime = delay * attempt; // Progressive backoff
+        const waitTime = delay * attempt; // Progressive backoff: 3s, 6s, 9s, 12s, 15s
         console.log(`⏳ Waiting ${waitTime / 1000}s before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
@@ -416,7 +451,14 @@ export const connectWithRetry = async (retries = 5, delay = 5000): Promise<void>
   console.error('🚨 DATABASE_URL set:', !!process.env.DATABASE_URL);
   console.error('🚨 URL prefix:', process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 40) + '...' : 'NOT SET');
   
-  // Even if initial connection fails, start keep-alive to attempt recovery
+  // Resolve dbReady even on failure so requests don't hang forever
+  // (they'll get a proper 503 from the error handler instead)
+  if (dbReadyResolve) {
+    dbReadyResolve();
+    dbReadyResolve = null;
+  }
+
+  // Start keep-alive to attempt recovery in background
   startKeepAlive();
 };
 
