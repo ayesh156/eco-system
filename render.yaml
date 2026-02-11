@@ -10,9 +10,11 @@ services:
     runtime: node
     region: singapore
     plan: free
+    branch: master
     rootDir: backend
     buildCommand: npm install --include=dev && npx prisma generate && npx tsc
     startCommand: node dist/index.js
+    autoDeploy: true
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -54,9 +56,11 @@ services:
   - type: web
     name: eco-system-frontend
     runtime: static
+    branch: master
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
+    autoDeploy: true
     headers:
       - path: /assets/*
         name: Cache-Control
