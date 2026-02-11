@@ -1,9 +1,94 @@
 /**
  * PDF Generation Service
  * Generates invoice and GRN PDFs using Puppeteer - MATCHES FRONTEND EXACTLY
+ *
+ * Render.com Notes:
+ * - Full `puppeteer` package downloads Chromium automatically during npm install.
+ * - Render's Node runtime includes most Chrome deps, but we must pass --no-sandbox
+ *   and --disable-dev-shm-usage for the container environment.
+ * - On Render free tier (512MB RAM), each PDF generation can spike to ~200-300MB.
+ *   Always close the browser in `finally` to prevent leaks.
  */
 
 import puppeteer from 'puppeteer';
+import { execSync } from 'child_process';
+
+// ===================================
+// Puppeteer Launch Configuration for Cloud Environments (Render, Railway, etc.)
+// ===================================
+
+/**
+ * Detect Chrome/Chromium executable path for the current environment.
+ * Priority:
+ *   1. PUPPETEER_EXECUTABLE_PATH env var (explicit override)
+ *   2. Puppeteer's bundled Chromium (default `puppeteer` behavior)
+ *   3. System-installed google-chrome / chromium-browser (fallback for Docker / buildpacks)
+ */
+function getChromiumPath(): string | undefined {
+  // 1. Explicit env var (used in Docker / custom Render setup)
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    console.log(`🔧 Using PUPPETEER_EXECUTABLE_PATH: ${process.env.PUPPETEER_EXECUTABLE_PATH}`);
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
+  // 2. Let Puppeteer use its bundled Chromium (works on Render's Node runtime)
+  //    Returning undefined tells puppeteer.launch() to use its own binary.
+  if (process.env.NODE_ENV !== 'production') {
+    return undefined;
+  }
+
+  // 3. In production, try system Chrome as fallback (e.g., if buildpack installed it)
+  const candidates = [
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+  ];
+  try {
+    const { existsSync } = require('fs');
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) {
+        console.log(`🔧 Found system Chrome at: ${candidate}`);
+        return candidate;
+      }
+    }
+  } catch {
+    // fs not available or error — fall through
+  }
+
+  // No system Chrome found — puppeteer will use its bundled one
+  return undefined;
+}
+
+/**
+ * Launch args optimized for containerized cloud environments.
+ * - --no-sandbox: Required inside Docker/Render containers (no user namespaces)
+ * - --disable-dev-shm-usage: /dev/shm is tiny on containers; use /tmp instead
+ * - --disable-gpu: No GPU on cloud servers
+ * - --single-process: Reduces memory footprint (~50MB savings)
+ * - --disable-extensions: No extensions needed for PDF generation
+ * - --font-render-hinting=none: Consistent font rendering across environments
+ */
+const PUPPETEER_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  '--disable-software-rasterizer',
+  '--single-process',
+  '--no-zygote',
+  '--disable-extensions',
+  '--disable-background-networking',
+  '--disable-default-apps',
+  '--disable-sync',
+  '--disable-translate',
+  '--font-render-hinting=none',
+  '--hide-scrollbars',
+  '--mute-audio',
+];
+
+/** Max time to wait for page.setContent + page.pdf combined */
+const PDF_GENERATION_TIMEOUT_MS = 30000; // 30s
 
 // Invoice item interface
 interface InvoiceItem {
@@ -756,17 +841,30 @@ export const generateInvoicePDF = async (data: InvoicePDFData): Promise<Buffer> 
   let browser = null;
   
   try {
-    // Launch headless browser
+    const executablePath = getChromiumPath();
+    console.log('📄 Launching Puppeteer for Invoice PDF...');
+    
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      executablePath,  // undefined = use bundled Chromium
+      args: PUPPETEER_ARGS,
+      timeout: PDF_GENERATION_TIMEOUT_MS,
+      protocolTimeout: PDF_GENERATION_TIMEOUT_MS,
     });
     
     const page = await browser.newPage();
     
-    // Set the HTML content
+    // Set the HTML content — use 'load' instead of 'networkidle0' for reliability
+    // on cloud environments. 'networkidle0' waits for zero network activity for
+    // 500ms which can hang if there are background requests or slow DNS.
     const html = generateInvoiceHTML(data);
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, {
+      waitUntil: 'load',
+      timeout: PDF_GENERATION_TIMEOUT_MS,
+    });
+    
+    // Brief pause for CSS rendering to complete
+    await new Promise(resolve => setTimeout(resolve, 200));
     
     // Generate PDF
     const pdfBuffer = await page.pdf({
@@ -778,12 +876,22 @@ export const generateInvoicePDF = async (data: InvoicePDFData): Promise<Buffer> 
         bottom: '10mm',
         left: '12mm',
       },
+      timeout: PDF_GENERATION_TIMEOUT_MS,
     });
     
+    console.log(`✅ Invoice PDF generated (${Buffer.from(pdfBuffer).length} bytes)`);
     return Buffer.from(pdfBuffer);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Invoice PDF generation failed: ${message}`);
+    throw new Error(`PDF generation failed: ${message}`);
   } finally {
     if (browser) {
-      await browser.close();
+      try {
+        await browser.close();
+      } catch {
+        // Browser may already be closed on error
+      }
     }
   }
 };
@@ -1621,17 +1729,28 @@ export const generateGRNPDF = async (data: GRNPDFData): Promise<Buffer> => {
   let browser = null;
   
   try {
-    // Launch headless browser
+    const executablePath = getChromiumPath();
+    console.log('📄 Launching Puppeteer for GRN PDF...');
+    
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      executablePath,  // undefined = use bundled Chromium
+      args: PUPPETEER_ARGS,
+      timeout: PDF_GENERATION_TIMEOUT_MS,
+      protocolTimeout: PDF_GENERATION_TIMEOUT_MS,
     });
     
     const page = await browser.newPage();
     
-    // Set the HTML content
+    // Set the HTML content — use 'load' instead of 'networkidle0'
     const html = generateGRNHTML(data);
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, {
+      waitUntil: 'load',
+      timeout: PDF_GENERATION_TIMEOUT_MS,
+    });
+    
+    // Brief pause for CSS rendering to complete
+    await new Promise(resolve => setTimeout(resolve, 200));
     
     // Generate PDF
     const pdfBuffer = await page.pdf({
@@ -1643,12 +1762,22 @@ export const generateGRNPDF = async (data: GRNPDFData): Promise<Buffer> => {
         bottom: '10mm',
         left: '12mm',
       },
+      timeout: PDF_GENERATION_TIMEOUT_MS,
     });
     
+    console.log(`✅ GRN PDF generated (${Buffer.from(pdfBuffer).length} bytes)`);
     return Buffer.from(pdfBuffer);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`❌ GRN PDF generation failed: ${message}`);
+    throw new Error(`PDF generation failed: ${message}`);
   } finally {
     if (browser) {
-      await browser.close();
+      try {
+        await browser.close();
+      } catch {
+        // Browser may already be closed on error
+      }
     }
   }
 };

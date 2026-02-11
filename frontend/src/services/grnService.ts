@@ -583,9 +583,9 @@ export const sendEmailWithPDF = async (
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // 120s timeout (30s SMTP timeout × 2 attempts + PDF generation + network overhead)
+    // 210s timeout (60s SMTP timeout × 3 attempts + delays + PDF generation + network overhead)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    const timeoutId = setTimeout(() => controller.abort(), 210000);
 
     const response = await fetch(url, {
       method: 'POST',

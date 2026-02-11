@@ -41,6 +41,12 @@ let currentPort: number | null = null;
 /**
  * Create a transporter for a specific port.
  * Port 587 = STARTTLS, Port 465 = Direct SSL
+ *
+ * RENDER.COM TIMEOUTS:
+ * Render's Singapore servers have higher latency to Gmail SMTP (~100-300ms RTT).
+ * The TLS handshake alone can take 3-5s. 15s connectionTimeout was cutting it
+ * too close — any DNS hiccup or cold SMTP connection caused instant timeout.
+ * New values: 30s connection, 20s greeting, 45s socket, 15s DNS.
  */
 const createTransporterForPort = (port: number): Transporter => {
   const config = getEmailConfig();
@@ -52,18 +58,20 @@ const createTransporterForPort = (port: number): Transporter => {
     secure: useDirectSSL, // true for 465 (SSL), false for 587 (STARTTLS)
     auth: config.auth,
     pool: false,
-    // Tight timeouts — fail fast, don't hang
-    connectionTimeout: 15000,  // 15s to establish TCP connection
-    greetingTimeout: 10000,    // 10s for SMTP greeting
-    socketTimeout: 30000,      // 30s for socket inactivity
+    // Cloud-friendly timeouts (Render Singapore → Gmail SMTP)
+    connectionTimeout: 30000,  // 30s to establish TCP + TLS connection
+    greetingTimeout: 20000,    // 20s for SMTP EHLO/greeting exchange
+    socketTimeout: 45000,      // 45s for socket inactivity (large PDF attachments)
     tls: {
       rejectUnauthorized: false,
       minVersion: 'TLSv1.2',
     },
-    dnsTimeout: 10000,
+    dnsTimeout: 15000,         // 15s for DNS resolution on cloud
+    // Enable debug logging in development
+    ...(process.env.NODE_ENV !== 'production' && { debug: true, logger: true }),
   };
 
-  console.log(`📧 Creating SMTP transporter: ${config.host}:${port} (secure: ${useDirectSSL}, pool: false)`);
+  console.log(`📧 Creating SMTP transporter: ${config.host}:${port} (secure: ${useDirectSSL}, pool: false, connTimeout: 30s, socketTimeout: 45s)`);
   return nodemailer.createTransport(transportOptions);
 };
 
@@ -110,35 +118,41 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise
 /**
  * Send email with automatic retry on connection failures.
  * Attempt 1: Uses configured port (typically 587/STARTTLS).
- * Attempt 2: Falls back to port 465 (direct SSL) if attempt 1 fails.
- * Each attempt has a 45s hard timeout.
+ * Attempt 2: Falls back to alternate port (465 SSL or vice versa).
+ * Attempt 3: Retries the primary port with a completely fresh transporter.
+ * Each attempt has a 60s hard timeout.
+ *
+ * The 3-attempt strategy handles:
+ * - Transient DNS issues (attempt 1 fails, attempt 2 or 3 succeeds)
+ * - Stale TLS sessions (reset transporter between attempts)
+ * - Port-specific blocking (some cloud providers block 587 but allow 465)
  */
 const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string }> => {
-  const SEND_TIMEOUT = 45000; // 45s hard timeout per attempt
+  const SEND_TIMEOUT = 60000; // 60s hard timeout per attempt (was 45s — too tight for Render)
   const config = getEmailConfig();
   const primaryPort = config.port;
   const fallbackPort = primaryPort === 465 ? 587 : 465;
   
   // Attempt 1: Primary port (configured port, usually 587)
   try {
-    console.log(`📧 [Attempt 1] Sending via port ${primaryPort}...`);
+    console.log(`📧 [Attempt 1/3] Sending via port ${primaryPort}...`);
     const transport = getTransporter(primaryPort);
     const result = await withTimeout(
       transport.sendMail(mailOptions),
       SEND_TIMEOUT,
       `SMTP port ${primaryPort} (attempt 1)`
     );
-    console.log('✅ [Attempt 1] Email sent, messageId:', result.messageId);
+    console.log('✅ [Attempt 1/3] Email sent, messageId:', result.messageId);
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.warn(`⚠️ [Attempt 1] Port ${primaryPort} failed: ${errorMessage}`);
+    console.warn(`⚠️ [Attempt 1/3] Port ${primaryPort} failed: ${errorMessage}`);
     resetTransporter();
   }
     
   // Attempt 2: Fallback port (465 SSL if primary was 587, or vice versa)
-  console.log(`📧 [Attempt 2] Falling back to port ${fallbackPort} after 2s delay...`);
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  console.log(`📧 [Attempt 2/3] Falling back to port ${fallbackPort} after 3s delay...`);
+  await new Promise(resolve => setTimeout(resolve, 3000));
   
   try {
     const retryTransport = getTransporter(fallbackPort);
@@ -147,13 +161,40 @@ const sendMailWithRetry = async (mailOptions: any): Promise<{ messageId: string 
       SEND_TIMEOUT,
       `SMTP port ${fallbackPort} (attempt 2)`
     );
-    console.log(`✅ [Attempt 2] Email sent via port ${fallbackPort}, messageId:`, result.messageId);
+    console.log(`✅ [Attempt 2/3] Email sent via port ${fallbackPort}, messageId:`, result.messageId);
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown';
-    console.error(`❌ [Attempt 2] Port ${fallbackPort} also failed: ${errorMessage}`);
+    console.warn(`⚠️ [Attempt 2/3] Port ${fallbackPort} failed: ${errorMessage}`);
     resetTransporter();
-    throw error;
+  }
+
+  // Attempt 3: Retry primary port with completely fresh transporter
+  // This handles stale DNS cache / TLS session issues on long-running Render servers
+  console.log(`📧 [Attempt 3/3] Retrying port ${primaryPort} with fresh transporter after 3s...`);
+  await new Promise(resolve => setTimeout(resolve, 3000));
+  
+  try {
+    // Force-create a brand new transporter (bypasses cache)
+    const freshTransport = createTransporterForPort(primaryPort);
+    const result = await withTimeout(
+      freshTransport.sendMail(mailOptions),
+      SEND_TIMEOUT,
+      `SMTP port ${primaryPort} (attempt 3 - fresh)`
+    );
+    console.log(`✅ [Attempt 3/3] Email sent via fresh transporter, messageId:`, result.messageId);
+    // Update the cached transporter to this working one
+    transporter = freshTransport;
+    currentPort = primaryPort;
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown';
+    console.error(`❌ [Attempt 3/3] All attempts failed. Last error: ${errorMessage}`);
+    console.error(`🚨 SMTP Diagnostics: host=${config.host}, ports tried=${primaryPort},${fallbackPort},${primaryPort}`);
+    console.error(`🚨 Make sure SMTP_HOST, SMTP_USER, SMTP_PASS env vars are set on Render.`);
+    console.error(`🚨 If using Gmail, ensure you\'re using an App Password (not account password).`);
+    resetTransporter();
+    throw new Error(`Failed to send email: Connection timeout (all 3 attempts failed). Check SMTP configuration.`);
   }
 };
 

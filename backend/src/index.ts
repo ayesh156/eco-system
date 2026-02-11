@@ -443,6 +443,35 @@ app.get(`${API_PREFIX}/test`, async (_req, res) => {
   res.status(200).send(html);
 });
 
+// ===================================
+// ROUTE-LEVEL TIMEOUT FOR HEAVY OPERATIONS
+// ===================================
+// Email sending (3 SMTP attempts × 60s each) and PDF generation (Puppeteer ~30s)
+// need much longer than Express's default 120s. Without this, the client gets
+// a "socket hang up" or empty response before the operation completes.
+const HEAVY_ROUTE_TIMEOUT_MS = 210000; // 3.5 minutes
+
+const extendTimeout = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  req.setTimeout(HEAVY_ROUTE_TIMEOUT_MS);
+  res.setTimeout(HEAVY_ROUTE_TIMEOUT_MS);
+  next();
+};
+
+// Apply extended timeout to email and PDF routes BEFORE the route handlers
+app.use(`${API_PREFIX}/invoices`, (req, res, next) => {
+  // Only extend timeout for email/PDF endpoints, not regular CRUD
+  if (req.path.includes('send-email') || req.path.includes('/pdf')) {
+    return extendTimeout(req, res, next);
+  }
+  next();
+});
+app.use(`${API_PREFIX}/grns`, (req, res, next) => {
+  if (req.path.includes('send-email') || req.path.includes('/pdf')) {
+    return extendTimeout(req, res, next);
+  }
+  next();
+});
+
 // Routes
 app.use(`${API_PREFIX}/auth`, authRoutes);
 app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
