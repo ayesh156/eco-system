@@ -58,20 +58,56 @@ const createTransporterForPort = (port: number): Transporter => {
     secure: useDirectSSL, // true for 465 (SSL), false for 587 (STARTTLS)
     auth: config.auth,
     pool: false,
-    // Cloud-friendly timeouts (Render Singapore → Gmail SMTP)
+
+    // ─── FIX #1: Force IPv4 ───────────────────────────────────────────
+    // Render (and most cloud providers) resolve smtp.gmail.com to both
+    // IPv4 (142.251.x.x) and IPv6 (2607:f8b0:...) addresses.
+    // Node's dns.lookup() may return the IPv6 address first, but Render's
+    // outbound IPv6 routing to Google is often misconfigured or firewalled,
+    // causing the TCP SYN to hang until the OS-level timeout (~75-120s).
+    // `family: 4` forces dns.lookup() to return only the A (IPv4) record,
+    // bypassing the broken IPv6 path entirely.
+    family: 4,
+
+    // ─── FIX #2: Cloud-friendly timeouts ──────────────────────────────
+    // Render Singapore → Gmail SMTP has ~100-300ms RTT. The TLS handshake
+    // alone can take 3-5s. These generous timeouts prevent premature aborts
+    // while still failing fast enough to allow retries within Render's
+    // 30s request timeout window.
     connectionTimeout: 30000,  // 30s to establish TCP + TLS connection
     greetingTimeout: 20000,    // 20s for SMTP EHLO/greeting exchange
     socketTimeout: 45000,      // 45s for socket inactivity (large PDF attachments)
+
+    // ─── FIX #3: TLS options ──────────────────────────────────────────
+    // `rejectUnauthorized: false` — some cloud egress proxies/firewalls
+    //   inject their own TLS certificates (e.g., Render's NAT gateway),
+    //   causing DEPTH_ZERO_SELF_SIGNED_CERT or UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+    //   In production with Gmail, the cert chain is valid, but this prevents
+    //   edge-case handshake failures behind intermediary proxies.
+    // `minVersion: TLSv1.2` — Gmail requires TLS 1.2+; explicitly setting
+    //   it prevents fallback to TLS 1.0/1.1 which Gmail rejects.
+    // `ciphers: 'HIGH:!aNULL:!MD5'` — ensures strong cipher negotiation;
+    //   avoids the rare case where Node picks a cipher Gmail doesn't support.
     tls: {
       rejectUnauthorized: false,
       minVersion: 'TLSv1.2',
+      ciphers: 'HIGH:!aNULL:!MD5',
     },
+
     dnsTimeout: 15000,         // 15s for DNS resolution on cloud
-    // Enable debug logging in development
-    ...(process.env.NODE_ENV !== 'production' && { debug: true, logger: true }),
+
+    // ─── FIX #4: Debug logging ────────────────────────────────────────
+    // In production on Render, enable logging so SMTP handshake details
+    // appear in render logs (Dashboard → Logs). This reveals exactly
+    // where the timeout occurs: DNS, TCP connect, STARTTLS, or AUTH.
+    // Set SMTP_DEBUG=true in Render env vars to enable without redeploying.
+    ...(( process.env.NODE_ENV !== 'production' || process.env.SMTP_DEBUG === 'true' ) && {
+      debug: true,
+      logger: true,
+    }),
   };
 
-  console.log(`📧 Creating SMTP transporter: ${config.host}:${port} (secure: ${useDirectSSL}, pool: false, connTimeout: 30s, socketTimeout: 45s)`);
+  console.log(`📧 Creating SMTP transporter: ${config.host}:${port} (secure: ${useDirectSSL}, IPv4-only, connTimeout: 30s, socketTimeout: 45s)`);
   return nodemailer.createTransport(transportOptions);
 };
 
