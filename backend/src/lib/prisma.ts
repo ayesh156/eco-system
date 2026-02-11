@@ -32,15 +32,17 @@ function ensurePoolerParams(): void {
   // Connection pool settings:
   // Supabase free tier has ~15 pooled connections globally.
   // Prisma opens connection_limit connections per PrismaClient instance.
-  // On Render free tier we want EXACTLY 1 to minimise pool contention.
-  // Prisma's internal pool will queue requests when the single conn is busy,
-  // which is fine for low QPS.
-  if (!url.includes('connection_limit=')) params.push('connection_limit=1');
+  // With connection_limit=3, Prisma maintains up to 3 TCP connections.
+  // This prevents head-of-line blocking — if one connection drops, the
+  // other 2 can still serve queries. 3 out of 15 is safe for one instance.
+  // NEVER use connection_limit=1 — a single dropped connection kills ALL queries.
+  if (!url.includes('connection_limit=')) params.push('connection_limit=3');
   
   // Pool timeout: how long Prisma waits to get a connection from its OWN pool.
-  // 60s is generous enough for cold-start scenarios where the single connection
-  // is temporarily busy with the startup SELECT 1.
-  if (!url.includes('pool_timeout=')) params.push('pool_timeout=60');
+  // 20s is long enough for burst traffic but short enough that users see a
+  // proper error instead of an infinite hang. Must be SHORTER than the HTTP
+  // layer timeout (DB gate = 45s, Render = 60s) so Prisma fails first.
+  if (!url.includes('pool_timeout=')) params.push('pool_timeout=20');
   
   // Connect timeout: how long to wait for a NEW TCP connection to Supabase.
   // 30s handles cross-region latency + cold Supabase wakeup.
@@ -60,7 +62,8 @@ function ensurePoolerParams(): void {
   if (params.length > 0) {
     process.env.DATABASE_URL = url + separator + params.join('&');
     console.log('🔧 Auto-added PgBouncer + TCP keep-alive params to DATABASE_URL');
-    console.log('   connection_limit=1 | pool_timeout=60 | connect_timeout=30');
+    console.log('   connection_limit=3 | pool_timeout=20 | connect_timeout=30');
+    console.log('   keepalives=1 | idle=30s | interval=10s | count=3');
   }
 }
 
@@ -93,12 +96,14 @@ export const dbReady: Promise<void> = new Promise((resolve) => {
 });
 
 // Timing constants tuned for Render + Supabase:
-const RECONNECT_COOLDOWN_MS = 10000;  // 10s cooldown between reconnect attempts (was 20s)
-const RECONNECT_PAUSE_MS = 1500;       // Brief pause before reconnect probe
-const HEALTH_PROBE_INTERVAL_MS = 300000;
-const RECENT_ACTIVITY_MS = 60000;
-const KEEP_ALIVE_INTERVAL_MS = 25000;
-const QUERY_RETRY_DELAY_MS = 2000;     // Delay before retrying a failed query
+// Faster recovery is critical — Render's free tier cold-starts must resolve
+// within 45s or users get 503. Every second counts.
+const RECONNECT_COOLDOWN_MS = 5000;    // 5s cooldown between reconnect attempts
+const RECONNECT_PAUSE_MS = 500;        // Brief pause before reconnect probe
+const HEALTH_PROBE_INTERVAL_MS = 300000; // 5min between health probes
+const RECENT_ACTIVITY_MS = 60000;      // 1min — consider DB active if recent query
+const KEEP_ALIVE_INTERVAL_MS = 20000;  // 20s ping — MUST be shorter than PgBouncer idle timeout (~60s)
+const QUERY_RETRY_DELAY_MS = 1000;     // 1s delay before retrying a failed query
 
 // ===================================
 // Connection Error Detection
@@ -152,7 +157,7 @@ function isConnectionError(error: any): boolean {
 /**
  * Reconnect with mutex to prevent concurrent reconnection storms.
  * If already reconnecting, all callers wait for the SAME promise.
- * 10s cooldown between attempts.
+ * 5s cooldown between attempts.
  */
 async function reconnect(client: PrismaClient): Promise<void> {
   // If already reconnecting, piggyback on the existing attempt
@@ -165,7 +170,9 @@ async function reconnect(client: PrismaClient): Promise<void> {
   if (now - lastConnectAttempt < RECONNECT_COOLDOWN_MS) {
     const remaining = Math.round((RECONNECT_COOLDOWN_MS - (now - lastConnectAttempt)) / 1000);
     console.log(`⏳ Reconnect cooldown active (${remaining}s remaining)`);
-    throw new Error(`Reconnect cooldown active (${remaining}s remaining)`);
+    // Don't throw — let the caller fall through to query retry.
+    // Throwing here previously caused instant failures during cooldown.
+    return;
   }
 
   isReconnecting = true;
@@ -383,7 +390,7 @@ async function keepAlivePing(): Promise<void> {
 function startKeepAlive(): void {
   if (keepAliveInterval) return;
   keepAliveInterval = setInterval(keepAlivePing, KEEP_ALIVE_INTERVAL_MS);
-  console.log(`💓 Keep-alive started (every ${KEEP_ALIVE_INTERVAL_MS / 1000}s)`);
+  console.log(`💓 Keep-alive started (every ${KEEP_ALIVE_INTERVAL_MS / 1000}s — Supabase PgBouncer idle timeout is ~60s)`);
 }
 
 export function stopKeepAlive(): void {
@@ -407,7 +414,7 @@ export function stopKeepAlive(): void {
  *     it's safe to let requests through.
  *  3. Starts server AFTER connection is established (see index.ts changes).
  */
-export const connectWithRetry = async (retries = 5, delay = 3000): Promise<void> => {
+export const connectWithRetry = async (retries = 5, delay = 2000): Promise<void> => {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       await prisma.$connect();
@@ -441,7 +448,7 @@ export const connectWithRetry = async (retries = 5, delay = 3000): Promise<void>
       const msg = error instanceof Error ? error.message.substring(0, 150) : String(error);
       console.error(`❌ DB connect attempt ${attempt}/${retries}: ${msg}`);
       if (attempt < retries) {
-        const waitTime = delay * attempt; // Progressive backoff: 3s, 6s, 9s, 12s, 15s
+        const waitTime = delay * attempt; // Progressive backoff: 2s, 4s, 6s, 8s, 10s (total=30s max)
         console.log(`⏳ Waiting ${waitTime / 1000}s before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }

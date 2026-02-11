@@ -150,9 +150,11 @@ app.get('/health', (_req, res) => {
 // DB connection is ready. Without this middleware, those requests get an instant
 // 503 "Database connection failed".
 //
-// This gate holds API requests for up to 30s, waiting for the DB to connect.
+// This gate holds API requests for up to 45s, waiting for the DB to connect.
+// Must be >= connectWithRetry's max duration (5 attempts × 2s backoff = ~30s
+// + connect_timeout overhead). 45s gives comfortable headroom.
 // Health checks (above) are exempt so Render doesn't think the service is dead.
-const DB_GATE_TIMEOUT_MS = 30000;
+const DB_GATE_TIMEOUT_MS = 45000;
 
 app.use(`${API_PREFIX}`, async (req, res, next) => {
   // If DB is already connected, proceed immediately (hot path — no overhead)
@@ -481,7 +483,7 @@ const startServer = async () => {
 
   // Then connect to DB (requests are held by the cold-start gate middleware)
   try {
-    await connectWithRetry(5, 3000);
+    await connectWithRetry(5, 2000); // 5 attempts, 2s progressive backoff (2,4,6,8,10s = 30s max)
     console.log('📦 Database initialization complete');
   } catch (err) {
     console.error('⚠️ Database pre-connect failed, per-request retry is still active:', err instanceof Error ? err.message : err);
