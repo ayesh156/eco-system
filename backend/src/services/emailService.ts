@@ -29,10 +29,35 @@ const getEmailConfig = (): EmailConfig => {
   const pass = process.env.SMTP_PASS || '';
 
   if (!user || !pass) {
-    console.warn('⚠️  WARNING: SMTP credentials not configured. Email sending will fail.');
+    // Only warn if Resend is also not configured
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('⚠️  WARNING: Neither SMTP credentials nor RESEND_API_KEY configured. Email sending will fail.');
+    }
   }
 
   return { user, pass };
+};
+
+/**
+ * Check if ANY email provider is available (Resend HTTP API or SMTP)
+ */
+const isEmailConfigured = (): boolean => {
+  // Resend HTTP API is the primary provider
+  if (process.env.RESEND_API_KEY) return true;
+  // SMTP is the fallback
+  const config = getEmailConfig();
+  return !!(config.user && config.pass);
+};
+
+/**
+ * Get the best "from" address for emails.
+ * Uses SMTP_FROM_EMAIL/SMTP_FROM_NAME if set, otherwise falls back to defaults.
+ * When using Resend, the from field gets overridden in sendViaResend anyway.
+ */
+const getFromField = (displayName: string): string => {
+  const fromName = process.env.SMTP_FROM_NAME || displayName;
+  const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@system.com';
+  return `"${fromName}" <${fromEmail}>`;
 };
 
 // Create reusable transporter (SMTP fallback only)
@@ -661,20 +686,18 @@ ${data.shopWebsite || ''}
  */
 export const sendInvoiceEmail = async (data: InvoiceEmailData): Promise<{ success: boolean; messageId?: string; error?: string }> => {
   try {
-    const config = getEmailConfig();
-    
-    // Check if SMTP is configured
-    if (!config.user || !config.pass) {
-      console.error('❌ SMTP not configured. Cannot send invoice email.');
+    // Check if ANY email provider is configured (Resend OR SMTP)
+    if (!isEmailConfigured()) {
+      console.error('❌ No email provider configured. Cannot send invoice email.');
       if (process.env.NODE_ENV !== 'production') {
         console.log('📧 [DEV MODE] Invoice email would be sent to:', data.email);
         return { success: true, messageId: 'dev-mode-no-email-sent' };
       }
-      return { success: false, error: 'Email service not configured' };
+      return { success: false, error: 'Email service not configured. Set RESEND_API_KEY or SMTP credentials.' };
     }
 
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
-    const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@system.com';
 
     console.log(`📤 Sending invoice email to: ${data.email}`);
 
@@ -706,20 +729,18 @@ export const sendInvoiceWithPDF = async (
   pdfBuffer: Buffer
 ): Promise<{ success: boolean; messageId?: string; error?: string }> => {
   try {
-    const config = getEmailConfig();
-    
-    // Check if SMTP is configured
-    if (!config.user || !config.pass) {
-      console.error('❌ SMTP not configured. Cannot send invoice email with PDF.');
+    // Check if ANY email provider is configured (Resend OR SMTP)
+    if (!isEmailConfigured()) {
+      console.error('❌ No email provider configured. Cannot send invoice email with PDF.');
       if (process.env.NODE_ENV !== 'production') {
         console.log('📧 [DEV MODE] Invoice email with PDF would be sent to:', data.email);
         return { success: true, messageId: 'dev-mode-no-email-sent' };
       }
-      return { success: false, error: 'Email service not configured' };
+      return { success: false, error: 'Email service not configured. Set RESEND_API_KEY or SMTP credentials.' };
     }
 
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
-    const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@system.com';
 
     console.log(`📤 Sending invoice email with PDF attachment to: ${data.email}`);
 
@@ -942,21 +963,19 @@ interface SendOTPResult {
  */
 export const sendPasswordResetOTP = async (data: OTPEmailData): Promise<SendOTPResult> => {
   try {
-    const config = getEmailConfig();
-    
-    // Check if SMTP is configured
-    if (!config.user || !config.pass) {
-      console.error('❌ SMTP not configured. Cannot send email.');
+    // Check if ANY email provider is configured (Resend OR SMTP)
+    if (!isEmailConfigured()) {
+      console.error('❌ No email provider configured. Cannot send email.');
       // In development, log the OTP to console
       if (process.env.NODE_ENV !== 'production') {
         console.log('📧 [DEV MODE] Password Reset OTP for', data.email, ':', data.otp);
         return { success: true, messageId: 'dev-mode-no-email-sent' };
       }
-      return { success: false, error: 'Email service not configured' };
+      return { success: false, error: 'Email service not configured. Set RESEND_API_KEY or SMTP credentials.' };
     }
 
     const fromName = process.env.SMTP_FROM_NAME || 'ECOTEC System';
-    const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@system.com';
 
     console.log(`📤 Attempting to send OTP email to: ${data.email}`);
 
@@ -993,15 +1012,21 @@ export const generateOTP = (): string => {
  */
 export const verifyEmailConnection = async (): Promise<boolean> => {
   try {
+    // If Resend is configured, we're good (no SMTP verification needed)
+    if (process.env.RESEND_API_KEY) {
+      console.log('✅ Email service: Resend API key configured');
+      return true;
+    }
+
     const config = getEmailConfig();
     if (!config.user || !config.pass) {
-      console.warn('⚠️  SMTP credentials not set. Email verification skipped.');
+      console.warn('⚠️  No email provider configured. Set RESEND_API_KEY or SMTP credentials.');
       return false;
     }
 
     const transport = getTransporter();
     await transport.verify();
-    console.log('✅ Email service connected successfully');
+    console.log('✅ Email service: SMTP connected successfully');
     return true;
   } catch (error) {
     console.error('❌ Email service connection failed:', error);
@@ -1349,20 +1374,18 @@ export const sendGRNWithPDF = async (
   pdfBase64?: string
 ): Promise<{ success: boolean; messageId?: string; error?: string; hasPdfAttachment?: boolean }> => {
   try {
-    const config = getEmailConfig();
-    
-    // Check if SMTP is configured
-    if (!config.user || !config.pass) {
-      console.error('❌ SMTP not configured. Cannot send GRN email.');
+    // Check if ANY email provider is configured (Resend OR SMTP)
+    if (!isEmailConfigured()) {
+      console.error('❌ No email provider configured. Cannot send GRN email.');
       if (process.env.NODE_ENV !== 'production') {
         console.log('📧 [DEV MODE] GRN email would be sent to:', data.email);
         return { success: true, messageId: 'dev-mode-no-email-sent', hasPdfAttachment: !!pdfBase64 };
       }
-      return { success: false, error: 'Email service not configured' };
+      return { success: false, error: 'Email service not configured. Set RESEND_API_KEY or SMTP credentials.' };
     }
 
     const fromName = process.env.SMTP_FROM_NAME || data.shopName;
-    const fromEmail = process.env.SMTP_FROM_EMAIL || config.user;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@system.com';
 
     console.log(`📤 Sending GRN email to: ${data.email}`);
 
