@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, LogIn, AlertCircle, CheckCircle } from 'lucide-react';
+import { getRefreshToken, getCachedUser } from '../services/authService';
 
 export const Login: React.FC = () => {
   const { theme } = useTheme();
@@ -62,8 +63,11 @@ export const Login: React.FC = () => {
     }
   };
 
-  // Show loading while checking authentication
-  if (isLoading) {
+  // Show loading ONLY if there's a possible session to restore
+  // (has refresh token or cached user). For new browsers with no tokens,
+  // show the login form immediately - no loading spinner needed.
+  const hasPossibleSession = !!getRefreshToken() || !!getCachedUser();
+  if (isLoading && hasPossibleSession) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${
         theme === 'dark' 
@@ -77,7 +81,7 @@ export const Login: React.FC = () => {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
           </div>
-          <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Loading...</p>
+          <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Checking session...</p>
         </div>
       </div>
     );

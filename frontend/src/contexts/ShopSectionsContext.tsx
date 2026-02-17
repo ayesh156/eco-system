@@ -282,6 +282,12 @@ export const ShopSectionsProvider: React.FC<{ children: ReactNode }> = ({ childr
       fetchHiddenSections(true);
     } else if (effectiveShopId && !hasInitialized) {
       fetchHiddenSections(false);
+    } else if (!effectiveShopId) {
+      // No shop/auth - clear loading state so UI doesn't hang on login page
+      setHiddenSections([]);
+      setAdminHiddenSections([]);
+      setIsLoading(false);
+      setHasInitialized(true);
     }
   }, [effectiveShopId, lastFetchedShopId, hasInitialized, fetchHiddenSections]);
 

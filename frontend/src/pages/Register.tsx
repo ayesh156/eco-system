@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, User, UserPlus, AlertCircle, Check } from 'lucide-react';
+import { getRefreshToken, getCachedUser } from '../services/authService';
 
 export const Register: React.FC = () => {
   const { theme } = useTheme();
@@ -94,8 +95,9 @@ export const Register: React.FC = () => {
     }
   };
 
-  // Show loading while checking authentication
-  if (isLoading) {
+  // Show loading ONLY if there's a possible session to restore
+  const hasPossibleSession = !!getRefreshToken() || !!getCachedUser();
+  if (isLoading && hasPossibleSession) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${
         theme === 'dark' 
