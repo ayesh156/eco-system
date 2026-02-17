@@ -3,7 +3,7 @@
  * Handles all invoice-related API calls to the backend
  */
 
-import { getAccessToken } from './authService';
+import { fetchWithAuth, handleAuthResponse, getAuthHeaders, getAccessToken } from '../lib/fetchWithAuth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
@@ -166,24 +166,8 @@ interface APIResponse<T> {
 // Helper Functions
 // ===================================
 
-// Helper to get authorization headers
-const getAuthHeaders = (): Record<string, string> => {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-};
-
 const handleResponse = async <T>(response: Response): Promise<T> => {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Network error' }));
-    throw new Error(error.message || `HTTP error! status: ${response.status}`);
-  }
-  return response.json();
+  return handleAuthResponse<T>(response);
 };
 
 // Convert backend status to frontend status (lowercase)
@@ -267,7 +251,7 @@ export const invoiceService = {
     if (params.shopId) queryParams.append('shopId', params.shopId);
 
     const url = `${API_BASE_URL}/invoices?${queryParams.toString()}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APIInvoice[]>>(response);
@@ -282,7 +266,7 @@ export const invoiceService = {
    * Get a single invoice by ID
    */
   async getById(id: string): Promise<APIInvoice> {
-    const response = await fetch(`${API_BASE_URL}/invoices/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/invoices/${id}`, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APIInvoice>>(response);
@@ -295,7 +279,7 @@ export const invoiceService = {
   async create(data: CreateInvoiceData, shopId?: string): Promise<APIInvoice> {
     console.log('📝 Creating invoice with data:', data);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/invoices${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/invoices${queryParams}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -311,7 +295,7 @@ export const invoiceService = {
   async update(id: string, data: UpdateInvoiceData, shopId?: string): Promise<APIInvoice> {
     console.log('📝 Updating invoice with ID:', id, 'Data:', data);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/invoices/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/invoices/${id}${queryParams}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -325,7 +309,7 @@ export const invoiceService = {
    */
   async delete(id: string, shopId?: string): Promise<void> {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/invoices/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/invoices/${id}${queryParams}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -337,7 +321,7 @@ export const invoiceService = {
    */
   async addPayment(invoiceId: string, data: AddPaymentData, shopId?: string): Promise<{ payment: APIInvoicePayment; invoice: APIInvoice }> {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/payments${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/invoices/${invoiceId}/payments${queryParams}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -350,7 +334,7 @@ export const invoiceService = {
    * Get invoice statistics
    */
   async getStats(): Promise<APIInvoiceStats> {
-    const response = await fetch(`${API_BASE_URL}/invoices/stats`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/invoices/stats`, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APIInvoiceStats>>(response);
@@ -365,7 +349,7 @@ export const invoiceService = {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
     try {
-      const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email${queryParams}`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/invoices/${invoiceId}/send-email${queryParams}`, {
         method: 'POST',
         headers: getAuthHeaders(),
         signal: controller.signal,
@@ -394,7 +378,7 @@ export const invoiceService = {
     canSendEmail: boolean;
   }> {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/email-status${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/invoices/${invoiceId}/email-status${queryParams}`, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<{ 
@@ -414,7 +398,7 @@ export const invoiceService = {
    */
   async downloadPDF(invoiceId: string, shopId?: string): Promise<Blob> {
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/pdf${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/invoices/${invoiceId}/pdf${queryParams}`, {
       headers: getAuthHeaders(),
     });
     
@@ -457,7 +441,7 @@ export const invoiceService = {
     const timeoutId = setTimeout(() => controller.abort(), 210000);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/send-email-with-pdf${queryParams}`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/invoices/${invoiceId}/send-email-with-pdf${queryParams}`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),

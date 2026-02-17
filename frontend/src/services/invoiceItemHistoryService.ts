@@ -3,7 +3,7 @@
  * Track all changes to invoice items (add, remove, qty change)
  */
 
-import { getAccessToken } from './authService';
+import { fetchWithAuth, getAuthHeaders } from '../lib/fetchWithAuth';
 
 // Get base URL and ensure we don't duplicate /api/v1
 const getApiBaseUrl = (): string => {
@@ -13,18 +13,6 @@ const getApiBaseUrl = (): string => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
-
-// Helper to get auth headers (using same pattern as invoiceService)
-const getAuthHeaders = (): Record<string, string> => {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-};
 
 // Types
 export type ItemHistoryAction = 'ADDED' | 'REMOVED' | 'QTY_INCREASED' | 'QTY_DECREASED' | 'PRICE_CHANGED';
@@ -86,7 +74,7 @@ export const invoiceItemHistoryService = {
     
     console.log('📡 [HistoryService] GET request to:', url);
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -126,7 +114,7 @@ export const invoiceItemHistoryService = {
     console.log('📡 [HistoryService] POST request to:', url);
     console.log('📡 [HistoryService] POST body:', JSON.stringify(changes, null, 2));
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(changes),

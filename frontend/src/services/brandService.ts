@@ -4,7 +4,7 @@
  * Handles all brand-related API calls to the backend
  */
 
-import { getAccessToken } from './authService';
+import { fetchWithAuth, handleAuthResponse, getAuthHeaders } from '../lib/fetchWithAuth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
@@ -64,23 +64,8 @@ interface APIResponse<T> {
 // Helper Functions
 // ===================================
 
-const getAuthHeaders = (): Record<string, string> => {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-};
-
 const handleResponse = async <T>(response: Response): Promise<T> => {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Network error' }));
-    throw new Error(error.message || `HTTP error! status: ${response.status}`);
-  }
-  return response.json();
+  return handleAuthResponse<T>(response);
 };
 
 // ===================================
@@ -101,7 +86,7 @@ export const brandService = {
 
     const url = `${API_BASE_URL}/brands?${queryParams.toString()}`;
     console.log('📝 Fetching brands from:', url);
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APIBrand[]>>(response);
@@ -120,7 +105,7 @@ export const brandService = {
     const queryParams = new URLSearchParams();
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/brands/${id}${shopId ? `?${queryParams.toString()}` : ''}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APIBrand>>(response);
@@ -133,7 +118,7 @@ export const brandService = {
   async create(data: CreateBrandDTO, shopId?: string): Promise<APIBrand> {
     console.log('📝 Creating brand:', data.name);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/brands${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/brands${queryParams}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -149,7 +134,7 @@ export const brandService = {
   async update(id: string, data: UpdateBrandDTO, shopId?: string): Promise<APIBrand> {
     console.log('📝 Updating brand:', id);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/brands/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/brands/${id}${queryParams}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -165,7 +150,7 @@ export const brandService = {
   async delete(id: string, shopId?: string): Promise<void> {
     console.log('🗑️ Deleting brand:', id);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/brands/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/brands/${id}${queryParams}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -180,7 +165,7 @@ export const brandService = {
     const queryParams = new URLSearchParams();
     if (search) queryParams.append('search', search);
     const url = `${API_BASE_URL}/brands/suggestions?${queryParams.toString()}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<BrandSuggestion[]>>(response);

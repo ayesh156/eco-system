@@ -1,22 +1,10 @@
 // Reminder Service - API calls for invoice reminders
 
-import { getAccessToken } from './authService';
+import { fetchWithAuth, getAuthHeaders } from '../lib/fetchWithAuth';
 
 // Remove /api/v1 suffix if present since we add it in the endpoints
 const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const API_BASE_URL = rawApiUrl.replace(/\/api\/v1\/?$/, '');
-
-// Helper to get authorization headers
-const getAuthHeaders = (): Record<string, string> => {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-};
 
 export interface InvoiceReminder {
   id: string;
@@ -65,7 +53,7 @@ export const reminderService = {
     }
     console.log('🔍 Fetching reminders from:', url);
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -96,7 +84,7 @@ export const reminderService = {
     }
     console.log('🔍 Fetching customer reminders from:', url);
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -127,7 +115,7 @@ export const reminderService = {
       url += `?shopId=${reminder.shopId}`;
     }
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(reminder),
@@ -208,7 +196,7 @@ export const grnReminderService = {
     }
     console.log('🔍 Fetching GRN reminders from:', url);
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
@@ -242,7 +230,7 @@ export const grnReminderService = {
     }
     console.log('📤 Creating GRN reminder:', url, reminder);
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(reminder),

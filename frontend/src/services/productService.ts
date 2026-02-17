@@ -4,7 +4,7 @@
  * Handles all product-related API calls to the backend
  */
 
-import { getAccessToken } from './authService';
+import { fetchWithAuth, handleAuthResponse, getAuthHeaders } from '../lib/fetchWithAuth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
@@ -212,23 +212,8 @@ interface APIResponse<T> {
 // Helper Functions
 // ===================================
 
-const getAuthHeaders = (): Record<string, string> => {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-};
-
 const handleResponse = async <T>(response: Response): Promise<T> => {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Network error' }));
-    throw new Error(error.message || `HTTP error! status: ${response.status}`);
-  }
-  return response.json();
+  return handleAuthResponse<T>(response);
 };
 
 // ===================================
@@ -256,7 +241,7 @@ export const productService = {
 
     const url = `${API_BASE_URL}/products?${queryParams.toString()}`;
     console.log('📝 Fetching products from:', url);
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APIProduct[]>>(response);
@@ -276,7 +261,7 @@ export const productService = {
     if (shopId) queryParams.append('shopId', shopId);
     
     const url = `${API_BASE_URL}/products/stats${shopId ? `?${queryParams.toString()}` : ''}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<ProductStats>>(response);
@@ -291,7 +276,7 @@ export const productService = {
     if (shopId) queryParams.append('shopId', shopId);
     
     const url = `${API_BASE_URL}/products/low-stock${shopId ? `?${queryParams.toString()}` : ''}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APIProduct[]>>(response);
@@ -309,7 +294,7 @@ export const productService = {
     queryParams.append('search', search);
     
     const url = `${API_BASE_URL}/products/suggestions?${queryParams.toString()}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<ProductSuggestion[]>>(response);
@@ -323,7 +308,7 @@ export const productService = {
     const queryParams = new URLSearchParams();
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/products/${id}${shopId ? `?${queryParams.toString()}` : ''}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APIProduct>>(response);
@@ -336,7 +321,7 @@ export const productService = {
   async create(data: CreateProductDTO, shopId?: string): Promise<APIProduct> {
     console.log('📝 Creating product:', data.name);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/products${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/products${queryParams}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -352,7 +337,7 @@ export const productService = {
   async update(id: string, data: UpdateProductDTO, shopId?: string): Promise<APIProduct> {
     console.log('📝 Updating product:', id);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/products/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/products/${id}${queryParams}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -372,7 +357,7 @@ export const productService = {
     referenceNumber?: string;
   }): Promise<APIProduct> {
     console.log('📝 Adjusting product stock:', id, operation, quantity);
-    const response = await fetch(`${API_BASE_URL}/products/${id}/stock`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/products/${id}/stock`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -390,7 +375,7 @@ export const productService = {
    * Get product stock movements
    */
   async getStockMovements(id: string): Promise<StockMovement[]> {
-    const response = await fetch(`${API_BASE_URL}/products/${id}/stock-movements`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/products/${id}/stock-movements`, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<StockMovement[]>>(response);
@@ -401,7 +386,7 @@ export const productService = {
    * Get product price history
    */
   async getPriceHistory(id: string): Promise<PriceHistoryRecord[]> {
-    const response = await fetch(`${API_BASE_URL}/products/${id}/price-history`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/products/${id}/price-history`, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<PriceHistoryRecord[]>>(response);
@@ -416,7 +401,7 @@ export const productService = {
     queryParams.append('page', page.toString());
     queryParams.append('limit', limit.toString());
     
-    const response = await fetch(`${API_BASE_URL}/products/${id}/sales-history?${queryParams.toString()}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/products/${id}/sales-history?${queryParams.toString()}`, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<{
@@ -439,7 +424,7 @@ export const productService = {
   async delete(id: string, shopId?: string): Promise<void> {
     console.log('🗑️ Deleting product:', id);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/products/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/products/${id}${queryParams}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });

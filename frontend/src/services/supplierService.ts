@@ -4,7 +4,7 @@
  * Handles all supplier-related API calls to the backend
  */
 
-import { getAccessToken } from './authService';
+import { fetchWithAuth, getAuthHeaders } from '../lib/fetchWithAuth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
@@ -73,14 +73,6 @@ export interface FrontendSupplier {
 // Helper Functions
 // ===================================
 
-const getAuthHeaders = () => {
-  const token = getAccessToken();
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': token ? `Bearer ${token}` : '',
-  };
-};
-
 // Convert API response to frontend format
 export const convertAPISupplierToFrontend = (apiSupplier: APISupplier): FrontendSupplier => {
   return {
@@ -128,7 +120,7 @@ export const getSuppliers = async (shopId?: string): Promise<{ success: boolean;
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/suppliers${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'GET',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -160,7 +152,7 @@ export const getSupplierById = async (id: string, shopId?: string): Promise<{ su
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/suppliers/${id}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'GET',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -193,7 +185,7 @@ export const createSupplier = async (supplierData: Partial<FrontendSupplier>, sh
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/suppliers${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -230,7 +222,7 @@ export const updateSupplier = async (id: string, supplierData: Partial<FrontendS
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/suppliers/${id}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'PUT',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -263,7 +255,7 @@ export const deleteSupplier = async (id: string, shopId?: string): Promise<{ suc
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/suppliers/${id}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'DELETE',
       headers: getAuthHeaders(),
       credentials: 'include',

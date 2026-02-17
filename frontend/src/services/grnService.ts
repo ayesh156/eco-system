@@ -4,7 +4,7 @@
  * Handles all GRN-related API calls to the backend with stock integration
  */
 
-import { getAccessToken } from './authService';
+import { fetchWithAuth, getAuthHeaders, getAccessToken } from '../lib/fetchWithAuth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
@@ -171,14 +171,6 @@ export interface FrontendGRN {
 // Helper Functions
 // ===================================
 
-const getAuthHeaders = () => {
-  const token = getAccessToken();
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': token ? `Bearer ${token}` : '',
-  };
-};
-
 // Map API status to frontend status
 const mapAPIStatusToFrontend = (status: string): FrontendGRN['status'] => {
   const statusMap: Record<string, FrontendGRN['status']> = {
@@ -298,7 +290,7 @@ export const getGRNs = async (params?: { status?: string; supplierId?: string; s
 
     const url = `${API_BASE_URL}/grns${queryParams.toString() ? `?${queryParams}` : ''}`;
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'GET',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -330,7 +322,7 @@ export const getGRNById = async (id: string, shopId?: string): Promise<{ success
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/grns/${id}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'GET',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -370,7 +362,7 @@ export const createGRN = async (grnData: Partial<FrontendGRN>, shopId?: string):
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/grns${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -449,7 +441,7 @@ export const deleteGRN = async (id: string, shopId?: string): Promise<{ success:
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/grns/${id}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'DELETE',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -481,7 +473,7 @@ export const updateGRN = async (id: string, grnData: Partial<FrontendGRN>, shopI
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/grns/${id}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'PUT',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -522,7 +514,7 @@ export const recordGRNPayment = async (
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/grns/${id}/payment${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'POST',
       headers: getAuthHeaders(),
       credentials: 'include',
@@ -587,7 +579,7 @@ export const sendEmailWithPDF = async (
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 210000);
 
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       method: 'POST',
       headers,
       credentials: 'include',

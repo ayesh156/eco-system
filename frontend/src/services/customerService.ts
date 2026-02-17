@@ -4,7 +4,7 @@
  * Handles all customer-related API calls to the backend
  */
 
-import { getAccessToken } from './authService';
+import { fetchWithAuth, handleAuthResponse, getAuthHeaders } from '../lib/fetchWithAuth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
@@ -99,23 +99,8 @@ interface APIResponse<T> {
 // Helper Functions
 // ===================================
 
-const getAuthHeaders = (): Record<string, string> => {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-};
-
 const handleResponse = async <T>(response: Response): Promise<T> => {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Network error' }));
-    throw new Error(error.message || `HTTP error! status: ${response.status}`);
-  }
-  return response.json();
+  return handleAuthResponse<T>(response);
 };
 
 // ===================================
@@ -140,7 +125,7 @@ export const customerService = {
 
     const url = `${API_BASE_URL}/customers?${queryParams.toString()}`;
     console.log('📝 Fetching customers from:', url);
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APICustomer[]>>(response);
@@ -160,7 +145,7 @@ export const customerService = {
     if (shopId) queryParams.append('shopId', shopId);
     
     const url = `${API_BASE_URL}/customers/stats${shopId ? `?${queryParams.toString()}` : ''}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<CustomerStats>>(response);
@@ -174,7 +159,7 @@ export const customerService = {
     const queryParams = new URLSearchParams();
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/customers/${id}${shopId ? `?${queryParams.toString()}` : ''}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APICustomer>>(response);
@@ -187,7 +172,7 @@ export const customerService = {
   async create(data: CreateCustomerDTO, shopId?: string): Promise<APICustomer> {
     console.log('📝 Creating customer:', data.name);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/customers${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/customers${queryParams}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -203,7 +188,7 @@ export const customerService = {
   async update(id: string, data: UpdateCustomerDTO, shopId?: string): Promise<APICustomer> {
     console.log('📝 Updating customer:', id);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/customers/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/customers/${id}${queryParams}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -222,7 +207,7 @@ export const customerService = {
     paymentMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE';
   }): Promise<APICustomer> {
     console.log('📝 Updating customer credit:', id, operation, amount);
-    const response = await fetch(`${API_BASE_URL}/customers/${id}/credit`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/customers/${id}/credit`, {
       method: 'PATCH',
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -240,7 +225,7 @@ export const customerService = {
    * Get customer payment history
    */
   async getPayments(id: string): Promise<any[]> {
-    const response = await fetch(`${API_BASE_URL}/customers/${id}/payments`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/customers/${id}/payments`, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<any[]>>(response);
@@ -253,7 +238,7 @@ export const customerService = {
   async delete(id: string, shopId?: string): Promise<void> {
     console.log('🗑️ Deleting customer:', id);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/customers/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/customers/${id}${queryParams}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });

@@ -4,7 +4,7 @@
  * Handles all category-related API calls to the backend
  */
 
-import { getAccessToken } from './authService';
+import { fetchWithAuth, handleAuthResponse, getAuthHeaders } from '../lib/fetchWithAuth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
 
@@ -58,23 +58,8 @@ interface APIResponse<T> {
 // Helper Functions
 // ===================================
 
-const getAuthHeaders = (): Record<string, string> => {
-  const token = getAccessToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-};
-
 const handleResponse = async <T>(response: Response): Promise<T> => {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Network error' }));
-    throw new Error(error.message || `HTTP error! status: ${response.status}`);
-  }
-  return response.json();
+  return handleAuthResponse<T>(response);
 };
 
 // ===================================
@@ -95,7 +80,7 @@ export const categoryService = {
 
     const url = `${API_BASE_URL}/categories?${queryParams.toString()}`;
     console.log('📝 Fetching categories from:', url);
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APICategory[]>>(response);
@@ -114,7 +99,7 @@ export const categoryService = {
     const queryParams = new URLSearchParams();
     if (shopId) queryParams.append('shopId', shopId);
     const url = `${API_BASE_URL}/categories/${id}${shopId ? `?${queryParams.toString()}` : ''}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<APICategory>>(response);
@@ -127,7 +112,7 @@ export const categoryService = {
   async create(data: CreateCategoryDTO, shopId?: string): Promise<APICategory> {
     console.log('📝 Creating category:', data.name);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/categories${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/categories${queryParams}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -143,7 +128,7 @@ export const categoryService = {
   async update(id: string, data: UpdateCategoryDTO, shopId?: string): Promise<APICategory> {
     console.log('📝 Updating category:', id);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/categories/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/categories/${id}${queryParams}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -159,7 +144,7 @@ export const categoryService = {
   async delete(id: string, shopId?: string): Promise<void> {
     console.log('🗑️ Deleting category:', id);
     const queryParams = shopId ? `?shopId=${shopId}` : '';
-    const response = await fetch(`${API_BASE_URL}/categories/${id}${queryParams}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/categories/${id}${queryParams}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -174,7 +159,7 @@ export const categoryService = {
     const queryParams = new URLSearchParams();
     if (search) queryParams.append('search', search);
     const url = `${API_BASE_URL}/categories/suggestions?${queryParams.toString()}`;
-    const response = await fetch(url, {
+    const response = await fetchWithAuth(url, {
       headers: getAuthHeaders(),
     });
     const result = await handleResponse<APIResponse<CategorySuggestion[]>>(response);

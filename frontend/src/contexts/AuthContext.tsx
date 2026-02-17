@@ -1,14 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { 
+import {
   authService,
   onTokenChange,
   getAccessToken,
   setAccessToken,
+  setRefreshToken,
   getRefreshToken,
   getCachedUser,
   setCachedUser,
 } from '../services/authService';
+import { clearAllCaches } from '../lib/persistentCache';
 import type { 
   User, 
   LoginCredentials, 
@@ -118,6 +120,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setCachedUser(null);
       setAccessToken(null);
+      setRefreshToken(null);
+      setViewingShopState(null);
+      sessionStorage.removeItem('viewingShop');
+      clearAllCaches();
     };
 
     window.addEventListener('auth:logout', handleLogoutEvent as EventListener);
@@ -197,8 +203,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (freshUser) {
           setUser(freshUser);
           setCachedUser(freshUser);
+        } else {
+          // Token invalid / expired and couldn't refresh — clear stale state
+          console.warn('⚠️ Background session restore failed, clearing stale user');
+          setUser(null);
+          setCachedUser(null);
+          setAccessToken(null);
+          setRefreshToken(null);
+          clearAllCaches();
         }
-      }).catch(() => {});
+      }).catch(() => {
+        // Network error during background restore — clear state to avoid stuck session
+        console.warn('⚠️ Background session restore threw, clearing stale user');
+        setUser(null);
+        setCachedUser(null);
+        setAccessToken(null);
+        setRefreshToken(null);
+        clearAllCaches();
+      });
     } else {
       // No cache, do full restore (shows loading spinner)
       restoreSession();
@@ -260,8 +282,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setUser(null);
       setCachedUser(null);
+      setAccessToken(null);
+      setRefreshToken(null);
       setViewingShopState(null);
       sessionStorage.removeItem('viewingShop');
+      clearAllCaches();
       setIsLoading(false);
     }
   }, []);
@@ -277,8 +302,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setUser(null);
       setCachedUser(null);
+      setAccessToken(null);
+      setRefreshToken(null);
       setViewingShopState(null);
       sessionStorage.removeItem('viewingShop');
+      clearAllCaches();
       setIsLoading(false);
     }
   }, []);

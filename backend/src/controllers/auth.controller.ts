@@ -381,7 +381,8 @@ export const logout = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const refreshToken = req.cookies[REFRESH_TOKEN_COOKIE_NAME];
+    // Accept refresh token from cookie OR request body (for environments where cookies don't work)
+    const refreshToken = req.cookies[REFRESH_TOKEN_COOKIE_NAME] || req.body?.refreshToken;
 
     if (refreshToken) {
       // Revoke the refresh token
