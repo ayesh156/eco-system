@@ -74,20 +74,45 @@ export interface ApiError {
 // Store access token in memory only (more secure than localStorage)
 let accessToken: string | null = null;
 
-// Refresh token fallback storage key (for environments where cookies don't work)
+// Storage keys
 const REFRESH_TOKEN_KEY = 'eco_refresh_token';
+const CACHED_USER_KEY = 'eco_cached_user';
+const ACCESS_TOKEN_KEY = 'eco_access_token';
 
 // Callback to notify when token changes (for React state sync)
 let tokenChangeCallback: ((token: string | null) => void) | null = null;
 
 export const setAccessToken = (token: string | null): void => {
   accessToken = token;
+  // Persist access token so it survives page refresh (still validated server-side)
+  if (token) {
+    localStorage.setItem(ACCESS_TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+  }
   if (tokenChangeCallback) {
     tokenChangeCallback(token);
   }
 };
 
-export const getAccessToken = (): string | null => accessToken;
+export const getAccessToken = (): string | null => {
+  // Restore from localStorage if in-memory is null (page refresh)
+  if (!accessToken) {
+    accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  }
+  return accessToken;
+};
+
+// Check if access token is expired (without verifying signature)
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // Add 30s buffer so we refresh slightly before actual expiry
+    return payload.exp * 1000 < Date.now() + 30000;
+  } catch {
+    return true;
+  }
+};
 
 // Refresh token fallback for development/mobile
 export const setRefreshToken = (token: string | null): void => {
@@ -100,6 +125,25 @@ export const setRefreshToken = (token: string | null): void => {
 
 export const getRefreshToken = (): string | null => {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
+};
+
+// Cache user data in localStorage for instant restore
+export const setCachedUser = (user: User | null): void => {
+  if (user) {
+    localStorage.setItem(CACHED_USER_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(CACHED_USER_KEY);
+  }
+};
+
+export const getCachedUser = (): User | null => {
+  try {
+    const cached = localStorage.getItem(CACHED_USER_KEY);
+    return cached ? JSON.parse(cached) : null;
+  } catch {
+    localStorage.removeItem(CACHED_USER_KEY);
+    return null;
+  }
 };
 
 export const onTokenChange = (callback: (token: string | null) => void): void => {
@@ -247,9 +291,10 @@ export const authService = {
    */
   register: async (data: RegisterData): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/register', data);
-    const { accessToken: token, refreshToken } = response.data.data;
+    const { accessToken: token, refreshToken, user } = response.data.data;
     setAccessToken(token);
     if (refreshToken) setRefreshToken(refreshToken);
+    setCachedUser(user);
     return response.data;
   },
 
@@ -258,9 +303,10 @@ export const authService = {
    */
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
-    const { accessToken: token, refreshToken } = response.data.data;
+    const { accessToken: token, refreshToken, user } = response.data.data;
     setAccessToken(token);
     if (refreshToken) setRefreshToken(refreshToken);
+    setCachedUser(user);
     return response.data;
   },
 
@@ -273,9 +319,10 @@ export const authService = {
     const response = await apiClient.post<RefreshResponse>('/auth/refresh', {
       refreshToken: storedRefreshToken,
     });
-    const { accessToken: token, refreshToken } = response.data.data;
+    const { accessToken: token, refreshToken, user } = response.data.data;
     setAccessToken(token);
     if (refreshToken) setRefreshToken(refreshToken);
+    if (user) setCachedUser(user);
     return response.data;
   },
 
@@ -288,6 +335,7 @@ export const authService = {
     } finally {
       setAccessToken(null);
       setRefreshToken(null);
+      setCachedUser(null);
     }
   },
 
@@ -300,6 +348,7 @@ export const authService = {
     } finally {
       setAccessToken(null);
       setRefreshToken(null);
+      setCachedUser(null);
     }
   },
 
@@ -337,21 +386,39 @@ export const authService = {
 
   /**
    * Try to restore session on app load
-   * Uses refresh token cookie to get new access token
-   * Note: 503 retries are handled by the axios interceptor (5 retries over ~45s)
+   * FAST PATH: If we have a valid (non-expired) access token + cached user, return instantly.
+   * SLOW PATH: If access token is expired but refresh token exists, call /auth/refresh.
+   * This eliminates the "Restoring session..." delay for most page loads.
    */
   restoreSession: async (): Promise<User | null> => {
-    // Only attempt if we have a refresh token
-    const storedToken = getRefreshToken();
-    if (!storedToken) {
+    // Check for cached access token (survives page refresh)
+    const storedAccessToken = getAccessToken();
+    const cachedUser = getCachedUser();
+    const storedRefreshToken = getRefreshToken();
+
+    // FAST PATH: Access token exists and not expired - restore instantly
+    if (storedAccessToken && cachedUser && !isTokenExpired(storedAccessToken)) {
+      console.log('⚡ Instant session restore (token still valid)');
+      setAccessToken(storedAccessToken); // ensure in-memory is set
+      return cachedUser;
+    }
+
+    // SLOW PATH: Access token expired or missing, try refresh
+    if (!storedRefreshToken) {
       return null;
     }
 
     try {
-      // Axios interceptor handles 503 retries automatically
+      console.log('🔄 Token expired, refreshing...');
       const response = await authService.refresh();
-      return response.data.user;
+      const user = response.data.user;
+      setCachedUser(user);
+      return user;
     } catch {
+      // Refresh failed, clear everything
+      setAccessToken(null);
+      setRefreshToken(null);
+      setCachedUser(null);
       return null;
     }
   },

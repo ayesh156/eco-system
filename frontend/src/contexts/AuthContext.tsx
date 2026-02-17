@@ -6,6 +6,8 @@ import {
   getAccessToken,
   setAccessToken,
   getRefreshToken,
+  getCachedUser,
+  setCachedUser,
 } from '../services/authService';
 import type { 
   User, 
@@ -114,6 +116,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const handleLogoutEvent = (event: CustomEvent<{ reason: string }>) => {
       console.log('🔒 Session expired, logging out...', event.detail.reason);
       setUser(null);
+      setCachedUser(null);
       setAccessToken(null);
     };
 
@@ -133,7 +136,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
   }, []);
 
-  // Try to restore session on mount
+  // Try to restore session on mount - instant if cached, async if token expired
   useEffect(() => {
     const restoreSession = async () => {
       try {
@@ -165,7 +168,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    restoreSession();
+    // FAST PATH: Try instant restore from cache first
+    const cachedUser = getCachedUser();
+    const token = getAccessToken();
+    if (cachedUser && token) {
+      // Set user immediately to avoid "Restoring session..." screen
+      setUser(cachedUser);
+      setIsLoading(false);
+      console.log('⚡ Instant user restore from cache:', cachedUser.email);
+      
+      // Restore viewing shop for SUPER_ADMIN
+      if (cachedUser.role === 'SUPER_ADMIN') {
+        const savedViewingShop = sessionStorage.getItem('viewingShop');
+        if (savedViewingShop) {
+          try {
+            setViewingShopState(JSON.parse(savedViewingShop));
+          } catch {
+            sessionStorage.removeItem('viewingShop');
+          }
+        }
+      }
+      
+      // Background: validate/refresh token if needed (non-blocking)
+      restoreSession().then(freshUser => {
+        if (freshUser) {
+          setUser(freshUser);
+          setCachedUser(freshUser);
+        }
+      }).catch(() => {});
+    } else {
+      // No cache, do full restore (shows loading spinner)
+      restoreSession();
+    }
   }, []);
 
   // Login
@@ -175,6 +209,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await authService.login(credentials);
       setUser(response.data.user);
+      setCachedUser(response.data.user);
       console.log('✅ Login successful:', response.data.user.email);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { message?: string } }; code?: string };
@@ -200,6 +235,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await authService.register(data);
       setUser(response.data.user);
+      setCachedUser(response.data.user);
       console.log('✅ Registration successful:', response.data.user.email);
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Registration failed. Please try again.';
@@ -220,6 +256,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Logout error:', err);
     } finally {
       setUser(null);
+      setCachedUser(null);
       setViewingShopState(null);
       sessionStorage.removeItem('viewingShop');
       setIsLoading(false);
@@ -236,6 +273,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Logout all error:', err);
     } finally {
       setUser(null);
+      setCachedUser(null);
       setViewingShopState(null);
       sessionStorage.removeItem('viewingShop');
       setIsLoading(false);
@@ -248,6 +286,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await authService.updateProfile(data);
       setUser(response.data.user);
+      setCachedUser(response.data.user);
       console.log('✅ Profile updated');
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Profile update failed.';
@@ -262,6 +301,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await authService.changePassword({ currentPassword, newPassword });
       setUser(null); // Force re-login
+      setCachedUser(null);
       console.log('✅ Password changed, please login again');
     } catch (err: unknown) {
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Password change failed.';
@@ -275,6 +315,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await authService.getMe();
       setUser(response.data.user);
+      setCachedUser(response.data.user);
     } catch (err) {
       console.error('Failed to refresh user:', err);
     }
