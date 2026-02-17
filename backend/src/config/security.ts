@@ -200,9 +200,8 @@ export const corsConfig = {
       );
     }
 
-    // Production: Allow Vercel and Render deployments
+    // Production: Allow Render deployments
     if (getIsProduction()) {
-      origins.push(/\.vercel\.app$/);
       origins.push(/\.onrender\.com$/);
     }
 

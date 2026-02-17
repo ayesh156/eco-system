@@ -182,8 +182,8 @@ app.use(`${API_PREFIX}`, async (req, res, next) => {
   next();
 });
 
-// API Test endpoint - Modern HTML response
-app.get(`${API_PREFIX}/test`, async (_req, res) => {
+// API Test endpoint - Shows at root URL (http://localhost:3001 or https://api.ecosystemlk.tech)
+app.get('/', async (_req, res) => {
   const currentTime = new Date().toLocaleString('en-US', { 
     dateStyle: 'full', 
     timeStyle: 'medium' 
