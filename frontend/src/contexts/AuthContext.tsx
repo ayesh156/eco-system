@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Try to restore session on mount - instant if cached, async if token expired
   useEffect(() => {
-    const restoreSession = async () => {
+    const restoreSession = async (): Promise<User | null> => {
       try {
         console.log('🔄 Attempting to restore session...');
         const restoredUser = await authService.restoreSession();
@@ -158,11 +158,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
             }
           }
+          return restoredUser;
         } else {
           console.log('ℹ️ No active session');
+          return null;
         }
       } catch (err) {
         console.log('ℹ️ No valid session found');
+        return null;
       } finally {
         setIsLoading(false);
       }
