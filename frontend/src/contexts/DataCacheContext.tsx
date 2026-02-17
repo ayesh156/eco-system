@@ -4,6 +4,7 @@ import { customerService, convertAPICustomerToFrontend } from '../services/custo
 import { productService, convertAPIProductToFrontend } from '../services/productService';
 import { invoiceService, convertAPIInvoiceToFrontend } from '../services/invoiceService';
 import { useAuth } from './AuthContext';
+import { getCachedData, getStaleCachedData, setCachedData, clearAllCaches } from '../lib/persistentCache';
 
 interface DataCacheContextType {
   // Customers
@@ -114,7 +115,9 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         invoices: requestVersionRef.current.invoices + 1,
       };
       
-      // Clear all cached data atomically
+      // Clear all cached data atomically (including persistent cache)
+      clearAllCaches();
+      
       setCustomers([]);
       setCustomersLoaded(false);
       lastCustomersUpdateRef.current = null;
@@ -149,8 +152,33 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       return customers;
     }
     
+    // Try persistent cache first (instant load from localStorage)
+    if (!forceRefresh && !isTransitioning && !customersLoaded) {
+      const persistedCustomers = getCachedData<Customer[]>('customers', effectiveShopId);
+      if (persistedCustomers && persistedCustomers.length > 0) {
+        console.log('💾 Using persisted customers cache:', persistedCustomers.length);
+        setCustomers(persistedCustomers);
+        setCustomersLoaded(true);
+        setIsUsingAPI(true);
+        lastCustomersUpdateRef.current = now;
+        // Still refresh in background for fresh data
+        setTimeout(() => loadCustomers(true).catch(() => {}), 2000);
+        return persistedCustomers;
+      }
+    }
+    
     // Capture the request version at start
     const requestVersion = ++requestVersionRef.current.customers;
+    
+    // Try stale persistent cache as instant fallback while loading
+    if (!customersLoaded) {
+      const staleCustomers = getStaleCachedData<Customer[]>('customers', effectiveShopId);
+      if (staleCustomers && staleCustomers.length > 0) {
+        console.log('📄 Using stale customers cache while loading:', staleCustomers.length);
+        setCustomers(staleCustomers);
+        setIsUsingAPI(true);
+      }
+    }
     
     setCustomersLoading(true);
     try {
@@ -167,6 +195,8 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       if (converted.length > 0 || forceRefresh) {
         setCustomers(converted);
         setIsUsingAPI(true);
+        // Persist to localStorage for next visit
+        setCachedData('customers', converted, effectiveShopId);
         console.log('✅ Loaded customers from API:', converted.length, shopIdParam ? `(shop: ${shopIdParam})` : '(own shop)');
         setCustomersLoaded(true);
         lastCustomersUpdateRef.current = now;
@@ -199,8 +229,33 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       return products;
     }
     
+    // Try persistent cache first (instant load from localStorage)
+    if (!forceRefresh && !isTransitioning && !productsLoaded) {
+      const persistedProducts = getCachedData<Product[]>('products', effectiveShopId);
+      if (persistedProducts && persistedProducts.length > 0) {
+        console.log('💾 Using persisted products cache:', persistedProducts.length);
+        setProducts(persistedProducts);
+        setProductsLoaded(true);
+        setIsUsingAPI(true);
+        lastProductsUpdateRef.current = now;
+        // Still refresh in background for fresh data
+        setTimeout(() => loadProducts(true).catch(() => {}), 2000);
+        return persistedProducts;
+      }
+    }
+    
     // Capture the request version at start
     const requestVersion = ++requestVersionRef.current.products;
+    
+    // Try stale persistent cache as instant fallback while loading
+    if (!productsLoaded) {
+      const staleProducts = getStaleCachedData<Product[]>('products', effectiveShopId);
+      if (staleProducts && staleProducts.length > 0) {
+        console.log('📄 Using stale products cache while loading:', staleProducts.length);
+        setProducts(staleProducts);
+        setIsUsingAPI(true);
+      }
+    }
     
     setProductsLoading(true);
     try {
@@ -217,6 +272,8 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       if (converted.length > 0 || forceRefresh) {
         setProducts(converted);
         setIsUsingAPI(true);
+        // Persist to localStorage for next visit
+        setCachedData('products', converted, effectiveShopId);
         console.log('✅ Loaded products from API:', converted.length, shopIdParam ? `(shop: ${shopIdParam})` : '(own shop)');
         setProductsLoaded(true);
         lastProductsUpdateRef.current = now;
@@ -249,8 +306,33 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       return invoices;
     }
     
+    // Try persistent cache first (instant load from localStorage)
+    if (!forceRefresh && !isTransitioning && !invoicesLoaded) {
+      const persistedInvoices = getCachedData<Invoice[]>('invoices', effectiveShopId);
+      if (persistedInvoices && persistedInvoices.length > 0) {
+        console.log('💾 Using persisted invoices cache:', persistedInvoices.length);
+        setInvoices(persistedInvoices);
+        setInvoicesLoaded(true);
+        setIsUsingAPI(true);
+        lastInvoicesUpdateRef.current = now;
+        // Still refresh in background for fresh data
+        setTimeout(() => loadInvoices(true).catch(() => {}), 2000);
+        return persistedInvoices;
+      }
+    }
+    
     // Capture the request version at start
     const requestVersion = ++requestVersionRef.current.invoices;
+    
+    // Try stale persistent cache as instant fallback while loading
+    if (!invoicesLoaded) {
+      const staleInvoices = getStaleCachedData<Invoice[]>('invoices', effectiveShopId);
+      if (staleInvoices && staleInvoices.length > 0) {
+        console.log('📄 Using stale invoices cache while loading:', staleInvoices.length);
+        setInvoices(staleInvoices);
+        setIsUsingAPI(true);
+      }
+    }
     
     setInvoicesLoading(true);
     try {
@@ -272,6 +354,8 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       const converted = apiInvoices.map(convertAPIInvoiceToFrontend);
       setInvoices(converted);
       setIsUsingAPI(true);
+      // Persist to localStorage for next visit
+      setCachedData('invoices', converted, effectiveShopId);
       console.log('✅ Loaded invoices from API:', converted.length, shopIdParam ? `(shop: ${shopIdParam})` : '(own shop)');
       setInvoicesLoaded(true);
       lastInvoicesUpdateRef.current = now;

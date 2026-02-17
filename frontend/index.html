@@ -5,13 +5,119 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ECOTEC - Computer Solutions</title>
+    <meta name="description" content="Premium Computer & Mobile Shop Management System" />
     <meta name="theme-color" id="theme-color-meta" content="#0f172a" />
+    
+    <!-- DNS Prefetch & Preconnect for faster resource loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    
+    <!-- Fonts with display=swap for non-blocking load -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Inline critical CSS for instant loading screen -->
+    <style>
+      /* Critical CSS - shows loading screen before any JS loads */
+      body { margin: 0; padding: 0; }
+      #app-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #0f172a 0%, #0f172a 50%, #020617 100%);
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        transition: opacity 0.4s ease, visibility 0.4s ease;
+      }
+      #app-loader.loaded {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #app-loader .loader-logo {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 24px;
+        animation: pulse-glow 2s ease-in-out infinite;
+      }
+      #app-loader .loader-title {
+        font-size: 24px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #10b981, #3b82f6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 8px;
+      }
+      #app-loader .loader-subtitle {
+        font-size: 13px;
+        color: #64748b;
+        margin-bottom: 32px;
+      }
+      #app-loader .loader-bar-track {
+        width: 200px;
+        height: 3px;
+        background: #1e293b;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      #app-loader .loader-bar {
+        height: 100%;
+        width: 30%;
+        background: linear-gradient(90deg, #10b981, #3b82f6);
+        border-radius: 4px;
+        animation: loader-slide 1.2s ease-in-out infinite;
+      }
+      @keyframes loader-slide {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(250%); }
+        100% { transform: translateX(-100%); }
+      }
+      @keyframes pulse-glow {
+        0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 8px rgba(16,185,129,0.3)); }
+        50% { opacity: 1; filter: drop-shadow(0 0 20px rgba(16,185,129,0.6)); }
+      }
+    </style>
   </head>
   <body>
+    <!-- Instant loading screen (visible before React hydrates) -->
+    <div id="app-loader">
+      <svg class="loader-logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="32" cy="32" r="28" stroke="url(#grad)" stroke-width="3" fill="none" opacity="0.3"/>
+        <circle cx="32" cy="32" r="20" stroke="url(#grad)" stroke-width="2.5" fill="none" opacity="0.6"/>
+        <circle cx="32" cy="32" r="8" fill="url(#grad)"/>
+        <defs>
+          <linearGradient id="grad" x1="0" y1="0" x2="64" y2="64">
+            <stop offset="0%" stop-color="#10b981"/>
+            <stop offset="100%" stop-color="#3b82f6"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="loader-title">ECOTEC</div>
+      <div class="loader-subtitle">Loading your workspace...</div>
+      <div class="loader-bar-track">
+        <div class="loader-bar"></div>
+      </div>
+    </div>
+    
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Remove loader when app is ready (fallback: 8 seconds max) -->
+    <script>
+      window.__removeLoader = function() {
+        var loader = document.getElementById('app-loader');
+        if (loader) {
+          loader.classList.add('loaded');
+          setTimeout(function() { loader.remove(); }, 500);
+        }
+      };
+      // Safety timeout - remove loader after 8s regardless
+      setTimeout(window.__removeLoader, 8000);
+    </script>
   </body>
 </html>

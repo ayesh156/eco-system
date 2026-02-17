@@ -11,8 +11,22 @@ export default defineConfig({
     },
   },
   build: {
+    // Enable source maps for production debugging (optional, remove if not needed)
+    sourcemap: false,
+    // Target modern browsers for smaller bundle
+    target: 'es2020',
+    // Minification settings
+    minify: 'esbuild',
+    // CSS optimization
+    cssMinify: true,
+    // Asset inlining threshold (4kb)
+    assetsInlineLimit: 4096,
     rollupOptions: {
       output: {
+        // Use content hash in filenames for long-term caching
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
         manualChunks(id) {
           // React core libraries (must be first to avoid circular deps)
           if (id.includes('node_modules/react/') || 
@@ -70,6 +84,16 @@ export default defineConfig({
             return 'vendor-cmdk';
           }
           
+          // Excel export
+          if (id.includes('node_modules/xlsx')) {
+            return 'vendor-xlsx';
+          }
+          
+          // Supabase
+          if (id.includes('node_modules/@supabase/')) {
+            return 'vendor-supabase';
+          }
+          
           // Remaining node_modules
           if (id.includes('node_modules/')) {
             return 'vendor-other';
@@ -78,5 +102,17 @@ export default defineConfig({
       },
     },
     chunkSizeWarningLimit: 1000, // Allow larger vendor chunks to avoid warnings
+  },
+  // Optimize dependency pre-bundling
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'lucide-react',
+      'clsx',
+      'tailwind-merge',
+      'sonner',
+    ],
   },
 })

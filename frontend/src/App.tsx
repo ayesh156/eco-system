@@ -58,7 +58,66 @@ const AdminDashboard = lazy(() => import('./pages/admin').then(m => ({ default: 
 const ShopAdminPanel = lazy(() => import('./pages/admin').then(m => ({ default: m.ShopAdminPanel })));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+      refetchOnWindowFocus: false,
+      retry: 2,
+    },
+  },
+});
+
+// Skeleton loading screen for lazy-loaded pages
+function PageSkeleton() {
+  return (
+    <div className="space-y-6 p-6 animate-pulse">
+      {/* Header skeleton */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="h-8 w-48 bg-slate-700/50 rounded-xl" />
+          <div className="h-4 w-64 bg-slate-700/30 rounded-lg mt-2" />
+        </div>
+        <div className="flex gap-3">
+          <div className="h-10 w-32 bg-slate-700/40 rounded-xl" />
+          <div className="h-10 w-36 bg-emerald-500/20 rounded-xl" />
+        </div>
+      </div>
+      
+      {/* Stats cards skeleton */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-24 bg-slate-800/40 rounded-2xl border border-slate-700/30" />
+        ))}
+      </div>
+      
+      {/* Search bar skeleton */}
+      <div className="h-14 bg-slate-800/30 rounded-2xl border border-slate-700/30" />
+      
+      {/* Content grid skeleton */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-48 bg-slate-800/30 rounded-2xl border border-slate-700/30">
+            <div className="p-5 space-y-3">
+              <div className="flex justify-between">
+                <div className="h-5 w-32 bg-slate-700/50 rounded-lg" />
+                <div className="h-5 w-20 bg-slate-700/30 rounded-lg" />
+              </div>
+              <div className="h-4 w-full bg-slate-700/20 rounded" />
+              <div className="h-4 w-3/4 bg-slate-700/20 rounded" />
+              <div className="h-4 w-1/2 bg-slate-700/20 rounded" />
+              <div className="flex gap-2 pt-2">
+                <div className="h-8 w-20 bg-slate-700/30 rounded-lg" />
+                <div className="h-8 w-20 bg-slate-700/30 rounded-lg" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Toast provider with theme support
 function ThemedToaster() {
@@ -111,11 +170,7 @@ function App() {
                     <Route path="/*" element={
                       <ProtectedRoute>
                         <AdminLayout>
-                          <Suspense fallback={
-                            <div className="flex items-center justify-center h-screen">
-                              <div className="text-emerald-500">Loading...</div>
-                            </div>
-                          }>
+                          <Suspense fallback={<PageSkeleton />}>
                             <Routes>
                               <Route path="/" element={<Dashboard />} />
                               <Route path="/dashboard" element={<Dashboard />} />
