@@ -14,9 +14,26 @@
  *   npx tsx prisma/seed.ts
  * 
  * Author: World-class Database Engineer @ EcoSystem
- * Version: 2.0.0
- * Last Updated: 2026-02-03
+ * Version: 2.1.0
+ * Last Updated: 2026-02-18
  */
+
+import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+
+// Load .env before anything else
+const envPaths = [
+  path.join(process.cwd(), '.env'),
+  path.join(process.cwd(), 'backend', '.env'),
+  path.resolve(__dirname, '../.env'),
+];
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    break;
+  }
+}
 
 import { 
   PrismaClient, 
@@ -34,7 +51,16 @@ import {
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+// Use DIRECT_URL (port 5432) to bypass PgBouncer - avoids deadlocks, FK issues
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DIRECT_URL || process.env.DATABASE_URL,
+    },
+  },
+});
+
+console.log(`🔗 Using DB: ${(process.env.DIRECT_URL || process.env.DATABASE_URL || '').includes('5432') ? 'DIRECT (port 5432)' : 'POOLER (port 6543)'}`);
 
 // ==========================================
 // CONFIGURATION - Edit these as needed
@@ -210,8 +236,8 @@ const PRODUCTS_DATA = [
   // Keyboards & Mice
   { name: 'Logitech MK270 Combo', category: 'Keyboards & Mice', brand: 'Logitech', price: 8500, costPrice: 6500, stock: 50, warranty: '1 Year', warrantyMonths: 12, barcode: 'LG-MK270-001' },
   { name: 'Logitech MX Master 3', category: 'Keyboards & Mice', brand: 'Logitech', price: 32000, costPrice: 27000, stock: 15, warranty: '2 Years', warrantyMonths: 24, barcode: 'LG-MXM3-001' },
-  { name: 'Microsoft Surface Keyboard', category: 'Keyboards & Mice', brand: 'Microsoft', price: 28000, costPrice: 23000, stock: 10, warranty: '1 Year', warrantyMonths: 12, barcode: 'MS-SRFK-001' },
-  { name: 'HP Wireless Mouse', category: 'Keyboards & Mice', brand: 'HP', price: 3500, costPrice: 2500, stock: 80, warranty: '1 Year', warrantyMonths: 12, barcode: 'HP-WM-001' },
+  { name: 'Microsoft Surface Keyboard', category: 'Keyboards & Mice', brand: 'Microsoft', price: 28000, costPrice: 23000, stock: 11, warranty: '1 Year', warrantyMonths: 12, barcode: 'MS-SRFK-001' },
+  { name: 'HP Wireless Mouse', category: 'Keyboards & Mice', brand: 'HP', price: 3500, costPrice: 2500, stock: 85, warranty: '1 Year', warrantyMonths: 12, barcode: 'HP-WM-001' },
   
   // Storage
   { name: 'WD Blue 1TB HDD', category: 'Storage', brand: 'Western Digital', price: 15500, costPrice: 12500, stock: 40, warranty: '2 Years', warrantyMonths: 24, barcode: 'WD-BL1TB-001' },
@@ -245,12 +271,12 @@ const PRODUCTS_DATA = [
   
   // Printers
   { name: 'HP LaserJet Pro M404n', category: 'Printers', brand: 'HP', price: 85000, costPrice: 72000, stock: 8, warranty: '1 Year', warrantyMonths: 12, barcode: 'HP-LJ404-001' },
-  { name: 'HP DeskJet 2720', category: 'Printers', brand: 'HP', price: 22000, costPrice: 17500, stock: 15, warranty: '1 Year', warrantyMonths: 12, barcode: 'HP-DJ2720-001' },
+  { name: 'HP DeskJet 2720', category: 'Printers', brand: 'HP', price: 22000, costPrice: 17500, stock: 16, warranty: '1 Year', warrantyMonths: 12, barcode: 'HP-DJ2720-001' },
   { name: 'Brother HL-L2350DW', category: 'Printers', brand: 'HP', price: 45000, costPrice: 38000, stock: 10, warranty: '2 Years', warrantyMonths: 24, barcode: 'BR-HLL2350-001' },
   
   // Components
   { name: 'Corsair 16GB DDR4 RAM', category: 'Components', brand: 'Kingston', price: 18500, costPrice: 15000, stock: 30, warranty: 'Lifetime', warrantyMonths: 120, barcode: 'CR-RAM16-001' },
-  { name: 'Kingston 8GB DDR4 RAM', category: 'Components', brand: 'Kingston', price: 9500, costPrice: 7500, stock: 45, warranty: 'Lifetime', warrantyMonths: 120, barcode: 'KN-RAM8-001' },
+  { name: 'Kingston 8GB DDR4 RAM', category: 'Components', brand: 'Kingston', price: 9500, costPrice: 7500, stock: 48, warranty: 'Lifetime', warrantyMonths: 120, barcode: 'KN-RAM8-001' },
   { name: 'Asus GTX 1660 Super', category: 'Components', brand: 'Asus', price: 95000, costPrice: 82000, stock: 6, warranty: '3 Years', warrantyMonths: 36, barcode: 'AS-GTX1660-001' },
   
   // Audio
@@ -272,8 +298,8 @@ const CUSTOMERS_DATA = [
   { name: 'Ruwan Bandara', email: 'ruwan.b@gmail.com', phone: '0783456789', address: 'No. 89, High Level Road, Nugegoda', nic: '881234571V', type: 'REGULAR' as CustomerType },
   
   // Wholesale customers
-  { name: 'ABC Computers', email: 'info@abccomputers.lk', phone: '0114567890', address: 'No. 234, Duplication Road, Colombo 03', nic: null, type: 'WHOLESALE' as CustomerType },
-  { name: 'Tech Solutions Lanka', email: 'sales@techsolutions.lk', phone: '0115678901', address: 'No. 567, Baseline Road, Colombo 09', nic: null, type: 'WHOLESALE' as CustomerType },
+  { name: 'ABC Computers', email: 'info@abccomputers.lk', phone: '0114567890', address: 'No. 234, Duplication Road, Colombo 03', nic: null, type: 'WHOLESALE' as CustomerType, creditLimit: 50000 },
+  { name: 'Tech Solutions Lanka', email: 'sales@techsolutions.lk', phone: '0115678901', address: 'No. 567, Baseline Road, Colombo 09', nic: null, type: 'WHOLESALE' as CustomerType, creditLimit: 50000 },
   
   // Dealers
   { name: 'CompuMart Dealers', email: 'orders@compumart.lk', phone: '0116789012', address: 'No. 890, Kandy Road, Kadawatha', nic: null, type: 'DEALER' as CustomerType },
@@ -298,9 +324,9 @@ const CUSTOMERS_DATA = [
 // ==========================================
 
 const SUPPLIERS_DATA = [
-  { name: 'HP Sri Lanka', contact: 'Roshan Fernando', email: 'roshan@hpsrilanka.lk', phone: '0112345678', address: 'No. 45, Duplication Road, Colombo 03' },
-  { name: 'Dell Technologies Lanka', contact: 'Chamara Perera', email: 'chamara@dell.lk', phone: '0112456789', address: 'No. 89, Galle Road, Colombo 04' },
-  { name: 'Lenovo Authorized Distributor', contact: 'Nirmala Silva', email: 'nirmala@lenovolanka.com', phone: '0113456789', address: 'No. 123, Union Place, Colombo 02' },
+  { name: 'HP Sri Lanka', contact: 'Roshan Fernando', email: 'ecoteccomputersolutions@gmail.com', phone: '0112345678', address: 'No. 45, Duplication Road, Colombo 03' },
+  { name: 'Dell Technologies Lanka', contact: 'Chamara Perera', email: 'eshararanaveeraa2@gmail.com', phone: '0112456789', address: 'No. 89, Galle Road, Colombo 04' },
+  { name: 'Lenovo Authorized Distributor', contact: 'Nirmala Silva', email: 'nebulainfinitex@gmail.com', phone: '0113456789', address: 'No. 123, Union Place, Colombo 02' },
   { name: 'Samsung Electronics Lanka', contact: 'Dilshan Jayawardena', email: 'dilshan@samsung.lk', phone: '0114567890', address: 'No. 234, Baseline Road, Colombo 09' },
   { name: 'Apple Premium Reseller', contact: 'Kavindi Rodrigo', email: 'kavindi@applereseller.lk', phone: '0115678901', address: 'No. 56, Ward Place, Colombo 07' },
   { name: 'Redington Lanka', contact: 'Ajith Bandara', email: 'ajith@redington.lk', phone: '0116789012', address: 'No. 789, Nawala Road, Rajagiriya' },
@@ -318,6 +344,37 @@ async function main() {
   console.log('║           🌱 ECOSYSTEM DATABASE SEEDING                       ║');
   console.log('║              World-Class Sample Data                          ║');
   console.log('╚═══════════════════════════════════════════════════════════════╝');
+  console.log('');
+
+  // ==========================================
+  // STEP 0: CLEAN EXISTING DATA
+  // ==========================================
+  console.log('🧹 Cleaning existing data...');
+  
+  // Using DIRECT_URL (not PgBouncer), so sequential deleteMany works reliably
+  await prisma.invoiceReminder.deleteMany();
+  await prisma.gRNReminder.deleteMany();
+  await prisma.invoiceItemHistory.deleteMany();
+  await prisma.invoicePayment.deleteMany();
+  await prisma.invoiceItem.deleteMany();
+  await prisma.gRNPayment.deleteMany();
+  await prisma.gRNItem.deleteMany();
+  await prisma.stockMovement.deleteMany();
+  await prisma.priceHistory.deleteMany();
+  await prisma.customerPaymentRecord.deleteMany();
+  await prisma.invoice.deleteMany();
+  await prisma.gRN.deleteMany();
+  await prisma.product.deleteMany();
+  await prisma.customer.deleteMany();
+  await prisma.supplier.deleteMany();
+  await prisma.category.deleteMany();
+  await prisma.brand.deleteMany();
+  await prisma.refreshToken.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.shop.deleteMany();
+  
+  console.log('   ✅ Database cleaned successfully');
   console.log('');
 
   // ==========================================
@@ -379,6 +436,20 @@ async function main() {
       grnPaymentReminderTemplate: `Hello! 👋\n\nGreetings from *{{shopName}}*!\n\nThis is a friendly notification regarding your GRN payment:\n\n📄 *GRN Number:* #{{grnNumber}}\n🏢 *Supplier:* {{supplierName}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{balanceDue}}\n📅 *GRN Date:* {{grnDate}}\n\nWe will process the remaining payment as per our agreement.\n\nFor any queries, please contact us.\n\nThank you for your partnership! 🙏\n\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
       grnOverdueReminderTemplate: `🚨 *URGENT: Payment Overdue*\n\nDear {{supplierName}},\n\nThis is an urgent reminder regarding the *overdue* payment for:\n\n📄 *GRN Number:* #{{grnNumber}}\n📅 *GRN Date:* {{grnDate}}\n💰 *Total Amount:* Rs. {{totalAmount}}\n✅ *Paid:* Rs. {{paidAmount}}\n⏳ *Balance Due:* Rs. {{balanceDue}}\n\n⚠️ Please note that this payment is now overdue. We kindly request you to coordinate with us for the settlement.\n\nFor any queries or to discuss payment arrangements, please contact us immediately.\n\nBest regards,\n*{{shopName}}*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
       supplierOrderTemplate: `🛒 *NEW ORDER REQUEST*\n━━━━━━━━━━━━━━━━━━━━━\n\nHello {{supplierName}}! 👋\n\nThis is *{{shopName}}* reaching out for a new order.\n\n📅 *Date:* {{orderDate}}\n🏢 *Supplier:* {{supplierCompany}}\n\n━━━━━━━━━━━━━━━━━━━━━\n📦 *ORDER DETAILS:*\n━━━━━━━━━━━━━━━━━━━━━\n\nPlease share your:\n✅ Latest product catalog\n✅ Current stock availability\n✅ Best pricing for bulk orders\n✅ Expected delivery timeline\n\n━━━━━━━━━━━━━━━━━━━━━\n\nWe look forward to doing business with you! 🤝\n\n_Sent via {{shopName}} POS System_\n🌟 *Quality Products, Quality Service*\n📞 {{shopPhone}}\n📍 {{shopAddress}}`,
+      hiddenSections: [
+        '/job-notes',
+        '/service-categories',
+        '/services',
+        '/quotations',
+        '/data-export',
+        '/pricing-proposals',
+        '/cash-management/insights',
+        '/cash-management/accounts',
+        '/reports',
+        '/cash-management/transactions',
+        '/warranties',
+        '/estimates',
+      ],
     },
   });
   console.log(`   ✅ Shop 1: ${shop1.name} (${shop1.slug})`);
@@ -635,60 +706,44 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
   console.log(`📌 Seeding ${shopName}...`);
 
   // ==========================================
-  // CATEGORIES
+  // CATEGORIES (Batch)
   // ==========================================
   console.log('   📁 Creating Categories...');
-  const categoryMap = new Map<string, string>();
-  
-  for (const cat of CATEGORIES_DATA) {
-    const category = await prisma.category.upsert({
-      where: { shopId_name: { shopId, name: cat.name } },
-      update: {},
-      create: {
-        name: cat.name,
-        description: cat.description,
-        shopId,
-      },
-    });
-    categoryMap.set(cat.name, category.id);
-  }
+  await prisma.category.createMany({
+    data: CATEGORIES_DATA.map(cat => ({
+      name: cat.name,
+      description: cat.description,
+      shopId,
+    })),
+  });
+  const allCategories = await prisma.category.findMany({ where: { shopId } });
+  const categoryMap = new Map(allCategories.map(c => [c.name, c.id]));
   console.log(`      ✅ Created ${CATEGORIES_DATA.length} categories`);
 
   // ==========================================
-  // BRANDS
+  // BRANDS (Batch)
   // ==========================================
   console.log('   🏷️  Creating Brands...');
-  const brandMap = new Map<string, string>();
-  
-  for (const brand of BRANDS_DATA) {
-    const b = await prisma.brand.upsert({
-      where: { shopId_name: { shopId, name: brand.name } },
-      update: {},
-      create: {
-        name: brand.name,
-        description: brand.description,
-        website: brand.website,
-        shopId,
-      },
-    });
-    brandMap.set(brand.name, b.id);
-  }
+  await prisma.brand.createMany({
+    data: BRANDS_DATA.map(brand => ({
+      name: brand.name,
+      description: brand.description,
+      website: brand.website,
+      shopId,
+    })),
+  });
+  const allBrands = await prisma.brand.findMany({ where: { shopId } });
+  const brandMap = new Map(allBrands.map(b => [b.name, b.id]));
   console.log(`      ✅ Created ${BRANDS_DATA.length} brands`);
 
   // ==========================================
-  // PRODUCTS
+  // PRODUCTS (Batch)
   // ==========================================
   console.log('   📦 Creating Products...');
-  const productMap = new Map<string, string>();
-  
-  for (const product of PRODUCTS_DATA) {
-    // Generate unique barcode per shop
-    const uniqueBarcode = `${shopId.slice(0, 4)}-${product.barcode}`;
-    
-    const p = await prisma.product.upsert({
-      where: { shopId_barcode: { shopId, barcode: uniqueBarcode } },
-      update: {},
-      create: {
+  await prisma.product.createMany({
+    data: PRODUCTS_DATA.map(product => {
+      const uniqueBarcode = `${shopId.slice(0, 4)}-${product.barcode}`;
+      return {
         name: product.name,
         description: `${product.brand} ${product.name} - Premium quality product`,
         price: product.price,
@@ -704,47 +759,41 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
         shopId,
         totalPurchased: product.stock,
         totalSold: 0,
-      },
-    });
-    productMap.set(product.name, p.id);
-  }
+      };
+    }),
+  });
+  const allProducts = await prisma.product.findMany({ where: { shopId } });
+  const productMap = new Map(allProducts.map(p => [p.name, p.id]));
   console.log(`      ✅ Created ${PRODUCTS_DATA.length} products`);
 
   // ==========================================
-  // SUPPLIERS
+  // SUPPLIERS (Batch)
   // ==========================================
   console.log('   🚚 Creating Suppliers...');
-  const supplierMap = new Map<string, string>();
-  
-  for (const supplier of SUPPLIERS_DATA) {
-    const s = await prisma.supplier.upsert({
-      where: { shopId_name: { shopId, name: supplier.name } },
-      update: {},
-      create: {
-        name: supplier.name,
-        contactPerson: supplier.contact,
-        email: supplier.email,
-        phone: supplier.phone,
-        address: supplier.address,
-        isActive: true,
-        shopId,
-      },
-    });
-    supplierMap.set(supplier.name, s.id);
-  }
+  await prisma.supplier.createMany({
+    data: SUPPLIERS_DATA.map(supplier => ({
+      name: supplier.name,
+      contactPerson: supplier.contact,
+      email: supplier.email,
+      phone: supplier.phone,
+      address: supplier.address,
+      isActive: true,
+      shopId,
+    })),
+  });
+  const allSuppliers = await prisma.supplier.findMany({ where: { shopId } });
+  const supplierMap = new Map(allSuppliers.map(s => [s.name, s.id]));
   console.log(`      ✅ Created ${SUPPLIERS_DATA.length} suppliers`);
 
   // ==========================================
-  // CUSTOMERS
+  // CUSTOMERS (Batch)
   // ==========================================
   console.log('   👥 Creating Customers...');
-  const customerMap = new Map<string, string>();
-  
-  for (const customer of CUSTOMERS_DATA) {
-    const hasCredit = 'credit' in customer && customer.credit;
-    
-    const c = await prisma.customer.create({
-      data: {
+  await prisma.customer.createMany({
+    data: CUSTOMERS_DATA.map(customer => {
+      const hasCredit = 'credit' in customer && customer.credit;
+      const hasCreditLimit = 'creditLimit' in customer && (customer as Record<string, unknown>).creditLimit;
+      return {
         name: customer.name,
         email: customer.email,
         phone: customer.phone,
@@ -754,50 +803,45 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
         totalSpent: 0,
         totalOrders: 0,
         creditBalance: hasCredit ? Math.floor(Math.random() * 50000) + 10000 : 0,
-        creditLimit: hasCredit ? 100000 : 0,
+        creditLimit: hasCreditLimit ? Number((customer as Record<string, unknown>).creditLimit) : (hasCredit ? 100000 : 0),
         creditStatus: hasCredit ? CreditStatus.ACTIVE : CreditStatus.CLEAR,
         creditDueDate: hasCredit ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
         shopId,
-      },
-    });
-    customerMap.set(customer.name, c.id);
-  }
+      };
+    }),
+  });
+  const allCustomers = await prisma.customer.findMany({ where: { shopId } });
+  const customerMap = new Map(allCustomers.map(c => [c.name, c.id]));
   console.log(`      ✅ Created ${CUSTOMERS_DATA.length} customers`);
 
   // ==========================================
-  // GRNs (Sample GRNs)
+  // GRNs (Sample GRNs - using already-fetched data)
   // ==========================================
   console.log('   📥 Creating GRNs...');
   
-  // Get some products and suppliers for GRN creation
-  const products = await prisma.product.findMany({ where: { shopId }, take: 10 });
-  const suppliers = await prisma.supplier.findMany({ where: { shopId }, take: 3 });
+  const products = allProducts.slice(0, 10);
+  const suppliers = allSuppliers.slice(0, 3);
   
   if (suppliers.length > 0 && products.length > 0) {
     const grnStatuses: GRNStatus[] = [GRNStatus.COMPLETED, GRNStatus.COMPLETED, GRNStatus.PENDING, GRNStatus.DRAFT];
+    const vehicleNumbers = ['CAB-1234', 'WP KA-5678', 'NW ABC-9012', 'CP XY-3456', 'SP LM-7890'];
+    const receivedByNames = ['Nuwan Perera', 'Kasun Silva', 'Chaminda Fernando', 'Amal Bandara', 'Saman Kumara'];
     
     for (let i = 0; i < 4; i++) {
       const supplier = suppliers[i % suppliers.length];
       const grnProducts = products.slice(i * 2, i * 2 + 3);
-      
       if (grnProducts.length === 0) continue;
       
-      const grnItems = grnProducts.map(p => ({
-        productId: p.id,
-        quantity: Math.floor(Math.random() * 20) + 5,
-        costPrice: p.costPrice || p.price * 0.8,
-        sellingPrice: p.price,
-        totalCost: (p.costPrice || p.price * 0.8) * (Math.floor(Math.random() * 20) + 5),
-      }));
+      const grnItems = grnProducts.map(p => {
+        const qty = Math.floor(Math.random() * 20) + 5;
+        const cost = p.costPrice || p.price * 0.8;
+        return { productId: p.id, quantity: qty, costPrice: cost, sellingPrice: p.price, totalCost: cost * qty };
+      });
       
       const subtotal = grnItems.reduce((sum, item) => sum + item.totalCost, 0);
-      
-      // Generate realistic Sri Lankan data for new fields
-      const vehicleNumbers = ['CAB-1234', 'WP KA-5678', 'NW ABC-9012', 'CP XY-3456', 'SP LM-7890'];
-      const receivedByNames = ['Nuwan Perera', 'Kasun Silva', 'Chaminda Fernando', 'Amal Bandara', 'Saman Kumara'];
       const grnDate = randomDate(new Date('2026-01-01'), new Date());
-      const receivedDate = grnStatuses[i] === GRNStatus.COMPLETED || grnStatuses[i] === GRNStatus.PENDING 
-        ? new Date(grnDate.getTime() + (Math.random() * 3 * 24 * 60 * 60 * 1000)) // 0-3 days after order
+      const receivedDate = grnStatuses[i] !== GRNStatus.DRAFT
+        ? new Date(grnDate.getTime() + (Math.random() * 3 * 24 * 60 * 60 * 1000))
         : null;
       
       await prisma.gRN.create({
@@ -810,10 +854,10 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
           deliveryNote: `DN${String(10000000 + Math.floor(Math.random() * 90000000)).padStart(8, '0')}`,
           vehicleNumber: vehicleNumbers[i % vehicleNumbers.length],
           receivedBy: receivedByNames[i % receivedByNames.length],
-          receivedDate: receivedDate,
+          receivedDate,
           subtotal,
           tax: 0,
-          discount: Math.random() > 0.5 ? Math.floor(subtotal * 0.02) : 0, // 50% chance of 2% discount
+          discount: Math.random() > 0.5 ? Math.floor(subtotal * 0.02) : 0,
           totalAmount: subtotal,
           paidAmount: grnStatuses[i] === GRNStatus.COMPLETED ? subtotal : 0,
           status: grnStatuses[i],
@@ -836,11 +880,17 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
   }
 
   // ==========================================
-  // INVOICES (Various statuses)
+  // INVOICES (Various statuses - batch payments & stock)
   // ==========================================
   console.log('   🧾 Creating Invoices...');
   
-  const customers = await prisma.customer.findMany({ where: { shopId }, take: 10 });
+  const customers = allCustomers.slice(0, 10);
+  
+  // Collect batch data
+  const paymentRecords: { invoiceId: string; amount: number; paymentMethod: PaymentMethod; paymentDate: Date; notes: string; recordedById: string }[] = [];
+  const stockMovements: { productId: string; type: StockMovementType; quantity: number; previousStock: number; newStock: number; referenceId: string; referenceNumber: string; referenceType: string; unitPrice: number; createdBy: string; shopId: string }[] = [];
+  const customerUpdates: Map<string, { totalSpent: number; totalOrders: number; lastPurchase: Date }> = new Map();
+  const productStockUpdates: Map<string, { soldQty: number; newStock: number }> = new Map();
   
   if (customers.length > 0 && products.length > 0) {
     const invoiceStatuses: InvoiceStatus[] = [
@@ -857,7 +907,6 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
     for (let i = 0; i < 8; i++) {
       const customer = customers[i % customers.length];
       const invoiceProducts = products.slice((i * 2) % products.length, ((i * 2) % products.length) + 3);
-      
       if (invoiceProducts.length === 0) continue;
       
       const invoiceItems = invoiceProducts.map(p => {
@@ -880,12 +929,12 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
       const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
       const status = invoiceStatuses[i];
       const paidAmount = status === InvoiceStatus.FULLPAID ? subtotal : 
-                         status === InvoiceStatus.HALFPAY ? Math.floor(subtotal / 2) : 
-                         status === InvoiceStatus.CANCELLED ? 0 : 0;
+                         status === InvoiceStatus.HALFPAY ? Math.floor(subtotal / 2) : 0;
       
       const invoiceDate = randomDate(new Date('2026-01-01'), new Date());
       const dueDate = new Date(invoiceDate);
       dueDate.setDate(dueDate.getDate() + 30);
+      const payMethod = status !== InvoiceStatus.UNPAID ? randomItem(paymentMethods) : null;
       
       const invoice = await prisma.invoice.create({
         data: {
@@ -893,96 +942,103 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
           shopId,
           customerId: customer.id,
           customerName: customer.name,
-          subtotal,
-          tax: 0,
-          discount: 0,
-          total: subtotal,
-          paidAmount,
-          dueAmount: subtotal - paidAmount,
-          status,
-          date: invoiceDate,
-          dueDate,
-          paymentMethod: status !== InvoiceStatus.UNPAID ? randomItem(paymentMethods) : null,
+          subtotal, tax: 0, discount: 0, total: subtotal,
+          paidAmount, dueAmount: subtotal - paidAmount,
+          status, date: invoiceDate, dueDate,
+          paymentMethod: payMethod,
           salesChannel: Math.random() > 0.2 ? SalesChannel.ON_SITE : SalesChannel.ONLINE,
           notes: status === InvoiceStatus.CANCELLED ? 'Customer cancelled order' : null,
           createdById: adminId,
-          items: {
-            create: invoiceItems,
-          },
+          items: { create: invoiceItems },
         },
       });
       
-      // Add payment records for paid/halfpaid invoices
+      // Collect payment record
       if (paidAmount > 0 && status !== InvoiceStatus.CANCELLED) {
-        await prisma.invoicePayment.create({
-          data: {
-            invoiceId: invoice.id,
-            amount: paidAmount,
-            paymentMethod: invoice.paymentMethod || PaymentMethod.CASH,
-            paymentDate: invoiceDate,
-            notes: 'Initial payment',
-            recordedById: adminId,
-          },
+        paymentRecords.push({
+          invoiceId: invoice.id, amount: paidAmount,
+          paymentMethod: payMethod || PaymentMethod.CASH,
+          paymentDate: invoiceDate, notes: 'Initial payment', recordedById: adminId,
         });
       }
       
-      // Update customer stats
+      // Collect customer update
       if (status !== InvoiceStatus.CANCELLED) {
-        await prisma.customer.update({
-          where: { id: customer.id },
-          data: {
-            totalSpent: { increment: paidAmount },
-            totalOrders: { increment: 1 },
-            lastPurchase: invoiceDate,
-          },
-        });
+        const existing = customerUpdates.get(customer.id) || { totalSpent: 0, totalOrders: 0, lastPurchase: new Date(0) };
+        existing.totalSpent += paidAmount;
+        existing.totalOrders += 1;
+        if (invoiceDate > existing.lastPurchase) existing.lastPurchase = invoiceDate;
+        customerUpdates.set(customer.id, existing);
       }
       
-      // Create stock movements for completed invoices
+      // Collect stock movements
       if (status === InvoiceStatus.FULLPAID || status === InvoiceStatus.HALFPAY) {
         for (const item of invoiceItems) {
           if (item.productId) {
             const product = invoiceProducts.find(p => p.id === item.productId);
             if (product) {
-              const previousStock = product.stock;
+              const prevUpdate = productStockUpdates.get(item.productId);
+              const previousStock = prevUpdate ? prevUpdate.newStock : product.stock;
               const newStock = Math.max(0, previousStock - item.quantity);
               
-              await prisma.stockMovement.create({
-                data: {
-                  productId: item.productId,
-                  type: StockMovementType.INVOICE_OUT,
-                  quantity: -item.quantity,
-                  previousStock,
-                  newStock,
-                  referenceId: invoice.id,
-                  referenceNumber: invoice.invoiceNumber,
-                  referenceType: 'invoice',
-                  unitPrice: item.unitPrice,
-                  createdBy: adminId,
-                  shopId,
-                },
+              stockMovements.push({
+                productId: item.productId, type: StockMovementType.INVOICE_OUT,
+                quantity: -item.quantity, previousStock, newStock,
+                referenceId: invoice.id, referenceNumber: invoice.invoiceNumber,
+                referenceType: 'invoice', unitPrice: item.unitPrice,
+                createdBy: adminId, shopId,
               });
               
-              // Update product stock and totalSold
-              await prisma.product.update({
-                where: { id: item.productId },
-                data: {
-                  stock: newStock,
-                  totalSold: { increment: item.quantity },
-                },
-              });
+              const existingUpdate = productStockUpdates.get(item.productId) || { soldQty: 0, newStock: product.stock };
+              existingUpdate.soldQty += item.quantity;
+              existingUpdate.newStock = newStock;
+              productStockUpdates.set(item.productId, existingUpdate);
             }
           }
         }
       }
     }
-    console.log(`      ✅ Created 8 sample invoices`);
+    
+    // Batch insert payment records
+    if (paymentRecords.length > 0) {
+      await prisma.invoicePayment.createMany({ data: paymentRecords });
+    }
+    
+    // Batch insert stock movements
+    if (stockMovements.length > 0) {
+      await prisma.stockMovement.createMany({ data: stockMovements });
+    }
+    
+    // Batch update customer stats
+    for (const [custId, update] of customerUpdates) {
+      await prisma.customer.update({
+        where: { id: custId },
+        data: {
+          totalSpent: { increment: update.totalSpent },
+          totalOrders: { increment: update.totalOrders },
+          lastPurchase: update.lastPurchase,
+        },
+      });
+    }
+    
+    // Batch update product stocks
+    for (const [prodId, update] of productStockUpdates) {
+      await prisma.product.update({
+        where: { id: prodId },
+        data: {
+          stock: update.newStock,
+          totalSold: { increment: update.soldQty },
+        },
+      });
+    }
+    
+    console.log(`      ✅ Created 8 invoices, ${paymentRecords.length} payments, ${stockMovements.length} stock movements`);
   }
 
   // ==========================================
-  // INVOICE REMINDERS (Sample)
+  // REMINDERS (Batch)
   // ==========================================
-  console.log('   📨 Creating Invoice Reminders...');
+  console.log('   📨 Creating Reminders...');
   
   const unpaidInvoices = await prisma.invoice.findMany({
     where: { shopId, status: { in: [InvoiceStatus.UNPAID, InvoiceStatus.HALFPAY] } },
@@ -990,27 +1046,21 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
     take: 3,
   });
   
-  for (const invoice of unpaidInvoices) {
-    if (invoice.customer) {
-      await prisma.invoiceReminder.create({
-        data: {
-          invoiceId: invoice.id,
-          shopId,
-          type: invoice.dueDate < new Date() ? ReminderType.OVERDUE : ReminderType.PAYMENT,
-          channel: 'whatsapp',
-          message: `Dear ${invoice.customerName}, reminder for invoice ${invoice.invoiceNumber} - Amount due: Rs. ${invoice.dueAmount.toLocaleString()}`,
-          customerPhone: invoice.customer.phone,
-          customerName: invoice.customerName,
-        },
-      });
-    }
+  const invoiceReminderData = unpaidInvoices
+    .filter(inv => inv.customer)
+    .map(invoice => ({
+      invoiceId: invoice.id,
+      shopId,
+      type: invoice.dueDate && invoice.dueDate < new Date() ? ReminderType.OVERDUE : ReminderType.PAYMENT,
+      channel: 'whatsapp',
+      message: `Dear ${invoice.customerName}, reminder for invoice ${invoice.invoiceNumber} - Amount due: Rs. ${invoice.dueAmount.toLocaleString()}`,
+      customerPhone: invoice.customer!.phone,
+      customerName: invoice.customerName,
+    }));
+  
+  if (invoiceReminderData.length > 0) {
+    await prisma.invoiceReminder.createMany({ data: invoiceReminderData });
   }
-  console.log(`      ✅ Created ${unpaidInvoices.length} invoice reminders`);
-
-  // ==========================================
-  // GRN REMINDERS (Sample)
-  // ==========================================
-  console.log('   📨 Creating GRN Reminders...');
   
   const unpaidGRNs = await prisma.gRN.findMany({
     where: { shopId, paymentStatus: { in: [PaymentStatus.UNPAID, PaymentStatus.PARTIAL] } },
@@ -1018,26 +1068,26 @@ async function seedShopData(shopId: string, shopName: string, adminId: string) {
     take: 3,
   });
   
-  for (const grn of unpaidGRNs) {
-    if (grn.supplier) {
-      const balanceDue = grn.totalAmount - (grn.paidAmount || 0);
-      await prisma.gRNReminder.create({
-        data: {
-          grnId: grn.id,
-          shopId,
-          type: ReminderType.PAYMENT,
-          channel: 'whatsapp',
-          message: `Dear ${grn.supplier.name}, reminder for GRN ${grn.grnNumber} - Total: Rs. ${grn.totalAmount.toLocaleString()}, Balance Due: Rs. ${balanceDue.toLocaleString()}`,
-          supplierPhone: grn.supplier.phone,
-          supplierName: grn.supplier.name,
-        },
-      });
-    }
+  const grnReminderData = unpaidGRNs
+    .filter(grn => grn.supplier)
+    .map(grn => ({
+      grnId: grn.id,
+      shopId,
+      type: ReminderType.PAYMENT,
+      channel: 'whatsapp',
+      message: `Dear ${grn.supplier!.name}, reminder for GRN ${grn.grnNumber} - Balance Due: Rs. ${(grn.totalAmount - (grn.paidAmount || 0)).toLocaleString()}`,
+      supplierPhone: grn.supplier!.phone,
+      supplierName: grn.supplier!.name,
+    }));
+  
+  if (grnReminderData.length > 0) {
+    await prisma.gRNReminder.createMany({ data: grnReminderData });
   }
-  console.log(`      ✅ Created ${unpaidGRNs.length} GRN reminders`);
+  
+  console.log(`      ✅ Created ${invoiceReminderData.length} invoice + ${grnReminderData.length} GRN reminders`);
 
   // ==========================================
-  // INVOICE ITEM HISTORY (Sample modifications)
+  // INVOICE ITEM HISTORY (Single record)
   // ==========================================
   console.log('   📜 Creating Invoice Item History...');
   
