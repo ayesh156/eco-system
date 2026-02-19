@@ -325,29 +325,29 @@ IMPORTANT LANGUAGE INSTRUCTION: ${languageInstructions[selectedLanguage]}`;
       <div className="absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-br from-purple-500/20 via-blue-500/15 to-emerald-500/10 rounded-full blur-3xl" />
       <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-gradient-to-br from-emerald-500/15 via-blue-500/10 to-purple-500/5 rounded-full blur-3xl" />
       
-      <div className="relative p-6">
+      <div className="relative p-4 sm:p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 shadow-lg shadow-purple-500/25`}>
-              <Brain className="w-6 h-6 text-white" />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 shadow-lg shadow-purple-500/25`}>
+              <Brain className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <h3 className={`text-lg font-semibold flex items-center gap-2 ${
+              <h3 className={`text-sm sm:text-lg font-semibold flex items-center gap-1.5 sm:gap-2 ${
                 theme === 'dark' ? 'text-white' : 'text-slate-900'
               }`}>
                 AI Monthly Analysis
-                <Sparkles className="w-4 h-4 text-amber-500" />
+                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
               </h3>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                 Powered by Gemini AI • January 2026
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="flex items-center gap-2 flex-wrap">
             {lastUpdated && (
-              <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+              <span className={`text-xs hidden sm:inline ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                 Updated {lastUpdated.toLocaleTimeString()}
               </span>
             )}
@@ -372,7 +372,7 @@ IMPORTANT LANGUAGE INSTRUCTION: ${languageInstructions[selectedLanguage]}`;
               
               {/* Dropdown Menu */}
               {isLanguageDropdownOpen && (
-                <div className={`absolute right-0 top-full mt-2 w-48 rounded-xl border shadow-xl z-50 overflow-hidden ${
+                <div className={`absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-56 sm:w-48 rounded-xl border shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 sm:slide-in-from-right-4 duration-200 ${
                   theme === 'dark'
                     ? 'bg-slate-800 border-slate-700'
                     : 'bg-white border-slate-200'
@@ -413,7 +413,7 @@ IMPORTANT LANGUAGE INSTRUCTION: ${languageInstructions[selectedLanguage]}`;
             <button
               onClick={generateAnalysis}
               disabled={isLoading}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-sm font-medium transition-all ${
                 isLoading
                   ? 'bg-slate-500/50 cursor-not-allowed'
                   : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg hover:shadow-purple-500/25'
@@ -447,48 +447,48 @@ IMPORTANT LANGUAGE INSTRUCTION: ${languageInstructions[selectedLanguage]}`;
 
         {/* Quick Metrics Summary */}
         {metrics && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <div className={`p-4 rounded-xl ${
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
+            <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl ${
               theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
             }`}>
-              <div className="flex items-center gap-2 mb-1">
-                <DollarSign className="w-4 h-4 text-emerald-500" />
-                <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Revenue</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+                <span className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Revenue</span>
               </div>
-              <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              <p className={`text-sm sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {formatCurrency(metrics.totalRevenue)}
               </p>
             </div>
-            <div className={`p-4 rounded-xl ${
+            <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl ${
               theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
             }`}>
-              <div className="flex items-center gap-2 mb-1">
-                <ShoppingCart className="w-4 h-4 text-blue-500" />
-                <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Orders</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
+                <span className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Orders</span>
               </div>
-              <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              <p className={`text-sm sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {metrics.totalOrders}
               </p>
             </div>
-            <div className={`p-4 rounded-xl ${
+            <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl ${
               theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
             }`}>
-              <div className="flex items-center gap-2 mb-1">
-                <Package className="w-4 h-4 text-amber-500" />
-                <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Low Stock</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
+                <span className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Low Stock</span>
               </div>
-              <p className={`text-lg font-bold ${metrics.lowStockItems.length > 3 ? 'text-amber-500' : theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              <p className={`text-sm sm:text-lg font-bold ${metrics.lowStockItems.length > 3 ? 'text-amber-500' : theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {metrics.lowStockItems.length} items
               </p>
             </div>
-            <div className={`p-4 rounded-xl ${
+            <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl ${
               theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
             }`}>
-              <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-4 h-4 text-purple-500" />
-                <span className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Active Jobs</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />
+                <span className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Active Jobs</span>
               </div>
-              <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              <p className={`text-sm sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {metrics.activeJobs}
               </p>
             </div>
@@ -594,19 +594,19 @@ IMPORTANT LANGUAGE INSTRUCTION: ${languageInstructions[selectedLanguage]}`;
 
         {/* Empty State */}
         {!analysis && !isLoading && !error && (
-          <div className="text-center py-8">
-            <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+          <div className="text-center py-5 sm:py-8">
+            <div className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-xl sm:rounded-2xl flex items-center justify-center ${
               theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'
             }`}>
-              <BarChart3 className={`w-8 h-8 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+              <BarChart3 className={`w-6 h-6 sm:w-8 sm:h-8 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
             </div>
-            <h4 className={`font-medium mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            <h4 className={`text-sm sm:text-base font-medium mb-1.5 sm:mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
               Get AI-Powered Business Insights
             </h4>
-            <p className={`text-sm mb-4 max-w-md mx-auto ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            <p className={`text-xs sm:text-sm mb-3 sm:mb-4 max-w-md mx-auto px-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
               Click "Generate Analysis" to get a comprehensive monthly business review with actionable recommendations powered by Gemini AI.
             </p>
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
               {['Sales Trends', 'Stock Alerts', 'Revenue Analysis', 'Action Items'].map((tag) => (
                 <span
                   key={tag}

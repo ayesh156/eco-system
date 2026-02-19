@@ -116,9 +116,9 @@ export const validateInvoiceUpdate = [
     .withMessage('At least one item is required when updating items'),
   
   body('items.*.productId')
-    .optional()
-    .notEmpty()
-    .withMessage('Product ID is required for each item'),
+    .optional({ values: 'null' })
+    .isString()
+    .withMessage('Product ID must be a string when provided'),
   
   body('items.*.productName')
     .optional()

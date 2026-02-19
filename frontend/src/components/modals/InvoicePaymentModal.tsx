@@ -217,15 +217,15 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
       {/* Backdrop with blur */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal - Full scroll */}
-      <div className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 ${
+      {/* Modal - Full screen on mobile, centered on desktop */}
+      <div className={`relative w-full sm:max-w-lg h-[100dvh] sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col overflow-hidden ${
         theme === 'dark' ? 'bg-slate-900' : 'bg-white'
       }`}>
         {/* Success Overlay - Beautiful Animation */}
@@ -248,6 +248,8 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
           </div>
         )}
 
+        {/* Scrollable content area - header scrolls away for more room */}
+        <div className="flex-1 overflow-y-auto min-h-0">
         {/* Header with Gradient */}
         <div className="relative overflow-hidden">
           <div className={`absolute inset-0 ${
@@ -280,21 +282,21 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
             <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/10 rounded-full blur-xl" />
           </div>
           
-          <div className="relative px-6 py-5">
+          <div className="relative px-4 py-3 sm:px-6 sm:py-5">
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur flex items-center justify-center">
-                    <Receipt className="w-4 h-4 text-white" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0">
+                    <Receipt className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                   </div>
-                  <div>
-                    <span className="text-white/80 text-sm font-medium">Invoice Payment</span>
-                    <span className="text-white/60 text-sm ml-2">#{invoice.id}</span>
+                  <div className="min-w-0">
+                    <span className="text-white/80 text-xs sm:text-sm font-medium">Invoice Payment</span>
+                    <span className="text-white/60 text-xs sm:text-sm ml-1.5 sm:ml-2">#{invoice.id}</span>
                   </div>
                 </div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  {invoice.customerName}
+                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 truncate">
+                  <User className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                  <span className="truncate">{invoice.customerName}</span>
                 </h2>
                 {isOverdue && (
                   <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-white/15 backdrop-blur rounded-lg w-fit">
@@ -305,26 +307,26 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
               </div>
               <button
                 onClick={onClose}
-                className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-all hover:scale-105"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-all hover:scale-105 flex-shrink-0"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
 
             {/* Invoice Summary Card */}
-            <div className="mt-4 p-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10">
-              <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="mt-3 sm:mt-4 p-3 sm:p-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
                 <div>
-                  <div className="text-white/60 text-xs mb-1">Total</div>
-                  <div className="text-lg font-bold text-white">{formatCurrency(invoice.total)}</div>
+                  <div className="text-white/60 text-[10px] sm:text-xs mb-0.5 sm:mb-1">Total</div>
+                  <div className="text-sm sm:text-lg font-bold text-white">{formatCurrency(invoice.total)}</div>
                 </div>
                 <div>
-                  <div className="text-white/60 text-xs mb-1">Paid</div>
-                  <div className="text-lg font-bold text-emerald-300">{formatCurrency(invoice.paidAmount || 0)}</div>
+                  <div className="text-white/60 text-[10px] sm:text-xs mb-0.5 sm:mb-1">Paid</div>
+                  <div className="text-sm sm:text-lg font-bold text-emerald-300">{formatCurrency(invoice.paidAmount || 0)}</div>
                 </div>
                 <div>
-                  <div className="text-white/60 text-xs mb-1">Balance</div>
-                  <div className="text-lg font-bold text-amber-300">{formatCurrency(remainingAmount)}</div>
+                  <div className="text-white/60 text-[10px] sm:text-xs mb-0.5 sm:mb-1">Balance</div>
+                  <div className="text-sm sm:text-lg font-bold text-amber-300">{formatCurrency(remainingAmount)}</div>
                 </div>
               </div>
 
@@ -375,7 +377,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className={`flex border-b ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+        <div className={`flex border-b sticky top-0 z-10 ${theme === 'dark' ? 'border-slate-700/50 bg-slate-900' : 'border-slate-200 bg-white'}`}>
           <button
             onClick={() => setActiveTab('payment')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-all ${
@@ -418,14 +420,14 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
         {/* Content */}
         <div>
           {activeTab === 'payment' ? (
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
               {/* Quick Amount Selection */}
               <div>
                 <label className={`flex items-center gap-2 text-sm font-semibold mb-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                   <Zap className="w-4 h-4 text-amber-500" />
                   Quick Select
                 </label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {quickAmounts.map(({ label, value, icon, description }) => (
                     <button
                       key={label}
@@ -474,7 +476,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                     max={remainingAmount}
                     min={0}
                     readOnly={isWalkInInvoice}
-                    className={`w-full pl-14 pr-4 py-4 rounded-xl border-2 text-2xl font-bold transition-all ${
+                    className={`w-full pl-14 pr-4 py-3 sm:py-4 rounded-xl border-2 text-xl sm:text-2xl font-bold transition-all ${
                       isWalkInInvoice
                         ? 'cursor-not-allowed opacity-75 ' + (theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-slate-100 border-slate-300 text-slate-500')
                         : theme === 'dark'
@@ -506,13 +508,13 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                   <CreditCard className="w-4 h-4 text-blue-500" />
                   Payment Method
                 </label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {paymentMethods.map(({ value, label, emoji, color }) => (
                     <button
                       key={value}
                       type="button"
                       onClick={() => setPaymentMethod(value)}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                      className={`flex flex-col items-center gap-1.5 sm:gap-2 p-2.5 sm:p-3 rounded-xl border-2 transition-all ${
                         paymentMethod === value
                           ? `border-${color}-500 bg-${color}-500/10 scale-105`
                           : theme === 'dark' 
@@ -524,7 +526,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                         backgroundColor: color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : color === 'purple' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(245, 158, 11, 0.1)'
                       } : {}}
                     >
-                      <span className="text-2xl">{emoji}</span>
+                      <span className="text-xl sm:text-2xl">{emoji}</span>
                       <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                         {label}
                       </span>
@@ -553,7 +555,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
               </div>
 
               {/* Payment Date & Time */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Date Picker */}
                 <div className="relative">
                   <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -660,7 +662,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                 {/* Time Picker */}
                 <div>
                   <label className={`flex items-center gap-2 text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                    <Clock className="w-4 h-4 text-pink-500" />
+                    <Clock className={`w-4 h-4 ${theme === 'dark' ? 'text-white' : 'text-slate-700'}`} />
                     Payment Time
                   </label>
                   <div className="relative">
@@ -668,13 +670,14 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                       type="time"
                       value={paymentTime}
                       onChange={(e) => setPaymentTime(e.target.value)}
+                      style={theme === 'dark' ? { colorScheme: 'dark' } : undefined}
                       className={`w-full px-4 py-3 rounded-xl border transition-all ${
                         theme === 'dark'
                           ? 'bg-slate-800/50 border-slate-700 text-white focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20'
                           : 'bg-white border-slate-200 text-slate-900 focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20'
                       }`}
                     />
-                    <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium px-2 py-1 rounded ${
+                    <div className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium px-2 py-1 rounded hidden sm:flex items-center ${
                       theme === 'dark' ? 'bg-pink-500/20 text-pink-400' : 'bg-pink-100 text-pink-600'
                     }`}>
                       {formatTimeDisplay(paymentTime)}
@@ -713,7 +716,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
             </div>
           ) : (
             /* Payment History Tab */
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {paymentHistory.length === 0 ? (
                 <div className={`text-center py-12 rounded-xl border-2 border-dashed ${
                   theme === 'dark' ? 'border-slate-700 bg-slate-800/20' : 'border-slate-200 bg-slate-50'
@@ -731,7 +734,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   {paymentHistory.map((payment, index) => {
                     const methodColors = getPaymentMethodColors(payment.paymentMethod);
                     const { date: formattedDate, time: formattedTime } = formatDateTime(payment.paymentDate);
@@ -739,7 +742,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                     return (
                       <div 
                         key={payment.id}
-                        className={`relative p-4 rounded-2xl border overflow-hidden transition-all hover:scale-[1.01] ${
+                        className={`relative p-3 sm:p-4 rounded-xl sm:rounded-2xl border overflow-hidden transition-all hover:scale-[1.01] ${
                           theme === 'dark' 
                             ? `bg-gradient-to-r ${methodColors.bg} ${methodColors.border}` 
                             : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
@@ -748,35 +751,35 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                         {/* Decorative accent */}
                         <div className={`absolute left-0 top-0 bottom-0 w-1 ${methodColors.icon}`} />
                         
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-lg ${methodColors.icon}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 flex items-center justify-center text-lg sm:text-xl shadow-lg ${methodColors.icon}`}>
                               {payment.paymentMethod === 'cash' ? '💵' : 
                                payment.paymentMethod === 'card' ? '💳' : 
                                payment.paymentMethod === 'bank' ? '🏦' : '📝'}
                             </div>
-                            <div>
-                              <div className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                            <div className="min-w-0">
+                              <div className={`text-base sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                                 {formatCurrency(payment.amount)}
                               </div>
-                              <div className={`flex items-center gap-2 text-xs ${methodColors.text}`}>
+                              <div className={`flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs ${methodColors.text}`}>
                                 <span className="font-medium">
                                   {payment.paymentMethod.charAt(0).toUpperCase() + payment.paymentMethod.slice(1)}
                                 </span>
                                 <span className="opacity-50">•</span>
                                 <span className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  Payment #{index + 1}
+                                  #{index + 1}
                                 </span>
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className={`flex items-center gap-1.5 text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
-                              <Calendar className="w-3.5 h-3.5 opacity-60" />
+                          <div className="text-right flex-shrink-0">
+                            <div className={`flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
+                              <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-60" />
                               {formattedDate}
                             </div>
-                            <div className={`flex items-center gap-1.5 text-xs mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              <Clock className="w-3 h-3 opacity-60" />
+                            <div className={`flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs mt-0.5 sm:mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 opacity-60" />
                               {formattedTime}
                             </div>
                           </div>
@@ -794,28 +797,28 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                   })}
                   
                   {/* Total Paid Summary */}
-                  <div className={`mt-4 p-5 rounded-2xl ${
+                  <div className={`mt-3 sm:mt-4 p-4 sm:p-5 rounded-xl sm:rounded-2xl ${
                     theme === 'dark' 
                       ? 'bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 border border-emerald-500/30' 
                       : 'bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200'
                   }`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 sm:gap-3">
+                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${
                           theme === 'dark' ? 'bg-emerald-500/30' : 'bg-emerald-100'
                         }`}>
-                          <CheckCircle className={`w-5 h-5 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                          <CheckCircle className={`w-4 h-4 sm:w-5 sm:h-5 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
                         </div>
                         <div>
                           <span className={`text-sm font-medium ${theme === 'dark' ? 'text-emerald-300' : 'text-emerald-700'}`}>
                             Total Paid
                           </span>
-                          <div className={`text-xs ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600/70'}`}>
-                            {paymentHistory.length} payment{paymentHistory.length !== 1 ? 's' : ''} recorded
+                          <div className={`text-[11px] sm:text-xs ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600/70'}`}>
+                            {paymentHistory.length} payment{paymentHistory.length !== 1 ? 's' : ''}
                           </div>
                         </div>
                       </div>
-                      <span className={`text-2xl font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                      <span className={`text-xl sm:text-2xl font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
                         {formatCurrency(paymentHistory.reduce((sum, p) => sum + p.amount, 0))}
                       </span>
                     </div>
@@ -825,14 +828,15 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
             </div>
           )}
         </div>
+        </div>
 
         {/* Footer - Pay Button */}
         {activeTab === 'payment' && (
-          <div className={`px-6 py-4 border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
+          <div className={`px-4 sm:px-6 py-3 sm:py-4 border-t flex-shrink-0 ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
             <button
               onClick={handlePayment}
               disabled={paymentAmount <= 0 || isProcessing}
-              className={`w-full flex items-center justify-center gap-3 py-4 rounded-xl font-bold text-lg transition-all ${
+              className={`w-full flex items-center justify-center gap-2 sm:gap-3 py-3.5 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all ${
                 paymentAmount > 0 && !isProcessing
                   ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02] active:scale-[0.98]'
                   : theme === 'dark' ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -840,13 +844,13 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
             >
               {isProcessing ? (
                 <>
-                  <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Processing Payment...</span>
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="text-sm sm:text-base">Processing...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-6 h-6" />
-                  <span>Record Payment • {formatCurrency(paymentAmount)}</span>
+                  <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <span className="text-sm sm:text-base">Record Payment • {formatCurrency(paymentAmount)}</span>
                 </>
               )}
             </button>

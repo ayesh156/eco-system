@@ -3,6 +3,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { productBrands, mockProducts, brandLogos } from '../data/mockData';
 import { brandService } from '../services/brandService';
+import { deleteBrandImage, isSupabaseUrl, isSupabaseConfigured } from '../services/brandCategoryImageService';
 import { BrandFormModal } from '../components/modals/BrandFormModal';
 import type { Brand } from '../components/modals/BrandFormModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
@@ -335,37 +336,33 @@ export const Brands: React.FC = () => {
 
   const handleSaveBrand = async (brand: Brand) => {
     try {
+      // Clean empty strings to undefined so backend optional validators work correctly
+      const cleanData = {
+        name: brand.name,
+        description: brand.description || undefined,
+        website: (brand as any).website || undefined,
+        contactEmail: (brand as any).contactEmail || undefined,
+        contactPhone: (brand as any).contactPhone || undefined,
+        image: brand.image || undefined,
+      };
+
       if (selectedBrand) {
         // Update existing brand
-        const updated = await brandService.update(brand.id, {
-          name: brand.name,
-          description: brand.description,
-          website: (brand as any).website,
-          contactEmail: (brand as any).contactEmail,
-          contactPhone: (brand as any).contactPhone,
-          image: brand.image,
-        }, effectiveShopId);
+        const updated = await brandService.update(brand.id, cleanData, effectiveShopId);
         setBrands(prev => prev.map(b => b.id === brand.id ? {
           ...b,
           name: updated.name,
           description: updated.description || b.description,
-          image: updated.image || b.image,
-          productCount: updated._count?.products || b.productCount,
-          website: (updated as any).website || (b as any).website,
+          image: updated.image || brand.image || b.image,  // Use modal image as fallback for immediate UI update
+          productCount: updated._count?.products ?? b.productCount,
+          website: updated.website || (b as any).website,
           contactEmail: (updated as any).contactEmail || (b as any).contactEmail,
           contactPhone: (updated as any).contactPhone || (b as any).contactPhone,
         } : b));
         setHighlightedBrandId(brand.id);
       } else {
         // Create new brand
-        const created = await brandService.create({
-          name: brand.name,
-          description: brand.description,
-          website: (brand as any).website,
-          contactEmail: (brand as any).contactEmail,
-          contactPhone: (brand as any).contactPhone,
-          image: brand.image,
-        }, effectiveShopId);
+        const created = await brandService.create(cleanData, effectiveShopId);
         const logoUrl = created.image || getBrandLogoUrl(brand.name);
         const newBrand: ExtendedBrand = {
           id: created.id,
@@ -392,6 +389,11 @@ export const Brands: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (brandToDelete) {
       try {
+        // Delete brand image from Supabase if it exists
+        if (brandToDelete.image && isSupabaseUrl(brandToDelete.image) && isSupabaseConfigured()) {
+          console.log('🗑️ Deleting brand image from Supabase:', brandToDelete.image);
+          await deleteBrandImage(brandToDelete.image);
+        }
         await brandService.delete(brandToDelete.id, effectiveShopId);
         setBrands(prev => prev.filter(b => b.id !== brandToDelete.id));
       } catch (error) {
@@ -405,6 +407,18 @@ export const Brands: React.FC = () => {
     }
   };
 
+  // Helper to get a brand logo from the local fallback map (case-insensitive)
+  const getBrandFallbackLogo = (name: string): string => {
+    // Try exact match first
+    if (brandLogos[name]) return brandLogos[name];
+    // Try case-insensitive match
+    const lowerName = name.toLowerCase();
+    for (const key of Object.keys(brandLogos)) {
+      if (key.toLowerCase() === lowerName) return brandLogos[key];
+    }
+    return '';
+  };
+
   // Render brand image or fallback
   const renderBrandImage = (brand: ExtendedBrand, size: 'sm' | 'md' | 'lg' = 'md') => {
     const sizeClasses = {
@@ -413,15 +427,20 @@ export const Brands: React.FC = () => {
       lg: 'w-16 h-16'
     };
 
-    if (brand.image) {
+    // Try brand.image first, then brandLogos fallback
+    const imageUrl = brand.image || getBrandFallbackLogo(brand.name);
+
+    if (imageUrl) {
       return (
         <div className={`${sizeClasses[size]} rounded-xl overflow-hidden bg-white flex items-center justify-center border ${
           theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
         }`}>
           <img 
-            src={brand.image} 
+            key={imageUrl}
+            src={imageUrl} 
             alt={brand.name}
             className="w-full h-full object-contain p-1"
+            crossOrigin="anonymous"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
               (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');

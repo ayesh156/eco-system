@@ -10,7 +10,9 @@ import { brandService } from '../../services/brandService';
 import type { BrandSuggestion } from '../../services/brandService';
 import { 
   uploadBrandImage, 
+  deleteBrandImage,
   isSupabaseConfigured,
+  isSupabaseUrl,
   isBase64DataUrl,
   base64ToFile 
 } from '../../services/brandCategoryImageService';
@@ -74,6 +76,9 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
   // Track if we have a pending image file to upload to Supabase
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   
+  // Track original image URL for deletion when replacing
+  const [originalImageUrl, setOriginalImageUrl] = useState<string>('');
+  
   // Brand name suggestions from database
   const [brandSuggestions, setBrandSuggestions] = useState<BrandSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -108,6 +113,8 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
             contactPhone: (freshBrandData as any).contactPhone || '',
             image: freshBrandData.image || '',
           });
+          // Track original image for deletion if changed
+          setOriginalImageUrl(freshBrandData.image || '');
         } catch (error) {
           console.error('Failed to load brand data:', error);
           setLoadError(error instanceof Error ? error.message : 'Failed to load brand details');
@@ -120,6 +127,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
             contactPhone: '',
             image: brand.image || '',
           });
+          setOriginalImageUrl(brand.image || '');
         } finally {
           setIsLoadingBrand(false);
         }
@@ -141,6 +149,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
       setIsUploading(false);
       setUploadProgress(0);
       setPendingImageFile(null);
+      if (!brand) setOriginalImageUrl('');
     };
     
     loadBrandData();
@@ -313,8 +322,16 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
     
     try {
       let finalImageUrl = formData.image;
+      const hasNewImage = pendingImageFile || (isBase64DataUrl(formData.image) && formData.image !== originalImageUrl);
+      const imageWasRemoved = !formData.image && originalImageUrl;
       
-      // Upload image to Supabase if we have a pending file or base64 image
+      // Delete old Supabase image if replacing with new one or removing
+      if ((hasNewImage || imageWasRemoved) && originalImageUrl && isSupabaseUrl(originalImageUrl) && isSupabaseConfigured()) {
+        console.log('🗑️ Deleting old brand image from Supabase:', originalImageUrl);
+        await deleteBrandImage(originalImageUrl);
+      }
+      
+      // Upload new image to Supabase if we have a pending file or base64 image
       if (pendingImageFile && isSupabaseConfigured() && user?.shop?.id) {
         const uploadResult = await uploadBrandImage(
           pendingImageFile,
@@ -324,6 +341,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
         
         if (uploadResult.success && uploadResult.url) {
           finalImageUrl = uploadResult.url;
+          console.log('✅ Brand image uploaded to Supabase:', finalImageUrl);
         } else if (uploadResult.error) {
           console.warn('Image upload to Supabase failed, using base64:', uploadResult.error);
           // Continue with base64 as fallback
@@ -335,7 +353,13 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
         
         if (uploadResult.success && uploadResult.url) {
           finalImageUrl = uploadResult.url;
+          console.log('✅ Brand image (from base64) uploaded to Supabase:', finalImageUrl);
         }
+      }
+      
+      // If image was removed, ensure we send empty/null
+      if (imageWasRemoved) {
+        finalImageUrl = '';
       }
       
       const newBrand: Brand = {

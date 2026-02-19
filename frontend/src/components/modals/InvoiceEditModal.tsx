@@ -612,7 +612,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto p-0 ${
+      <DialogContent className={`w-full max-w-4xl p-0 !rounded-none sm:!rounded-2xl fixed sm:relative inset-0 sm:inset-auto translate-x-0 translate-y-0 sm:translate-x-[-50%] sm:translate-y-[-50%] h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
         <DialogHeader className="sr-only">
@@ -621,31 +621,34 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
         </DialogHeader>
         
         {/* Gradient Header */}
-        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-6 text-white">
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-4 sm:p-6 text-white">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-                <FileText className="w-7 h-7" />
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 sm:w-7 sm:h-7" />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold">Edit Invoice</h2>
-                <p className="text-emerald-100 text-sm">{invoice.id} • {invoice.customerName}</p>
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-2xl font-bold">Edit Invoice</h2>
+                <p className="text-emerald-100 text-xs sm:text-sm truncate">{invoice.id} • {invoice.customerName}</p>
               </div>
             </div>
             <button
               onClick={loadHistory}
               disabled={isLoadingHistory}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur rounded-xl transition-all text-sm font-medium"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/20 hover:bg-white/30 backdrop-blur rounded-xl transition-all text-xs sm:text-sm font-medium flex-shrink-0"
             >
               <History className="w-4 h-4" />
-              {isLoadingHistory ? 'Loading...' : 'View History'}
+              <span className="hidden sm:inline">{isLoadingHistory ? 'Loading...' : 'View History'}</span>
+              <span className="sm:hidden">{isLoadingHistory ? '...' : 'History'}</span>
             </button>
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Invoice Details */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             {/* Issue Date with Modern Calendar */}
             <div>
               <Label className="text-gray-900 dark:text-white">Issue Date</Label>
@@ -894,16 +897,16 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
           </div>
 
           {/* Tax Settings */}
-          <div className={`p-4 rounded-xl border ${
+          <div className={`p-3 sm:p-4 rounded-xl border ${
             theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'
           }`}>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
                   <span className="text-purple-400 text-sm font-bold">%</span>
                 </div>
                 <div>
-                  <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <h3 className={`font-semibold text-sm sm:text-base ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Tax Settings
                   </h3>
                   <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -952,7 +955,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
           </div>
 
           {/* Add Products Section */}
-          <div className={`p-4 rounded-xl border ${
+          <div className={`p-3 sm:p-4 rounded-xl border ${
             theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'
           }`}>
             <div className="flex items-center gap-3 mb-4">
@@ -1011,7 +1014,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                           setSelectedWarranty(mapWarrantyToCode(p.warranty));
                         }}
                         disabled={isOutOfStock}
-                        className={`w-full px-4 py-2 text-left border-b last:border-b-0 transition-colors ${
+                        className={`w-full px-3 sm:px-4 py-2 text-left border-b last:border-b-0 transition-colors ${
                           theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'
                         } ${
                           isOutOfStock 
@@ -1021,9 +1024,9 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                               : theme === 'dark' ? 'hover:bg-slate-700/50' : 'hover:bg-slate-100'
                         }`}
                       >
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className={`font-medium truncate ${
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+                            <span className={`font-medium text-sm truncate max-w-[140px] sm:max-w-none ${
                               isOutOfStock 
                                 ? (theme === 'dark' ? 'text-slate-500' : 'text-slate-400')
                                 : selectedProductId === p.id 
@@ -1033,24 +1036,28 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                               {p.name}
                             </span>
                             {/* Real-Time Stock Badge */}
-                            <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${
+                            <span className={`flex-shrink-0 text-[10px] sm:text-xs px-1.5 py-0.5 rounded font-medium ${
                               isOutOfStock
                                 ? (theme === 'dark' ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600')
                                 : isLowStock
                                   ? (theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-50 text-amber-600')
                                   : (theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600')
                             }`}>
-                              {isOutOfStock ? 'Out of Stock' : `${realTimeStock} available`}
+                              {isOutOfStock ? 'Out of Stock' : `${realTimeStock} avl`}
                             </span>
                             {p.warranty && (
-                              <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded ${
+                              <span className={`flex-shrink-0 text-[10px] sm:text-xs px-1.5 py-0.5 rounded ${
                                 theme === 'dark' ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-600'
                               }`}>
                                 {p.warranty}
                               </span>
                             )}
                           </div>
-                          <span className={`text-sm flex-shrink-0 ml-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          <span className={`text-sm font-semibold flex-shrink-0 ${
+                            selectedProductId === p.id 
+                              ? 'text-emerald-400' 
+                              : (theme === 'dark' ? 'text-slate-300' : 'text-slate-600')
+                          }`}>
                             Rs. {p.price.toLocaleString()}
                           </span>
                         </div>
@@ -1063,7 +1070,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
 
             {currentProduct && (
               <div className="p-2 mb-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
-                <p className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
                   Selected: <span className="font-semibold text-emerald-400">{currentProduct.name}</span> • 
                   <span className={`ml-1 font-medium ${
                     calculateRealTimeStock(currentProduct.id, currentProduct.stock) <= 0 
@@ -1072,10 +1079,10 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                         ? 'text-amber-400' 
                         : 'text-emerald-400'
                   }`}>
-                    {calculateRealTimeStock(currentProduct.id, currentProduct.stock)} available
+                    {calculateRealTimeStock(currentProduct.id, currentProduct.stock)} avl
                   </span>
                   {currentProduct.warranty && (
-                    <span className="ml-2 text-blue-400">• 🛡️ {currentProduct.warranty}</span>
+                    <span className="ml-1 sm:ml-2 text-blue-400">• 🛡️ {currentProduct.warranty}</span>
                   )}
                 </p>
               </div>
@@ -1087,7 +1094,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                 <CreditCard className="w-4 h-4 text-blue-500" />
                 Payment Method
               </Label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                 {[
                   { value: 'cash', label: 'Cash', emoji: '💵', color: 'emerald' },
                   { value: 'card', label: 'Card', emoji: '💳', color: 'blue' },
@@ -1102,7 +1109,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                       onClick={() => !isCreditDisabled && setAddPaymentMethod(value as 'cash' | 'card' | 'bank' | 'credit')}
                       disabled={isCreditDisabled}
                       title={isCreditDisabled ? 'Credit not available for walk-in customers' : undefined}
-                      className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
+                      className={`flex flex-col items-center gap-0.5 sm:gap-1 p-1.5 sm:p-2 rounded-xl border-2 transition-all ${
                         isCreditDisabled
                           ? 'opacity-40 cursor-not-allowed border-slate-500/30'
                           : addPaymentMethod === value
@@ -1116,8 +1123,8 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                         backgroundColor: color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : color === 'purple' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(239, 68, 68, 0.1)'
                       } : {}}
                     >
-                      <span className="text-xl">{emoji}</span>
-                      <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <span className="text-lg sm:text-xl">{emoji}</span>
+                      <span className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                         {label}
                       </span>
                     </button>
@@ -1267,13 +1274,14 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                   return (
                     <div
                       key={item.productId}
-                      className={`p-3 rounded-xl border flex items-center justify-between ${
+                      className={`p-2.5 sm:p-3 rounded-xl border ${
                         theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
                       }`}
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      <div className="flex items-start sm:items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                            <p className={`font-medium text-sm sm:text-base truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                             {item.productName}
                           </p>
                           {hasWarranty && (
@@ -1294,15 +1302,15 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                               N/W
                             </span>
                           )}
+                          </div>
+                          <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            Rs. {item.unitPrice.toLocaleString()} × {item.quantity} = <span className="text-emerald-500 font-medium">Rs.{' '}
+                            {(item.quantity * item.unitPrice).toLocaleString()}</span>
+                          </p>
                         </div>
-                        <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Rs. {item.unitPrice.toLocaleString()} each = <span className="text-emerald-500 font-medium">Rs.{' '}
-                          {(item.quantity * item.unitPrice).toLocaleString()}</span>
-                        </p>
-                      </div>
                       
-                      {/* Quantity Controls */}
-                      <div className="flex items-center gap-1">
+                        {/* Quantity Controls */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
                         {/* Decrease / Remove Button */}
                         <button
                           onClick={() => removeItem(item.productId)}
@@ -1352,6 +1360,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                             <Trash2 className="w-4 h-4" />
                           </button>
                         )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1361,7 +1370,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
           </div>
 
           {/* Totals */}
-          <div className={`space-y-2 p-4 rounded-xl border ${
+          <div className={`space-y-2 p-3 sm:p-4 rounded-xl border ${
             theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
           }`}>
             <div className={`flex justify-between ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
@@ -1426,14 +1435,15 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
             )}
           </div>
         </div>
+        </div>
 
-        {/* Footer */}
-        <div className={`border-t p-4 flex justify-end gap-3 ${
-          theme === 'dark' ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-200 bg-slate-50'
+        {/* Footer - Fixed at bottom */}
+        <div className={`border-t p-3 sm:p-4 flex gap-2 sm:gap-3 flex-shrink-0 ${
+          theme === 'dark' ? 'border-slate-700/50 bg-slate-900' : 'border-slate-200 bg-white'
         }`}>
           <button
             onClick={handleClose}
-            className={`px-5 py-2.5 rounded-xl font-medium transition-colors border ${
+            className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-medium transition-colors border text-center ${
               theme === 'dark'
                 ? 'bg-slate-700/50 hover:bg-slate-700 text-white border-slate-600/50'
                 : 'bg-white hover:bg-slate-100 text-slate-900 border-slate-300'
@@ -1444,7 +1454,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
           <button
             onClick={handleSave}
             disabled={items.length === 0 || isSaving}
-            className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/25 flex items-center gap-2 min-w-[140px] justify-center"
+            className="flex-1 sm:flex-none px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/25 flex items-center gap-2 justify-center"
           >
             {isSaving ? (
               <>

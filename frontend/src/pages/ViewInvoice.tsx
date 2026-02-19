@@ -25,6 +25,7 @@ import {
   Copy, Download, MoreVertical, TrendingUp, Monitor, X, CircleDollarSign,
   AlertTriangle, Store, Globe, Shield, MessageCircle, Wallet, Loader2
 } from 'lucide-react';
+import { useIsMobile } from '../hooks/use-mobile';
 
 export const ViewInvoice: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +35,7 @@ export const ViewInvoice: React.FC = () => {
   const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
   const { settings: whatsAppSettings, shopDetails } = useWhatsAppSettings();
   const { branding } = useShopBranding();
+  const isMobile = useIsMobile();
   
   // Get effective shop - use viewing shop for SUPER_ADMIN, otherwise user's shop
   const effectiveShop = isViewingShop && viewingShop ? viewingShop : user?.shop;
@@ -70,6 +72,8 @@ export const ViewInvoice: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
   
   // API states
   const [isLoading, setIsLoading] = useState(true);
@@ -154,6 +158,26 @@ export const ViewInvoice: React.FC = () => {
       loadProducts();
     }
   }, [showEditModal, cachedProducts.length, loadProducts]);
+
+  // Calculate scale for invoice print preview to fit container width
+  useEffect(() => {
+    if (!showPrintPreview || !previewContainerRef.current) return;
+    const A4_WIDTH_PX = 793.7; // 210mm in px at 96dpi
+    const calculateScale = () => {
+      if (!previewContainerRef.current) return;
+      const containerWidth = previewContainerRef.current.clientWidth;
+      if (containerWidth < A4_WIDTH_PX) {
+        const scale = containerWidth / A4_WIDTH_PX;
+        setPreviewScale(scale);
+      } else {
+        setPreviewScale(1);
+      }
+    };
+    calculateScale();
+    const observer = new ResizeObserver(calculateScale);
+    observer.observe(previewContainerRef.current);
+    return () => observer.disconnect();
+  }, [showPrintPreview]);
 
   // Find the invoice and enrich with warranty data
   const invoice = useMemo(() => {
@@ -483,7 +507,7 @@ export const ViewInvoice: React.FC = () => {
         try {
           const apiUpdatedInvoice = await invoiceService.update(apiInvoiceId, {
             items: updatedInvoice.items.map(item => ({
-              productId: item.productId,
+              ...(item.productId ? { productId: item.productId } : {}),
               productName: item.productName,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
@@ -812,61 +836,208 @@ Thank you for your business! 🙏`;
   const status = statusConfig[invoice.status];
   const StatusIcon = status.icon;
 
+  // Actions menu content (shared between dropdown and bottom sheet)
+  const actionsMenuContent = (
+    <>
+      {/* Download PDF */}
+      <button 
+        onClick={() => {
+          handleDownloadPDF();
+          setShowActions(false);
+        }}
+        className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all ${
+          theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+        }`}
+      >
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme === 'dark' ? 'bg-blue-500/15' : 'bg-blue-50'}`}>
+          <Download className="w-4 h-4 text-blue-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Download PDF</span>
+          <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Save invoice as PDF</p>
+        </div>
+      </button>
+
+      {/* Email Invoice */}
+      {(invoice.customer?.email || customer?.email) && (
+        <button 
+          onClick={() => {
+            handleSendEmail();
+          }}
+          disabled={isSendingEmail}
+          className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all ${
+            theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+          } ${isSendingEmail ? 'opacity-50 cursor-wait' : ''}`}
+        >
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme === 'dark' ? 'bg-indigo-500/15' : 'bg-indigo-50'}`}>
+            {isSendingEmail ? (
+              <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Mail className="w-4 h-4 text-indigo-500" />
+            )}
+          </div>
+          <div className="flex-1">
+            <span className="text-sm font-medium">{isSendingEmail ? 'Sending...' : invoice.emailSent ? 'Resend Email' : 'Email Invoice'}</span>
+            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+              {invoice.customer?.email || customer?.email}
+            </p>
+          </div>
+          {invoice.emailSent && <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />}
+        </button>
+      )}
+
+      {/* Send PDF via WhatsApp */}
+      {(customer?.phone || invoice.customer?.phone) && (
+        <button 
+          onClick={() => { handleWhatsAppPDF(); setShowActions(false); }}
+          className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all ${
+            theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+          }`}
+        >
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme === 'dark' ? 'bg-green-500/15' : 'bg-green-50'}`}>
+            <MessageCircle className="w-4 h-4 text-green-600" />
+          </div>
+          <div>
+            <span className="text-sm font-medium">Send PDF via WhatsApp</span>
+            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Download & share</p>
+          </div>
+        </button>
+      )}
+
+      {/* WhatsApp Reminder */}
+      {needsReminder && whatsAppSettings.enabled && (
+        <button 
+          onClick={() => {
+            sendWhatsAppReminder();
+            setShowActions(false);
+          }}
+          disabled={sendingReminder}
+          className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all ${
+            sendingReminder
+              ? 'opacity-70 cursor-wait'
+              : isInvoiceOverdue 
+                ? 'text-red-400 hover:bg-red-500/10' 
+                : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+          }`}
+        >
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+            isInvoiceOverdue 
+              ? (theme === 'dark' ? 'bg-red-500/15' : 'bg-red-50') 
+              : (theme === 'dark' ? 'bg-green-500/15' : 'bg-green-50')
+          }`}>
+            {sendingReminder ? (
+              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+            ) : (
+              <MessageCircle className={`w-4 h-4 ${isInvoiceOverdue ? 'text-red-500' : 'text-green-500'}`} />
+            )}
+          </div>
+          <div className="flex-1">
+            <span className="text-sm font-medium">{sendingReminder ? 'Sending...' : isInvoiceOverdue ? 'Send Overdue Reminder' : 'Send Payment Reminder'}</span>
+          </div>
+          {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
+            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${
+              isInvoiceOverdue ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-500'
+            }`}>
+              {invoice.reminderCount}
+            </span>
+          )}
+        </button>
+      )}
+
+      <div className={`border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`} />
+
+      {/* Copy Invoice Number */}
+      <button 
+        onClick={() => {
+          handleCopyInvoiceNumber();
+          setShowActions(false);
+          toast.success('Invoice number copied!');
+        }}
+        className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all ${
+          theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
+        }`}
+      >
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
+          <Copy className="w-4 h-4 text-slate-400" />
+        </div>
+        <span className="text-sm font-medium">Copy Invoice Number</span>
+      </button>
+
+      {/* Email Sent Status */}
+      {invoice.emailSent && invoice.emailSentAt && (
+        <div className={`px-4 py-3 border-t ${
+          theme === 'dark' ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'
+        }`}>
+          <div className="flex items-center gap-2 text-emerald-500 text-xs">
+            <CheckCircle className="w-3.5 h-3.5" />
+            <span>Emailed {new Date(invoice.emailSentAt).toLocaleDateString('en-GB', { 
+              day: '2-digit', 
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}</span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   return (
-    <div className={`min-h-screen p-6 ${theme === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}>
+    <div className={`min-h-screen p-3 sm:p-4 lg:p-6 ${theme === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}>
       {/* Header */}
-      <div className="max-w-6xl mx-auto mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/invoices')}
-              className={`p-2.5 rounded-xl border transition-all ${
-                theme === 'dark'
-                  ? 'border-slate-700 hover:bg-slate-800 text-slate-400'
-                  : 'border-slate-200 hover:bg-slate-100 text-slate-600'
-              }`}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                  {invoice.id}
-                </h1>
-                <button
-                  onClick={handleCopyInvoiceNumber}
-                  className={`p-1.5 rounded-lg transition-all ${
-                    theme === 'dark' ? 'hover:bg-slate-800 text-slate-500' : 'hover:bg-slate-200 text-slate-400'
-                  }`}
-                  title="Copy invoice number"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
+      <div className="max-w-6xl mx-auto mb-4 sm:mb-6">
+        <div className="flex items-center justify-between gap-2">
+          {/* Left: Back button */}
+          <button
+            onClick={() => navigate('/invoices')}
+            className={`p-2 sm:p-2.5 rounded-xl border transition-all flex-shrink-0 ${
+              theme === 'dark'
+                ? 'border-slate-700 hover:bg-slate-800 text-slate-400'
+                : 'border-slate-200 hover:bg-slate-100 text-slate-600'
+            }`}
+          >
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+
+          {/* Center: Invoice info */}
+          <div className="flex-1 min-w-0 mx-2 sm:mx-4">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <h1 className={`text-base sm:text-xl lg:text-2xl font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {invoice.id}
+              </h1>
+              <button
+                onClick={handleCopyInvoiceNumber}
+                className={`p-1 rounded-lg transition-all flex-shrink-0 hidden sm:flex ${
+                  theme === 'dark' ? 'hover:bg-slate-800 text-slate-500' : 'hover:bg-slate-200 text-slate-400'
+                }`}
+                title="Copy invoice number"
+              >
+                <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </button>
+              {/* Status Badge - Inline */}
+              <div className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border flex-shrink-0 ${status.bgClass}`}>
+                <div className="flex items-center gap-1 sm:gap-1.5">
+                  <StatusIcon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${status.textClass}`} />
+                  <span className={`text-[10px] sm:text-xs font-semibold whitespace-nowrap ${status.textClass}`}>{status.label}</span>
+                </div>
               </div>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Created on {(() => {
-                  const date = new Date(invoice.date);
-                  const timeStr = date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
-                  const dateStr = date.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-                  return `${dateStr} at ${timeStr.toUpperCase()}`;
-                })()}
-              </p>
             </div>
+            <p className={`text-[10px] sm:text-xs lg:text-sm truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+              Created on {(() => {
+                const date = new Date(invoice.date);
+                const timeStr = date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+                const dateStr = date.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+                return `${dateStr} at ${timeStr.toUpperCase()}`;
+              })()}
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Status Badge */}
-            <div className={`px-4 py-2 rounded-xl border ${status.bgClass}`}>
-              <div className="flex items-center gap-2">
-                <StatusIcon className={`w-4 h-4 ${status.textClass}`} />
-                <span className={`font-semibold ${status.textClass}`}>{status.label}</span>
-              </div>
-            </div>
-
-            {/* Action Buttons - Keep minimal for clean UI */}
+          {/* Right: Action Buttons */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Print - Hidden on mobile, shown on tablet+ */}
             <button
               onClick={handlePrint}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl font-medium transition-all ${
+              className={`hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl font-medium transition-all text-sm ${
                 theme === 'dark'
                   ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
                   : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm'
@@ -874,158 +1045,53 @@ Thank you for your business! 🙏`;
               title="Print Invoice"
             >
               <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Print</span>
+              <span className="hidden lg:inline">Print</span>
             </button>
 
+            {/* Edit - Hidden on mobile, shown on tablet+ */}
             <button
               onClick={() => {
                 setSelectedInvoice(invoice);
                 setShowEditModal(true);
               }}
-              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20"
+              className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl font-medium transition-all shadow-lg shadow-emerald-500/20 text-sm"
               title="Edit Invoice"
             >
               <Edit3 className="w-4 h-4" />
-              <span className="hidden sm:inline">Edit</span>
+              <span className="hidden lg:inline">Edit</span>
             </button>
 
-            {/* More Actions - Contains all sharing options */}
+            {/* 3 Dots Menu */}
             <div className="relative">
               <button
                 onClick={() => setShowActions(!showActions)}
-                className={`p-2 rounded-xl border transition-all ${
-                  theme === 'dark'
-                    ? 'border-slate-700 hover:bg-slate-800 text-slate-400'
-                    : 'border-slate-200 hover:bg-slate-100 text-slate-600'
+                className={`p-2 sm:p-2.5 rounded-xl border transition-all ${
+                  showActions
+                    ? theme === 'dark'
+                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400'
+                      : 'border-emerald-500/50 bg-emerald-50 text-emerald-600'
+                    : theme === 'dark'
+                      ? 'border-slate-700 hover:bg-slate-800 text-slate-400'
+                      : 'border-slate-200 hover:bg-slate-100 text-slate-600'
                 }`}
                 title="More Actions"
               >
-                <MoreVertical className="w-5 h-5" />
+                <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
-              {showActions && (
-                <div className={`absolute right-0 mt-2 w-64 rounded-xl border shadow-xl z-10 overflow-hidden ${
+              
+              {/* Desktop/Tablet Dropdown */}
+              {showActions && !isMobile && (
+                <div className={`absolute right-0 mt-2 w-72 rounded-2xl border shadow-2xl z-50 overflow-hidden ${
                   theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
                 }`}>
-                  {/* Download PDF */}
-                  <button 
-                    onClick={() => {
-                      handleDownloadPDF();
-                      setShowActions(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                      theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    <Download className="w-4 h-4 text-blue-500" />
-                    <span>Download PDF</span>
-                  </button>
-
-                  {/* Email Invoice - Keep menu open while sending */}
-                  {(invoice.customer?.email || customer?.email) && (
-                    <button 
-                      onClick={() => {
-                        handleSendEmail();
-                        // Don't close menu immediately - let it stay open while sending
-                        // Menu will close after success/error via toast
-                      }}
-                      disabled={isSendingEmail}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                        theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
-                      } ${isSendingEmail ? 'opacity-50 cursor-wait' : ''}`}
-                    >
-                      {isSendingEmail ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                          <span className="flex-1 text-indigo-500">Sending...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="w-4 h-4 text-indigo-500" />
-                          <span className="flex-1">{invoice.emailSent ? 'Resend Email' : 'Email Invoice'}</span>
-                          {invoice.emailSent && <CheckCircle className="w-4 h-4 text-emerald-500" />}
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Send PDF via WhatsApp - Downloads PDF then opens WhatsApp Web */}
-                  {(customer?.phone || invoice.customer?.phone) && (
-                    <button 
-                      onClick={() => handleWhatsAppPDF()}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                        theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <MessageCircle className="w-4 h-4 text-green-600" />
-                      <span className="flex-1">Send PDF via WhatsApp</span>
-                    </button>
-                  )}
-
-                  {/* WhatsApp Reminder - Only show when needed */}
-                  {needsReminder && whatsAppSettings.enabled && (
-                    <button 
-                      onClick={() => {
-                        sendWhatsAppReminder();
-                        setShowActions(false);
-                      }}
-                      disabled={sendingReminder}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                        sendingReminder
-                          ? 'opacity-70 cursor-wait'
-                          : isInvoiceOverdue 
-                            ? 'text-red-400 hover:bg-red-500/10' 
-                            : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      {sendingReminder ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-                      ) : (
-                        <MessageCircle className={`w-4 h-4 ${isInvoiceOverdue ? 'text-red-500' : 'text-green-500'}`} />
-                      )}
-                      <span>{sendingReminder ? 'Sending...' : isInvoiceOverdue ? 'Send Overdue Reminder' : 'Send Payment Reminder'}</span>
-                      {invoice.reminderCount !== undefined && invoice.reminderCount > 0 && (
-                        <span className={`ml-auto px-2 py-0.5 text-xs font-bold rounded-full ${
-                          isInvoiceOverdue ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-500'
-                        }`}>
-                          {invoice.reminderCount}
-                        </span>
-                      )}
-                    </button>
-                  )}
-
-                  <div className={`border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`} />
-
-                  {/* Copy Invoice Number */}
-                  <button 
-                    onClick={() => {
-                      handleCopyInvoiceNumber();
-                      setShowActions(false);
-                      toast.success('Invoice number copied!');
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                      theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    <Copy className="w-4 h-4 text-slate-400" />
-                    <span>Copy Invoice Number</span>
-                  </button>
-
-                  {/* Email Sent Status */}
-                  {invoice.emailSent && invoice.emailSentAt && (
-                    <div className={`px-4 py-3 border-t ${
-                      theme === 'dark' ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'
-                    }`}>
-                      <div className="flex items-center gap-2 text-emerald-500 text-xs">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        <span>Emailed {new Date(invoice.emailSentAt).toLocaleDateString('en-GB', { 
-                          day: '2-digit', 
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}</span>
-                      </div>
-                    </div>
-                  )}
+                  <div className={`px-4 py-3 border-b ${
+                    theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
+                  }`}>
+                    <p className={`text-xs font-semibold uppercase tracking-wider ${
+                      theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                    }`}>Actions</p>
+                  </div>
+                  {actionsMenuContent}
                 </div>
               )}
             </div>
@@ -1033,35 +1099,112 @@ Thank you for your business! 🙏`;
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {/* Mobile Bottom Sheet Overlay */}
+      {showActions && isMobile && (
+        <div className="fixed inset-0 z-50 flex items-end">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowActions(false)}
+          />
+          {/* Sheet */}
+          <div className={`relative w-full rounded-t-3xl pb-safe animate-in slide-in-from-bottom duration-300 ${
+            theme === 'dark' ? 'bg-slate-900 border-t border-slate-700' : 'bg-white border-t border-slate-200'
+          }`}>
+            {/* Handle */}
+            <div className="flex justify-center py-3">
+              <div className={`w-10 h-1 rounded-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'}`} />
+            </div>
+            
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pb-3">
+              <div>
+                <h3 className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  Invoice Actions
+                </h3>
+                <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {invoice.id}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowActions(false)}
+                className={`p-2 rounded-xl transition-all ${
+                  theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quick Actions Row (Print + Edit on mobile) */}
+            <div className="grid grid-cols-2 gap-2 px-5 pb-3">
+              <button
+                onClick={() => { handlePrint(); setShowActions(false); }}
+                className={`flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-sm transition-all ${
+                  theme === 'dark'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                }`}
+              >
+                <Printer className="w-4 h-4" />
+                Print
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedInvoice(invoice);
+                  setShowEditModal(true);
+                  setShowActions(false);
+                }}
+                className="flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium text-sm transition-all shadow-lg shadow-emerald-500/20"
+              >
+                <Edit3 className="w-4 h-4" />
+                Edit
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className={`border-t ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`} />
+            
+            {/* Actions List */}
+            <div className="max-h-[50vh] overflow-y-auto">
+              {actionsMenuContent}
+            </div>
+
+            {/* Safe area padding */}
+            <div className="h-4" />
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Main Invoice Preview */}
-        <div className="xl:col-span-2">
-          <div className={`rounded-2xl overflow-hidden shadow-2xl ${
+        <div className="lg:col-span-2">
+          <div className={`rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl ${
             theme === 'dark' ? 'shadow-black/50' : 'shadow-slate-300/50'
           }`}>
             {/* Invoice Header */}
-            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-8 text-white">
-              <div className="flex justify-between items-start">
+            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-4 sm:p-6 lg:p-8 text-white">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
                 <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <Monitor className="w-8 h-8" />
-                    <h2 className="text-3xl font-bold tracking-tight">ECOTEC</h2>
+                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                    <Monitor className="w-5 h-5 sm:w-8 sm:h-8" />
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight">ECOTEC</h2>
                   </div>
-                  <p className="text-emerald-200 text-sm mt-1 tracking-widest">COMPUTER SOLUTIONS</p>
-                  <div className="mt-4 text-emerald-100 text-sm space-y-1">
-                    <p className="flex items-center gap-2"><MapPin className="w-4 h-4" /> Main Street, Colombo 03</p>
-                    <p className="flex items-center gap-2"><Phone className="w-4 h-4" /> 011-2345678 • 077-1234567</p>
-                    <p className="flex items-center gap-2"><Mail className="w-4 h-4" /> info@ecotec.lk</p>
+                  <p className="text-emerald-200 text-xs sm:text-sm mt-0.5 sm:mt-1 tracking-widest">COMPUTER SOLUTIONS</p>
+                  <div className="mt-2 sm:mt-4 text-emerald-100 text-xs sm:text-sm space-y-0.5 sm:space-y-1">
+                    <p className="flex items-center gap-1.5 sm:gap-2"><MapPin className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" /> Main Street, Colombo 03</p>
+                    <p className="flex items-center gap-1.5 sm:gap-2"><Phone className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" /> 011-2345678 • 077-1234567</p>
+                    <p className="flex items-center gap-1.5 sm:gap-2"><Mail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" /> info@ecotec.lk</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-4xl font-bold tracking-wider">INVOICE</p>
-                  <p className="text-emerald-200 text-lg mt-2">{invoice.id}</p>
-                  <div className={`inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-full ${
+                <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-0 sm:text-right">
+                  <p className="text-xl sm:text-3xl lg:text-4xl font-bold tracking-wider">INVOICE</p>
+                  <p className="text-emerald-200 text-sm sm:text-lg sm:mt-2">{invoice.id}</p>
+                  <div className={`inline-flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-3 px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm ${
                     invoice.status === 'fullpaid' ? 'bg-emerald-500' :
                     invoice.status === 'halfpay' ? 'bg-amber-500' : 'bg-red-500'
                   }`}>
-                    <StatusIcon className="w-4 h-4" />
+                    <StatusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                     <span className="font-semibold">{status.label.toUpperCase()}</span>
                   </div>
                 </div>
@@ -1069,49 +1212,49 @@ Thank you for your business! 🙏`;
             </div>
 
             {/* Invoice Body */}
-            <div className={`p-8 ${theme === 'dark' ? 'bg-slate-900' : 'bg-white'}`}>
+            <div className={`p-4 sm:p-6 lg:p-8 ${theme === 'dark' ? 'bg-slate-900' : 'bg-white'}`}>
               {/* Customer & Date Row */}
-              <div className="grid grid-cols-2 gap-6 mb-6">
-                <div className={`p-5 rounded-xl border-l-4 border-emerald-500 ${
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6 mb-4 sm:mb-6">
+                <div className={`p-3 sm:p-5 rounded-lg sm:rounded-xl border-l-4 border-emerald-500 ${
                   theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
                 }`}>
-                  <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${
+                  <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1 sm:mb-2 ${
                     theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'
                   }`}>Bill To</p>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <p className={`text-sm sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     {invoice.customerName}
                   </p>
                   {customer && customer.id !== 'walk-in' && (
                     <>
-                      <p className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                      <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
                         📞 {customer.phone}
                       </p>
-                      <p className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                      <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
                         ✉️ {customer.email}
                       </p>
                     </>
                   )}
                 </div>
 
-                <div className={`p-5 rounded-xl border-l-4 border-teal-500 ${
+                <div className={`p-3 sm:p-5 rounded-lg sm:rounded-xl border-l-4 border-teal-500 ${
                   theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
                 }`}>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                      <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1 ${
                         theme === 'dark' ? 'text-teal-400' : 'text-teal-600'
                       }`}>Issue Date</p>
-                      <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      <p className={`text-xs sm:text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         {new Date(invoice.date).toLocaleDateString('en-GB', { 
                           day: '2-digit', month: 'short', year: 'numeric'
                         })}
                       </p>
                     </div>
                     <div>
-                      <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                      <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-0.5 sm:mb-1 ${
                         theme === 'dark' ? 'text-teal-400' : 'text-teal-600'
                       }`}>Due Date</p>
-                      <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      <p className={`text-xs sm:text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         {(() => {
                           const date = new Date(invoice.dueDate);
                           const timeStr = date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1124,43 +1267,43 @@ Thank you for your business! 🙏`;
               </div>
               
               {/* Payment Method & Sales Channel */}
-              <div className="grid grid-cols-2 gap-6 mb-8">
-                <div className={`p-4 rounded-xl flex items-center gap-3 ${
+              <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-4 sm:mb-8">
+                <div className={`p-3 sm:p-4 rounded-lg sm:rounded-xl flex items-center gap-2.5 sm:gap-3 ${
                   theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
                 }`}>
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     theme === 'dark' ? 'bg-cyan-500/20' : 'bg-cyan-100'
                   }`}>
-                    <CircleDollarSign className="w-5 h-5 text-cyan-500" />
+                    <CircleDollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-500" />
                   </div>
-                  <div>
-                    <p className={`text-xs font-bold uppercase tracking-wider ${
+                  <div className="min-w-0">
+                    <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
                       theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                     }`}>Payment Method</p>
-                    <p className={`font-semibold capitalize ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <p className={`text-xs sm:text-base font-semibold capitalize truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                       {invoice.paymentMethod ? invoice.paymentMethod.replace('_', ' ') : 'Cash'}
                     </p>
                   </div>
                 </div>
                 
-                <div className={`p-4 rounded-xl flex items-center gap-3 ${
+                <div className={`p-3 sm:p-4 rounded-lg sm:rounded-xl flex items-center gap-2.5 sm:gap-3 ${
                   theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
                 }`}>
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     invoice.salesChannel === 'online' 
                       ? (theme === 'dark' ? 'bg-purple-500/20' : 'bg-purple-100')
                       : (theme === 'dark' ? 'bg-amber-500/20' : 'bg-amber-100')
                   }`}>
                     {invoice.salesChannel === 'online' 
-                      ? <Globe className="w-5 h-5 text-purple-500" />
-                      : <Store className="w-5 h-5 text-amber-500" />
+                      ? <Globe className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
+                      : <Store className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
                     }
                   </div>
-                  <div>
-                    <p className={`text-xs font-bold uppercase tracking-wider ${
+                  <div className="min-w-0">
+                    <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
                       theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                     }`}>Sales Channel</p>
-                    <p className={`font-semibold capitalize ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <p className={`text-xs sm:text-base font-semibold capitalize ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                       {invoice.salesChannel === 'online' ? 'Online' : 'On Site'}
                     </p>
                   </div>
@@ -1194,26 +1337,100 @@ Thank you for your business! 🙏`;
               )}
 
               {/* Items Table */}
-              <div className="mb-8">
-                <div className={`rounded-xl overflow-hidden border ${
+              <div className="mb-4 sm:mb-8">
+                <div className={`rounded-lg sm:rounded-xl overflow-hidden border ${
                   theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
                 }`}>
-                  <table className="w-full">
+                  {/* Mobile Card Layout */}
+                  <div className="sm:hidden">
+                    <div className={`py-2.5 px-3 text-xs font-bold uppercase tracking-wider ${
+                      theme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      Items ({invoice.items.length})
+                    </div>
+                    <div className={`divide-y ${theme === 'dark' ? 'divide-slate-700' : 'divide-slate-200'}`}>
+                      {invoice.items.map((item, index) => {
+                        const product = getProductDetails(item.productId);
+                        const warrantyStatus = getWarrantyStatus(item.warrantyDueDate);
+                        return (
+                          <div key={item.productId + index} className={`p-3 ${index % 2 === 1 ? (theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50/50') : ''}`}>
+                            <div className="flex items-start gap-2.5">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                                theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-100'
+                              }`}>
+                                <Package className="w-4 h-4 text-emerald-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                  {item.productName}
+                                  {product?.warranty && (
+                                    <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded ${theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
+                                      [{product.warranty.toLowerCase().includes('no') ? 'N/W' : 
+                                        product.warranty.toLowerCase().includes('lifetime') ? 'L/W' :
+                                        product.warranty.match(/(\d+)\s*y/i) ? `${product.warranty.match(/(\d+)\s*y/i)?.[1]}Y` :
+                                        product.warranty.match(/(\d+)\s*m/i) ? `${product.warranty.match(/(\d+)\s*m/i)?.[1]}M` :
+                                        product.warranty.substring(0, 5)}]
+                                    </span>
+                                  )}
+                                </p>
+                                <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                  {warrantyStatus && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${
+                                      warrantyStatus.status === 'expired' 
+                                        ? 'bg-red-500/20 text-red-400'
+                                        : warrantyStatus.status === 'expiring'
+                                          ? 'bg-amber-500/20 text-amber-400'
+                                          : 'bg-emerald-500/20 text-emerald-400'
+                                    }`}>
+                                      <Shield className="w-2.5 h-2.5" />
+                                      {warrantyStatus.status === 'expired' ? 'Expired' : 
+                                       warrantyStatus.status === 'expiring' ? 'Expiring' : 'Active'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between mt-1.5">
+                                  <div className="flex items-center gap-3">
+                                    <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Qty: {item.quantity}</span>
+                                    <span className={`text-xs font-mono ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                      {item.originalPrice && item.originalPrice !== item.unitPrice ? (
+                                        <>
+                                          <span className="line-through text-red-400 mr-1">Rs.{item.originalPrice.toLocaleString()}</span>
+                                          <span className="text-emerald-400">Rs.{item.unitPrice.toLocaleString()}</span>
+                                        </>
+                                      ) : (
+                                        <>Rs.{item.unitPrice.toLocaleString()}</>
+                                      )}
+                                    </span>
+                                  </div>
+                                  <span className={`text-sm font-mono font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                                    Rs. {item.total.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Desktop Table Layout */}
+                  <table className="w-full hidden sm:table">
                     <thead>
                       <tr className={theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}>
-                        <th className={`py-4 px-4 text-left text-xs font-bold uppercase tracking-wider ${
+                        <th className={`py-3 sm:py-4 px-3 sm:px-4 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
                           theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                         }`}>#</th>
-                        <th className={`py-4 px-4 text-left text-xs font-bold uppercase tracking-wider ${
+                        <th className={`py-3 sm:py-4 px-3 sm:px-4 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
                           theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                         }`}>Item Description</th>
-                        <th className={`py-4 px-4 text-center text-xs font-bold uppercase tracking-wider ${
+                        <th className={`py-3 sm:py-4 px-3 sm:px-4 text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
                           theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                         }`}>Qty</th>
-                        <th className={`py-4 px-4 text-right text-xs font-bold uppercase tracking-wider ${
+                        <th className={`py-3 sm:py-4 px-3 sm:px-4 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
                           theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                         }`}>Unit Price</th>
-                        <th className={`py-4 px-4 text-right text-xs font-bold uppercase tracking-wider ${
+                        <th className={`py-3 sm:py-4 px-3 sm:px-4 text-right text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
                           theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                         }`}>Total</th>
                       </tr>
@@ -1308,18 +1525,18 @@ Thank you for your business! 🙏`;
 
               {/* Totals */}
               <div className="flex justify-end">
-                <div className="w-80">
-                  <div className={`space-y-3 p-5 rounded-xl ${
+                <div className="w-full sm:w-80">
+                  <div className={`space-y-2 sm:space-y-3 p-3 sm:p-5 rounded-lg sm:rounded-xl ${
                     theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
                   }`}>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-sm sm:text-base">
                       <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Subtotal</span>
                       <span className={`font-mono ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         Rs. {invoice.subtotal.toLocaleString()}
                       </span>
                     </div>
                     {invoice.tax > 0 && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between text-sm sm:text-base">
                         <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>
                           Tax (15%)
                         </span>
@@ -1328,13 +1545,13 @@ Thank you for your business! 🙏`;
                         </span>
                       </div>
                     )}
-                    <div className={`flex justify-between pt-4 mt-2 border-t ${
+                    <div className={`flex justify-between pt-3 sm:pt-4 mt-2 border-t ${
                       theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
                     }`}>
-                      <span className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      <span className={`text-sm sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         Total
                       </span>
-                      <span className="text-2xl font-bold text-emerald-500">
+                      <span className="text-lg sm:text-2xl font-bold text-emerald-500">
                         Rs. {invoice.total.toLocaleString()}
                       </span>
                     </div>
@@ -1344,18 +1561,18 @@ Thank you for your business! 🙏`;
             </div>
 
             {/* Invoice Footer */}
-            <div className={`px-8 py-6 ${
+            <div className={`px-4 sm:px-8 py-4 sm:py-6 ${
               theme === 'dark' ? 'bg-slate-800/50 border-t border-slate-700' : 'bg-slate-50 border-t border-slate-200'
             }`}>
-              <p className={`text-center text-sm font-medium ${
+              <p className={`text-center text-xs sm:text-sm font-medium ${
                 theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'
               }`}>
                 Thank you for your business!
               </p>
-              <p className={`text-center text-xs mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+              <p className={`text-center text-[10px] sm:text-xs mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
                 ECOTEC Computer Solutions • Main Street, Colombo 03 • 📞 011-2345678 / 077-1234567 • info@ecotec.lk
               </p>
-              <p className={`text-center text-[10px] mt-2 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
+              <p className={`text-center text-[9px] sm:text-[10px] mt-1 sm:mt-2 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
                 © 2025 Powered by <span className="font-semibold">ECOTEC</span>
               </p>
             </div>
@@ -1363,42 +1580,42 @@ Thank you for your business! 🙏`;
         </div>
 
         {/* Right Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Quick Stats */}
-          <div className={`p-6 rounded-2xl border ${
+          <div className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border ${
             theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
           }`}>
-            <h3 className={`font-bold mb-4 flex items-center gap-2 ${
+            <h3 className={`text-sm sm:text-base font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
               theme === 'dark' ? 'text-white' : 'text-slate-900'
             }`}>
-              <TrendingUp className="w-5 h-5 text-emerald-500" />
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
               Invoice Summary
             </h3>
             
-            <div className="space-y-4">
-              <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className="space-y-3 sm:space-y-4">
+              <div className={`p-3 sm:p-4 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                <p className={`text-[10px] sm:text-xs font-medium mb-0.5 sm:mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                   Total Amount
                 </p>
-                <p className="text-2xl font-bold text-emerald-500">
+                <p className="text-lg sm:text-2xl font-bold text-emerald-500">
                   Rs. {invoice.total.toLocaleString()}
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                  <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <div className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                  <p className={`text-[10px] sm:text-xs font-medium mb-0.5 sm:mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                     Items
                   </p>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <p className={`text-base sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     {invoice.items.length}
                   </p>
                 </div>
-                <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                  <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <div className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                  <p className={`text-[10px] sm:text-xs font-medium mb-0.5 sm:mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                     Quantity
                   </p>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <p className={`text-base sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     {invoice.items.reduce((sum, item) => sum + item.quantity, 0)}
                   </p>
                 </div>
@@ -1408,28 +1625,28 @@ Thank you for your business! 🙏`;
 
           {/* Customer Card */}
           {customer && (
-            <div className={`p-6 rounded-2xl border ${
+            <div className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border ${
               theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
             }`}>
-              <h3 className={`font-bold mb-4 flex items-center gap-2 ${
+              <h3 className={`text-sm sm:text-base font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
                 theme === 'dark' ? 'text-white' : 'text-slate-900'
               }`}>
-                <User className="w-5 h-5 text-teal-500" />
+                <User className="w-4 h-4 sm:w-5 sm:h-5 text-teal-500" />
                 Customer Details
               </h3>
               
-              <div className="flex items-center gap-4 mb-4">
-                <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold ${
+              <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl flex items-center justify-center text-base sm:text-xl font-bold flex-shrink-0 ${
                   theme === 'dark' ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-100 text-teal-600'
                 }`}>
                   {customer.name.charAt(0)}
                 </div>
-                <div>
-                  <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="min-w-0">
+                  <p className={`text-sm sm:text-base font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     {customer.name}
                   </p>
                   {customer.id !== 'walk-in' && (
-                    <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <p className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                       {customer.email}
                     </p>
                   )}
@@ -1462,13 +1679,13 @@ Thank you for your business! 🙏`;
           )}
 
           {/* Payment Management Section */}
-          <div className={`p-6 rounded-2xl border ${
+          <div className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border ${
             theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
           }`}>
-            <h3 className={`font-bold mb-4 flex items-center gap-2 ${
+            <h3 className={`text-sm sm:text-base font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
               theme === 'dark' ? 'text-white' : 'text-slate-900'
             }`}>
-              <Wallet className="w-5 h-5 text-purple-500" />
+              <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
               Payment Details
             </h3>
 
@@ -1561,13 +1778,13 @@ Thank you for your business! 🙏`;
           </div>
 
           {/* Timeline / Activity */}
-          <div className={`p-6 rounded-2xl border ${
+          <div className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border ${
             theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
           }`}>
-            <h3 className={`font-bold mb-4 flex items-center gap-2 ${
+            <h3 className={`text-sm sm:text-base font-bold mb-3 sm:mb-4 flex items-center gap-2 ${
               theme === 'dark' ? 'text-white' : 'text-slate-900'
             }`}>
-              <Clock className="w-5 h-5 text-cyan-500" />
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-500" />
               Activity
             </h3>
             
@@ -1660,31 +1877,31 @@ Thank you for your business! 🙏`;
 
       {/* Print Preview Modal */}
       {showPrintPreview && invoice && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className={`w-full max-w-4xl max-h-[95vh] overflow-hidden rounded-2xl ${
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-0 sm:p-4">
+          <div className={`w-full sm:max-w-4xl h-full sm:h-auto sm:max-h-[95vh] overflow-hidden sm:rounded-2xl flex flex-col ${
             theme === 'dark' ? 'bg-slate-900' : 'bg-white'
           }`}>
             {/* Modal Header */}
-            <div className={`flex items-center justify-between px-6 py-4 border-b ${
+            <div className={`flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b flex-shrink-0 ${
               theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
             }`}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                  <Printer className="w-5 h-5 text-emerald-500" />
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Printer className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                 </div>
-                <div>
-                  <h2 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="min-w-0">
+                  <h2 className={`text-sm sm:text-lg font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Print Invoice
                   </h2>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <p className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-emerald-400' : 'text-slate-500'}`}>
                     {invoice.id}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={handleActualPrint}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors text-sm"
                 >
                   <Printer className="w-4 h-4" />
                   Print
@@ -1700,9 +1917,20 @@ Thank you for your business! 🙏`;
               </div>
             </div>
             
-            {/* Print Preview */}
-            <div className="overflow-auto max-h-[calc(95vh-80px)] bg-gray-100 p-4">
-              <div ref={printRef} className="print-area">
+            {/* Print Preview - Scales to fit viewport */}
+            <div ref={previewContainerRef} className="flex-1 overflow-auto bg-gray-100 p-2 sm:p-4">
+              <div 
+                ref={printRef} 
+                className="print-area"
+                style={{
+                  transformOrigin: 'top left',
+                  ...(previewScale < 1 ? {
+                    width: '210mm',
+                    transform: `scale(${previewScale})`,
+                    marginBottom: `calc(-297mm * ${1 - previewScale})`,
+                  } : {})
+                }}
+              >
                 <PrintableInvoice invoice={invoice} customer={customer} branding={branding} />
               </div>
             </div>
@@ -1713,7 +1941,12 @@ Thank you for your business! 🙏`;
             @media print {
               body * { visibility: hidden; }
               .print-area, .print-area * { visibility: visible; }
-              .print-area { position: absolute; left: 0; top: 0; }
+              .print-area { position: absolute; left: 0; top: 0; transform: none !important; margin-bottom: 0 !important; }
+            }
+            @media (max-width: 850px) {
+              .print-area .print-invoice {
+                width: 210mm !important;
+              }
             }
           `}</style>
         </div>

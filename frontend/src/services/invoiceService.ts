@@ -559,7 +559,7 @@ export const convertFrontendInvoiceToAPI = (invoice: Partial<Invoice> & { items?
   return {
     customerId: invoice.customerId!,
     items: (invoice.items || []).map(item => ({
-      productId: item.productId,
+      ...(item.productId ? { productId: item.productId } : {}),
       productName: item.productName,
       quantity: item.quantity,
       unitPrice: item.unitPrice,

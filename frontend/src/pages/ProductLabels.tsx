@@ -89,6 +89,7 @@ export const ProductLabels: React.FC = () => {
   // Resizable panels state
   const [leftPanelWidth, setLeftPanelWidth] = useState(35); // percentage
   const [isResizing, setIsResizing] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'products' | 'preview'>('products');
 
   // Handle resizing
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -583,23 +584,74 @@ export const ProductLabels: React.FC = () => {
         </div>
       )}
 
-      {/* Main Content - Resizable Split Panel */}
+      {/* Mobile/Tablet Tabs - Visible below lg breakpoint */}
+      <div className={`flex lg:hidden rounded-xl p-1 flex-shrink-0 ${
+        theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'
+      }`}>
+        <button
+          onClick={() => setMobileTab('products')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            mobileTab === 'products'
+              ? 'bg-emerald-500 text-white shadow-md'
+              : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          Select Products
+          {selectedProducts.length > 0 && (
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              mobileTab === 'products' ? 'bg-white/20 text-white' : theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
+            }`}>{selectedProducts.length}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setMobileTab('preview')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            mobileTab === 'preview'
+              ? 'bg-emerald-500 text-white shadow-md'
+              : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+          }`}
+        >
+          <Tag className="w-4 h-4" />
+          Label Preview
+          {totalLabels > 0 && (
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              mobileTab === 'preview' ? 'bg-white/20 text-white' : theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
+            }`}>{totalLabels}</span>
+          )}
+        </button>
+      </div>
+
+      {/* Main Content */}
       <div 
         ref={mainContainerRef}
-        className={`flex-1 flex min-h-0 ${isResizing ? 'select-none' : ''}`}
+        className={`flex-1 flex flex-col lg:flex-row min-h-0 gap-0 lg:gap-0 ${isResizing ? 'select-none' : ''}`}
       >
+        {/* Panel width styles */}
+        <style>{`
+          @media (min-width: 1024px) {
+            [data-panel="left"] { width: ${leftPanelWidth}% !important; }
+            [data-panel="right"] { width: ${100 - leftPanelWidth}% !important; }
+          }
+          @media (max-width: 1023px) {
+            [data-panel="left"], [data-panel="right"] { width: 100% !important; flex: 1 1 0%; }
+          }
+        `}</style>
+
         {/* Left Panel - Product Selection */}
         <div
+          data-panel="left"
           className={`rounded-2xl border flex flex-col overflow-hidden ${
+            mobileTab === 'products' ? 'flex' : 'hidden'
+          } lg:flex ${
             theme === 'dark'
               ? 'bg-slate-800/30 border-slate-700/50'
               : 'bg-white border-slate-200'
           }`}
-          style={{ width: `${leftPanelWidth}%` }}
         >
-          <div className={`p-4 border-b flex-shrink-0 ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+          <div className={`p-3 sm:p-4 border-b flex-shrink-0 ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
             <h3
-              className={`text-lg font-semibold mb-4 flex items-center gap-2 ${
+              className={`text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2 ${
                 theme === 'dark' ? 'text-white' : 'text-slate-900'
               }`}
             >
@@ -609,21 +661,21 @@ export const ProductLabels: React.FC = () => {
 
             {/* Search Products */}
             <div
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl border mb-4 ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border mb-3 sm:mb-4 ${
                 theme === 'dark'
                   ? 'bg-slate-800/50 border-slate-700/50'
                   : 'bg-slate-50 border-slate-200'
               }`}
             >
               <Search
-                className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}
+                className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}
               />
               <input
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`bg-transparent border-none outline-none flex-1 text-sm ${
+                className={`bg-transparent border-none outline-none flex-1 text-sm min-w-0 ${
                   theme === 'dark'
                     ? 'text-white placeholder-slate-500'
                     : 'text-slate-900 placeholder-slate-400'
@@ -656,24 +708,24 @@ export const ProductLabels: React.FC = () => {
               return (
                 <div
                   key={product.id}
-                  className={`p-3 border-b transition-colors ${
+                  className={`p-2.5 sm:p-3 border-b transition-colors ${
                     theme === 'dark'
                       ? 'border-slate-700/50 hover:bg-slate-800/50'
                       : 'border-slate-100 hover:bg-slate-50'
                   } ${isSelected ? (theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50') : ''}`}
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-2 sm:gap-3">
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`font-medium truncate ${
+                        className={`text-sm font-medium truncate ${
                           theme === 'dark' ? 'text-white' : 'text-slate-900'
                         }`}
                       >
                         {product.name}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 flex-wrap">
                         <span
-                          className={`text-xs font-mono ${
+                          className={`text-[10px] sm:text-xs font-mono ${
                             theme === 'dark' ? 'text-slate-500' : 'text-slate-400'
                           }`}
                         >
@@ -682,7 +734,7 @@ export const ProductLabels: React.FC = () => {
                         {product.barcode && (
                           <button
                             onClick={() => handleCopyBarcode(product.barcode!)}
-                            className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded ${
+                            className={`flex items-center gap-1 text-[10px] sm:text-xs px-1.5 py-0.5 rounded ${
                               copiedId === product.barcode
                                 ? 'bg-emerald-500/20 text-emerald-500'
                                 : theme === 'dark'
@@ -696,14 +748,15 @@ export const ProductLabels: React.FC = () => {
                             ) : (
                               <Copy className="w-3 h-3" />
                             )}
-                            <span className="font-mono">{product.barcode}</span>
+                            <span className="font-mono hidden sm:inline">{product.barcode}</span>
+                            <span className="font-mono sm:hidden">{product.barcode?.slice(0, 8)}...</span>
                           </button>
                         )}
                       </div>
                     </div>
 
                     {isSelected ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                         <button
                           onClick={() => handleQuantityChange(product.id, -1)}
                           className={`w-7 h-7 rounded-lg flex items-center justify-center ${
@@ -715,7 +768,7 @@ export const ProductLabels: React.FC = () => {
                           <Minus className="w-3 h-3" />
                         </button>
                         <span
-                          className={`w-8 text-center font-semibold ${
+                          className={`w-6 sm:w-8 text-center text-sm font-semibold ${
                             theme === 'dark' ? 'text-white' : 'text-slate-900'
                           }`}
                         >
@@ -740,8 +793,11 @@ export const ProductLabels: React.FC = () => {
                       </div>
                     ) : (
                       <button
-                        onClick={() => handleAddProduct(product.id)}
-                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                        onClick={() => {
+                          handleAddProduct(product.id);
+                          // On mobile, show a brief flash of preview tab badge
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors flex-shrink-0"
                       >
                         Add
                       </button>
@@ -753,10 +809,10 @@ export const ProductLabels: React.FC = () => {
           </div>
         </div>
 
-        {/* Resizer Handle */}
+        {/* Resizer Handle - Desktop only */}
         <div
           onMouseDown={handleMouseDown}
-          className={`w-3 cursor-col-resize flex items-center justify-center transition-colors flex-shrink-0 mx-1 rounded-full ${
+          className={`hidden lg:flex w-3 cursor-col-resize items-center justify-center transition-colors flex-shrink-0 mx-1 rounded-full ${
             isResizing
               ? 'bg-emerald-500'
               : theme === 'dark' ? 'bg-slate-700 hover:bg-emerald-500/50' : 'bg-slate-200 hover:bg-emerald-500/50'
@@ -767,20 +823,22 @@ export const ProductLabels: React.FC = () => {
 
         {/* Right Panel - Label Preview */}
         <div
+          data-panel="right"
           className={`rounded-2xl border flex flex-col overflow-hidden ${
+            mobileTab === 'preview' ? 'flex' : 'hidden'
+          } lg:flex ${
             theme === 'dark'
               ? 'bg-slate-800/30 border-slate-700/50'
               : 'bg-white border-slate-200'
           }`}
-          style={{ width: `${100 - leftPanelWidth}%` }}
         >
           <div
-            className={`p-4 border-b flex items-center justify-between flex-shrink-0 ${
+            className={`p-3 sm:p-4 border-b flex items-center justify-between flex-shrink-0 ${
               theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
             }`}
           >
             <h3
-              className={`text-lg font-semibold flex items-center gap-2 ${
+              className={`text-base sm:text-lg font-semibold flex items-center gap-2 ${
                 theme === 'dark' ? 'text-white' : 'text-slate-900'
               }`}
             >
@@ -789,7 +847,7 @@ export const ProductLabels: React.FC = () => {
             </h3>
             {totalLabels > 0 && (
               <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                className={`px-2.5 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
                   theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
                 }`}
               >
@@ -799,42 +857,49 @@ export const ProductLabels: React.FC = () => {
           </div>
 
           {selectedProducts.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8">
               <div
-                className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-4 ${
+                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center mb-4 ${
                   theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
                 }`}
               >
                 <Barcode
-                  className={`w-10 h-10 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}
+                  className={`w-8 h-8 sm:w-10 sm:h-10 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}
                 />
               </div>
               <p
-                className={`text-lg font-medium ${
+                className={`text-base sm:text-lg font-medium text-center ${
                   theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                 }`}
               >
                 No products selected
               </p>
               <p
-                className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}
+                className={`text-xs sm:text-sm mt-1 text-center ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}
               >
                 Select products from the list to generate labels
               </p>
+              {/* Mobile/Tablet hint */}
+              <button
+                onClick={() => setMobileTab('products')}
+                className="lg:hidden mt-4 px-4 py-2 bg-emerald-500 text-white text-sm rounded-xl font-medium hover:bg-emerald-600 transition-colors"
+              >
+                Browse Products
+              </button>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col p-4 overflow-hidden">
+            <div className="flex-1 flex flex-col p-3 sm:p-4 overflow-hidden">
               {/* Preview Area */}
               <div
-                className={`flex-1 p-6 rounded-xl overflow-auto ${
+                className={`flex-1 p-3 sm:p-6 rounded-xl overflow-auto ${
                   theme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'
                 }`}
               >
                 <div ref={printRef}>
                   <div 
-                    className="labels-container grid gap-3"
+                    className="labels-container grid gap-2 sm:gap-3"
                     style={{
-                      gridTemplateColumns: `repeat(auto-fill, minmax(${labelDimensions.width}px, 1fr))`,
+                      gridTemplateColumns: `repeat(auto-fill, minmax(${Math.min(labelDimensions.width, 160)}px, 1fr))`,
                     }}
                   >
                     {selectedProducts.flatMap((sp) =>
@@ -843,7 +908,8 @@ export const ProductLabels: React.FC = () => {
                           key={`${sp.product.id}-${idx}`}
                           className="label bg-white rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center p-2"
                           style={{
-                            width: labelDimensions.width,
+                            width: '100%',
+                            maxWidth: labelDimensions.width,
                             height: labelDimensions.height,
                           }}
                         >
@@ -871,7 +937,7 @@ export const ProductLabels: React.FC = () => {
                             </div>
                           )}
                           {showBarcode && sp.product.barcode && (
-                            <div className="barcode-wrapper">
+                            <div className="barcode-wrapper w-full flex justify-center">
                               <BarcodeDisplay
                                 value={sp.product.barcode}
                                 width={fontSizes.barcodeWidth}
@@ -895,31 +961,31 @@ export const ProductLabels: React.FC = () => {
               </div>
 
               {/* Selected Products Summary */}
-              <div className={`mt-4 pt-4 space-y-2 flex-shrink-0 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+              <div className={`mt-3 sm:mt-4 pt-3 sm:pt-4 space-y-2 flex-shrink-0 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
                 <h4
-                  className={`text-sm font-medium ${
+                  className={`text-xs sm:text-sm font-medium ${
                     theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                   }`}
                 >
-                  Selected Products ({selectedProducts.length})
+                  Selected ({selectedProducts.length})
                 </h4>
-                <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2 max-h-20 sm:max-h-24 overflow-y-auto">
                   {selectedProducts.map((sp) => (
                     <div
                       key={sp.product.id}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                      className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg ${
                         theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
                       }`}
                     >
                       <span
-                        className={`text-sm font-medium ${
+                        className={`text-xs sm:text-sm font-medium truncate max-w-[100px] sm:max-w-[150px] ${
                           theme === 'dark' ? 'text-white' : 'text-slate-900'
                         }`}
                       >
                         {sp.product.name}
                       </span>
                       <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
+                        className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full flex-shrink-0 ${
                           theme === 'dark'
                             ? 'bg-emerald-500/20 text-emerald-400'
                             : 'bg-emerald-100 text-emerald-600'
@@ -929,7 +995,7 @@ export const ProductLabels: React.FC = () => {
                       </span>
                       <button
                         onClick={() => handleRemoveProduct(sp.product.id)}
-                        className={`p-1 rounded hover:bg-red-500/20 text-red-500`}
+                        className={`p-0.5 sm:p-1 rounded hover:bg-red-500/20 text-red-500 flex-shrink-0`}
                       >
                         <X className="w-3 h-3" />
                       </button>

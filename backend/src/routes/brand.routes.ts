@@ -30,26 +30,26 @@ const validateBrand = [
     .isLength({ min: 2, max: 100 })
     .withMessage('Brand name must be 2-100 characters'),
   body('description')
-    .optional()
+    .optional({ values: 'falsy' })
     .trim()
     .isLength({ max: 500 })
     .withMessage('Description must not exceed 500 characters'),
   body('image')
-    .optional()
+    .optional({ values: 'falsy' })
     .isString()
     .withMessage('Image must be a string (URL or base64)'),
   body('website')
-    .optional()
+    .optional({ values: 'falsy' })
     .trim()
     .isURL({ require_protocol: false })
     .withMessage('Website must be a valid URL'),
   body('contactEmail')
-    .optional()
+    .optional({ values: 'falsy' })
     .trim()
     .isEmail()
     .withMessage('Contact email must be valid'),
   body('contactPhone')
-    .optional()
+    .optional({ values: 'falsy' })
     .trim()
     .isLength({ min: 8, max: 20 })
     .withMessage('Contact phone must be 8-20 characters'),

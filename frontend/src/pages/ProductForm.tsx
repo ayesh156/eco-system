@@ -1066,25 +1066,28 @@ export const ProductForm: React.FC = () => {
 
       let savedProductId: string;
       let savedProductName: string = formData.name.trim();
+      let savedProduct: APIProduct;
 
       if (isEditing && existingProduct) {
         // Update existing product
-        const updated = await productService.update(existingProduct.id, productData, currentShopId || undefined);
-        savedProductId = updated.id;
+        savedProduct = await productService.update(existingProduct.id, productData, currentShopId || undefined);
+        savedProductId = savedProduct.id;
       } else {
         // Create new product
-        const created = await productService.create(productData, currentShopId || undefined);
-        savedProductId = created.id;
+        savedProduct = await productService.create(productData, currentShopId || undefined);
+        savedProductId = savedProduct.id;
       }
 
       // Force refresh the product cache for other pages (CreateInvoice, etc.)
       loadProducts(true);
 
-      // Navigate back to products list with the saved product ID for highlighting
+      // Navigate back to products list with the saved product data for local update (no full reload)
       navigate('/products', { 
         state: { 
           highlightProductId: savedProductId,
-          highlightProductName: savedProductName
+          highlightProductName: savedProductName,
+          savedProduct,
+          isEdit: isEditing,
         } 
       });
     } catch (error) {

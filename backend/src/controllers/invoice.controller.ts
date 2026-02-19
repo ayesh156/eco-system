@@ -632,13 +632,16 @@ export const updateInvoice = async (
 
       // Validate products and allow null productId for quick-add items
       for (const item of items) {
-        const product = await prisma.product.findUnique({
-          where: { id: item.productId },
-        });
+        let product = null;
+        if (item.productId) {
+          product = await prisma.product.findUnique({
+            where: { id: item.productId },
+          });
+        }
         
         validatedItems.push({
           ...item,
-          productId: product ? item.productId : null, // Set to null if product doesn't exist
+          productId: product ? item.productId : null, // Set to null if product doesn't exist or quick-add
         });
       }
     }

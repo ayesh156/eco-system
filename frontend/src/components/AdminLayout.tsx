@@ -47,9 +47,32 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const [isTablet, setIsTablet] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Detect tablet viewport (768-1024px) and auto-collapse sidebar
+  useEffect(() => {
+    const checkTablet = () => {
+      const width = window.innerWidth;
+      const tablet = width >= 768 && width < 1024;
+      setIsTablet(tablet);
+    };
+    checkTablet();
+    window.addEventListener('resize', checkTablet);
+    return () => window.removeEventListener('resize', checkTablet);
+  }, []);
+
+  // Auto-collapse sidebar on tablet for more content space
+  useEffect(() => {
+    if (isTablet) {
+      setSidebarCollapsed(true);
+    }
+  }, [isTablet]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [searchPopupOpen, setSearchPopupOpen] = useState(false);
+  const searchPopupRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [notificationCount] = useState(3);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const [collapsedPopover, setCollapsedPopover] = useState<string | null>(null);
@@ -127,6 +150,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [profileDropdownOpen]);
+
+  // Close search popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchPopupRef.current && !searchPopupRef.current.contains(event.target as Node)) {
+        setSearchPopupOpen(false);
+      }
+    };
+    if (searchPopupOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [searchPopupOpen]);
 
   // Close collapsed popover when clicking outside
   useEffect(() => {
@@ -1328,7 +1364,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           }`}>
           <div className="flex items-center justify-between h-full px-4 lg:px-6">
             {/* Left side */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 lg:gap-4">
               {isMobile && (
                 <button
                   onClick={() => setMobileSidebarOpen(true)}
@@ -1339,8 +1375,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 </button>
               )}
 
-              {/* Search Bar */}
-              <div className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border ${theme === 'dark'
+              {/* Search Bar - Full on desktop (lg+) */}
+              <div className={`hidden lg:flex items-center gap-2 px-4 py-2 rounded-xl border ${theme === 'dark'
                   ? 'bg-slate-800/30 border-slate-700/50'
                   : 'bg-white border-slate-200'
                 }`}>
@@ -1352,29 +1388,82 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     }`}
                 />
               </div>
+
+              {/* Search Icon Button - Tablet & Mobile (before lg) */}
+              <div className="relative flex lg:hidden" ref={searchPopupRef}>
+                <button
+                  onClick={() => { setSearchPopupOpen(!searchPopupOpen); setTimeout(() => searchInputRef.current?.focus(), 100); }}
+                  className={`p-2.5 rounded-xl border transition-all ${searchPopupOpen
+                    ? theme === 'dark'
+                      ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                    : theme === 'dark'
+                      ? 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-700/50 text-slate-400'
+                      : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                  }`}
+                >
+                  <Search className="w-5 h-5" />
+                </button>
+
+                {/* Search Popup */}
+                {searchPopupOpen && (
+                  <div className={`absolute top-full left-0 mt-2 w-80 rounded-xl border shadow-2xl overflow-hidden z-50 ${theme === 'dark'
+                    ? 'bg-slate-900 border-slate-700/50'
+                    : 'bg-white border-slate-200'
+                  }`}>
+                    <div className="p-3">
+                      <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border ${theme === 'dark'
+                        ? 'bg-slate-800/50 border-slate-700/50'
+                        : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <Search className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+                        <input
+                          ref={searchInputRef}
+                          type="text"
+                          placeholder="Search products, invoices..."
+                          className={`bg-transparent border-none outline-none w-full text-sm ${theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'}`}
+                        />
+                        <button
+                          onClick={() => setSearchPopupOpen(false)}
+                          className={`p-1 rounded-md transition-colors ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'}`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <p className={`text-[10px] mt-2 px-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Type to search across products, invoices, customers...
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Center - Ecosystem Branding (hidden for SUPER_ADMIN) */}
-            {user?.role !== 'SUPER_ADMIN' && (
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg overflow-hidden">
-                  <img src={ecosystemLogo} alt="Eco System" className="w-full h-full object-contain" />
-                </div>
-                <div className="flex flex-col">
-                  <span className={`text-base font-bold tracking-wide ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                    Eco System
-                  </span>
-                  <span className={`text-[9px] -mt-0.5 tracking-wider uppercase ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                    NEBULAINFINITE
-                  </span>
+            {user?.role !== 'SUPER_ADMIN' ? (
+              <div className="hidden md:flex flex-1 items-center justify-center">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+                    <img src={ecosystemLogo} alt="Eco System" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={`text-base font-bold tracking-wide leading-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      Eco System
+                    </span>
+                    <span className={`text-[9px] -mt-0.5 tracking-wider uppercase ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                      NEBULAINFINITE
+                    </span>
+                  </div>
                 </div>
               </div>
+            ) : (
+              <div className="flex-1" />
             )}
 
             {/* Right side */}
-            <div className="flex items-center gap-3">
-              {/* Pro Badge */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 rounded-full border border-emerald-500/20">
+            <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3">
+              {/* Pro Badge - hidden on tablet for space */}
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 rounded-full border border-emerald-500/20">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="text-xs font-medium text-emerald-400">Pro</span>
               </div>
@@ -1443,19 +1532,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <div className="relative z-50">
                 <button
                   onClick={(e) => { e.stopPropagation(); setProfileDropdownOpen(!profileDropdownOpen); }}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl border transition-all ${theme === 'dark'
+                  className={`flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 rounded-xl border transition-all ${theme === 'dark'
                       ? 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-700/50'
                       : 'bg-white border-slate-200 hover:bg-slate-50'
                     }`}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center flex-shrink-0">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <div className="hidden md:block text-left">
-                    <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{user?.role || 'User'}</p>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{user?.shop?.name || 'No Shop'}</p>
+                  <div className="hidden md:block text-left min-w-0">
+                    <p className={`text-sm font-medium truncate max-w-[80px] lg:max-w-[120px] ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{user?.role || 'User'}</p>
+                    <p className={`text-xs truncate max-w-[80px] lg:max-w-[120px] ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{user?.shop?.name || 'No Shop'}</p>
                   </div>
-                  <ChevronDown className={`w-4 h-4 transition-transform ${profileDropdownOpen ? 'rotate-180' : ''} ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
+                  <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${profileDropdownOpen ? 'rotate-180' : ''} ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
                 </button>
 
                 {/* Dropdown Menu */}

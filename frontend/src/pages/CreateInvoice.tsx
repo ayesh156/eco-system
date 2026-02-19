@@ -163,13 +163,38 @@ export const CreateInvoice: React.FC = () => {
   const [isResizing, setIsResizing] = useState(false);
   const mainContainerRef = useRef<HTMLDivElement>(null);
 
+  // Mobile/Tablet responsive state
+  const [showMobileCart, setShowMobileCart] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(typeof window !== 'undefined' && window.innerWidth < 1024);
+
   // Print state
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
+  const ciPreviewContainerRef = useRef<HTMLDivElement>(null);
+  const [ciPreviewScale, setCiPreviewScale] = useState(1);
 
   // Price editing state
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState<number>(0);
+
+  // Calculate scale for invoice print preview to fit container width
+  useEffect(() => {
+    if (!showPrintPreview || !ciPreviewContainerRef.current) return;
+    const A4_WIDTH_PX = 793.7;
+    const calculateScale = () => {
+      if (!ciPreviewContainerRef.current) return;
+      const containerWidth = ciPreviewContainerRef.current.clientWidth;
+      if (containerWidth < A4_WIDTH_PX) {
+        setCiPreviewScale(containerWidth / A4_WIDTH_PX);
+      } else {
+        setCiPreviewScale(1);
+      }
+    };
+    calculateScale();
+    const observer = new ResizeObserver(calculateScale);
+    observer.observe(ciPreviewContainerRef.current);
+    return () => observer.disconnect();
+  }, [showPrintPreview]);
 
   // Calendar popup state
   const [showBuyingCalendar, setShowBuyingCalendar] = useState(false);
@@ -208,6 +233,17 @@ export const CreateInvoice: React.FC = () => {
       };
     }
   }, [isResizing, handleMouseMove, handleMouseUp]);
+
+  // Track layout mode for responsive design
+  useEffect(() => {
+    const handleLayoutResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobileLayout(mobile);
+      if (!mobile) setShowMobileCart(false);
+    };
+    window.addEventListener('resize', handleLayoutResize);
+    return () => window.removeEventListener('resize', handleLayoutResize);
+  }, []);
 
   const currentCustomer = customers.find((c) => c.id === selectedCustomer);
 
@@ -807,31 +843,31 @@ export const CreateInvoice: React.FC = () => {
   // Print Preview Modal
   if (showPrintPreview && createdInvoice) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-        <div className={`w-full max-w-4xl max-h-[95vh] overflow-hidden rounded-2xl ${
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-0 sm:p-4">
+        <div className={`w-full sm:max-w-4xl h-full sm:h-auto sm:max-h-[95vh] overflow-hidden sm:rounded-2xl flex flex-col ${
           theme === 'dark' ? 'bg-slate-900' : 'bg-white'
         }`}>
           {/* Modal Header */}
-          <div className={`flex items-center justify-between px-6 py-4 border-b ${
+          <div className={`flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b flex-shrink-0 ${
             theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
           }`}>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                <Receipt className="w-5 h-5 text-emerald-500" />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
               </div>
-              <div>
-                <h2 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                  Invoice Created Successfully!
+              <div className="min-w-0">
+                <h2 className={`text-sm sm:text-lg font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  Invoice Created!
                 </h2>
-                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                <p className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-emerald-400' : 'text-slate-500'}`}>
                   {createdInvoice.id}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={handlePrint}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors text-sm"
               >
                 <Printer className="w-4 h-4" />
                 Print
@@ -847,9 +883,20 @@ export const CreateInvoice: React.FC = () => {
             </div>
           </div>
           
-          {/* Print Preview */}
-          <div className="overflow-auto max-h-[calc(95vh-80px)] bg-gray-100 p-4">
-            <div ref={printRef} className="print-area">
+          {/* Print Preview - Scales to fit viewport */}
+          <div ref={ciPreviewContainerRef} className="flex-1 overflow-auto bg-gray-100 p-2 sm:p-4">
+            <div 
+              ref={printRef} 
+              className="print-area"
+              style={{
+                transformOrigin: 'top left',
+                ...(ciPreviewScale < 1 ? {
+                  width: '210mm',
+                  transform: `scale(${ciPreviewScale})`,
+                  marginBottom: `calc(-297mm * ${1 - ciPreviewScale})`,
+                } : {})
+              }}
+            >
               <PrintableInvoice invoice={createdInvoice as any} customer={printCustomer} branding={branding} />
             </div>
           </div>
@@ -860,7 +907,12 @@ export const CreateInvoice: React.FC = () => {
           @media print {
             body * { visibility: hidden; }
             .print-area, .print-area * { visibility: visible; }
-            .print-area { position: absolute; left: 0; top: 0; }
+            .print-area { position: absolute; left: 0; top: 0; transform: none !important; margin-bottom: 0 !important; }
+          }
+          @media (max-width: 850px) {
+            .print-area .print-invoice {
+              width: 210mm !important;
+            }
           }
         `}</style>
       </div>
@@ -870,9 +922,11 @@ export const CreateInvoice: React.FC = () => {
   return (
     <div className="h-[calc(100vh-120px)] flex flex-col">
       {/* Compact Header with Steps */}
-      <div className={`flex items-center gap-4 p-3 rounded-xl mb-3 ${
+      <div className={`flex flex-col lg:hidden w-full items-start gap-2 p-3 rounded-t-xl mb-2 ${
         theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'
       }`}>
+      {/* Back Button and Title */}
+      <div className="flex items-center gap-2">
         <button
           onClick={() => navigate('/invoices')}
           className={`p-2 rounded-xl transition-colors ${
@@ -882,25 +936,26 @@ export const CreateInvoice: React.FC = () => {
           <ArrowLeft className="w-5 h-5" />
         </button>
         
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
           <FileText className="w-5 h-5 text-emerald-500" />
           <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
             New Invoice
           </span>
         </div>
+      </div>
 
-        {/* Inline Step Indicator */}
-        <div className="flex items-center gap-1 ml-auto">
-          {[1, 2, 3].map((s) => (
-            <React.Fragment key={s}>
-              <button
-                onClick={() => {
-                  if (s === 1 || (s === 2 && canProceedToStep2) || (s === 3 && canProceedToStep2 && canProceedToStep3)) {
-                    setStep(s as Step);
-                  }
-                }}
-                disabled={(s === 2 && !canProceedToStep2) || (s === 3 && (!canProceedToStep2 || !canProceedToStep3))}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
+      {/* Mobile Step Indicator */}
+      <div className="flex items-center gap-1.5 w-full">
+        {[1, 2, 3].map((s) => (
+          <React.Fragment key={s}>
+            <button
+              onClick={() => {
+                if (s === 1 || (s === 2 && canProceedToStep2) || (s === 3 && canProceedToStep2 && canProceedToStep3)) {
+                  setStep(s as Step);
+                }
+              }}
+              disabled={(s === 2 && !canProceedToStep2) || (s === 3 && (!canProceedToStep2 || !canProceedToStep3))}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                   s === step
                     ? 'bg-emerald-500 text-white'
                     : s < step
@@ -908,41 +963,97 @@ export const CreateInvoice: React.FC = () => {
                     : theme === 'dark' 
                       ? 'bg-slate-700 text-slate-400 disabled:opacity-50' 
                       : 'bg-slate-100 text-slate-500 disabled:opacity-50'
-                }`}
-              >
-                {s < step ? <CheckCircle className="w-3.5 h-3.5" /> : (
-                  s === 1 ? <User className="w-3.5 h-3.5" /> :
-                  s === 2 ? <Package className="w-3.5 h-3.5" /> :
-                  <Receipt className="w-3.5 h-3.5" />
-                )}
-                <span className="hidden sm:inline">
-                  {s === 1 ? 'Customer' : s === 2 ? 'Products' : 'Review'}
-                </span>
-              </button>
-              {s < 3 && (
-                <ChevronRight className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
+              }`}
+            >
+              {s < step ? <CheckCircle className="w-3 h-3" /> : (
+                s === 1 ? <User className="w-3 h-3" /> :
+                s === 2 ? <Package className="w-3 h-3" /> :
+                <Receipt className="w-3 h-3" />
               )}
-            </React.Fragment>
-          ))}
-        </div>
+              <span>{s === 1 ? 'Customer' : s === 2 ? 'Products' : 'Review'}</span>
+            </button>
+            {s < 3 && (
+              <ChevronRight className={`w-3 h-3 flex-shrink-0 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+
+    {/* Desktop Header with Steps */}
+    <div className={`hidden lg:flex items-center gap-4 p-3 rounded-xl mb-3 ${
+        theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'
+      }`}>
+      <button
+        onClick={() => navigate('/invoices')}
+        className={`p-2 rounded-xl transition-colors ${
+          theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+        }`}
+      >
+        <ArrowLeft className="w-5 h-5" />
+      </button>
+      
+      <div className="flex items-center gap-2">
+        <FileText className="w-5 h-5 text-emerald-500" />
+        <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+          New Invoice
+        </span>
       </div>
 
-      {/* Main Content - Split Panel Layout */}
+      {/* Desktop Step Indicator */}
+      <div className="flex items-center gap-1 ml-auto">
+        {[1, 2, 3].map((s) => (
+          <React.Fragment key={s}>
+            <button
+              onClick={() => {
+                if (s === 1 || (s === 2 && canProceedToStep2) || (s === 3 && canProceedToStep2 && canProceedToStep3)) {
+                  setStep(s as Step);
+                }
+              }}
+              disabled={(s === 2 && !canProceedToStep2) || (s === 3 && (!canProceedToStep2 || !canProceedToStep3))}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
+                s === step
+                  ? 'bg-emerald-500 text-white'
+                  : s < step
+                  ? 'bg-emerald-500/20 text-emerald-500'
+                  : theme === 'dark' 
+                    ? 'bg-slate-700 text-slate-400 disabled:opacity-50' 
+                    : 'bg-slate-100 text-slate-500 disabled:opacity-50'
+              }`}
+            >
+              {s < step ? <CheckCircle className="w-3.5 h-3.5" /> : (
+                s === 1 ? <User className="w-3.5 h-3.5" /> :
+                s === 2 ? <Package className="w-3.5 h-3.5" /> :
+                <Receipt className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {s === 1 ? 'Customer' : s === 2 ? 'Products' : 'Review'}
+              </span>
+            </button>
+            {s < 3 && (
+              <ChevronRight className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+
+      {/* Main Content - Split Panel (Desktop) / Full Width (Mobile/Tablet) */}
       <div 
         ref={mainContainerRef}
-        className={`flex-1 flex min-h-0 ${isResizing ? 'select-none' : ''}`}
+        className={`flex-1 flex min-h-0 ${isResizing ? 'select-none' : ''} ${isMobileLayout ? 'pb-16' : ''}`}
       >
-        {/* Left Panel - Main Content */}
+        {/* Left Panel - Full width on mobile/tablet, resizable on desktop */}
         <div 
           className={`rounded-xl overflow-hidden flex flex-col ${
             theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'
           }`}
-          style={{ width: `${leftPanelWidth}%` }}
+          style={isMobileLayout ? { width: '100%' } : { width: `${leftPanelWidth}%` }}
         >
           {/* Step 1: Customer Selection */}
           {step === 1 && (
-            <div className="flex-1 flex flex-col p-4 overflow-hidden">
-              <div className="flex items-center justify-between mb-3">
+            <div className="flex-1 flex flex-col p-3 sm:p-4 overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <User className="w-5 h-5 text-emerald-500" />
                   <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
@@ -952,13 +1063,13 @@ export const CreateInvoice: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setShowCustomerFormModal(true)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                       theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                     }`}
                     title="Register a new customer"
                   >
                     <UserPlus className="w-4 h-4" />
-                    Register
+                    <span>Register</span>
                   </button>
                   <button
                     onClick={() => { setIsWalkIn(!isWalkIn); setSelectedCustomer(''); }}
@@ -1041,14 +1152,14 @@ export const CreateInvoice: React.FC = () => {
 
           {/* Step 2: Product Selection */}
           {step === 2 && (
-            <div className="flex-1 flex flex-col p-4 overflow-hidden">
-              <div className="flex items-center justify-between mb-3">
+            <div className="flex-1 flex flex-col p-3 sm:p-4 overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <Package className="w-5 h-5 text-teal-500" />
                   <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Add Products
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  <span className={`hidden sm:inline text-xs px-2 py-0.5 rounded-full ${
                     theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'
                   }`}>
                     Double-click price to edit
@@ -1084,36 +1195,44 @@ export const CreateInvoice: React.FC = () => {
                 <div className={`p-3 rounded-xl mb-3 ${
                   theme === 'dark' ? 'bg-amber-500/10 border-2 border-amber-500/30' : 'bg-amber-50 border-2 border-amber-200'
                 }`}>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-1.5">
                     <input
                       type="text"
                       placeholder="Item name..."
                       value={quickAddName}
                       onChange={(e) => setQuickAddName(e.target.value)}
-                      className={inputClass}
+                      className={`${inputClass} flex-1`}
                     />
-                    <input
-                      type="number"
-                      placeholder="Price"
-                      value={quickAddPrice || ''}
-                      onChange={(e) => setQuickAddPrice(parseFloat(e.target.value) || 0)}
-                      className={`${inputClass} w-28`}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      min="1"
-                      value={quickAddQty}
-                      onChange={(e) => setQuickAddQty(parseInt(e.target.value) || 1)}
-                      className={`${inputClass} w-20`}
-                    />
-                    <button
-                      onClick={addQuickItem}
-                      disabled={!quickAddName.trim() || quickAddPrice <= 0}
-                      className="px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
+                    <div className="flex gap-1.5 sm:contents">
+                      <div className="relative flex-1">
+                        <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Rs.</span>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={quickAddPrice || ''}
+                          onChange={(e) => setQuickAddPrice(parseFloat(e.target.value) || 0)}
+                          className={`${inputClass} pl-9 w-full`}
+                        />
+                      </div>
+                      <div className="relative flex-1">
+                        <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-medium ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Qty</span>
+                        <input
+                          type="number"
+                          placeholder="1"
+                          min="1"
+                          value={quickAddQty}
+                          onChange={(e) => setQuickAddQty(parseInt(e.target.value) || 1)}
+                          className={`${inputClass} pl-9 w-full text-center`}
+                        />
+                      </div>
+                      <button
+                        onClick={addQuickItem}
+                        disabled={!quickAddName.trim() || quickAddPrice <= 0}
+                        className="px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1190,7 +1309,7 @@ export const CreateInvoice: React.FC = () => {
 
           {/* Step 3: Review */}
           {step === 3 && (
-            <div className="flex-1 flex flex-col p-4 overflow-hidden">
+            <div className="flex-1 flex flex-col p-3 sm:p-4 overflow-hidden">
               <div className="flex items-center gap-2 mb-4">
                 <Receipt className="w-5 h-5 text-emerald-500" />
                 <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
@@ -1200,7 +1319,7 @@ export const CreateInvoice: React.FC = () => {
 
               <div className="flex-1 overflow-y-auto space-y-5 pr-1">
                 {/* Dates Section */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Buying Date */}
                   <div className="relative">
                     <label className={`text-sm font-medium mb-2 block ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -1245,7 +1364,7 @@ export const CreateInvoice: React.FC = () => {
                   <label className={`text-sm font-medium mb-2 block ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                     Payment Method
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
                       { key: 'cash', label: 'Cash', icon: Banknote },
                       { key: 'card', label: 'Card', icon: CreditCard },
@@ -1387,7 +1506,8 @@ export const CreateInvoice: React.FC = () => {
           )}
         </div>
 
-        {/* Resizer Handle */}
+        {/* Resizer Handle - Desktop only */}
+        {!isMobileLayout && (
         <div
           onMouseDown={handleMouseDown}
           className={`w-3 cursor-col-resize flex items-center justify-center transition-colors flex-shrink-0 mx-1 rounded-full ${
@@ -1398,8 +1518,10 @@ export const CreateInvoice: React.FC = () => {
         >
           <GripVertical className={`w-4 h-4 ${isResizing ? 'text-white' : 'text-slate-400'}`} />
         </div>
+        )}
 
-        {/* Right Panel - Cart Summary (Always Visible) */}
+        {/* Right Panel - Cart Summary (Desktop only) */}
+        {!isMobileLayout && (
         <div 
           className={`rounded-xl overflow-hidden flex flex-col ${
             theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'
@@ -1632,7 +1754,292 @@ export const CreateInvoice: React.FC = () => {
             )}
           </div>
         </div>
+        )}
       </div>
+
+      {/* Mobile/Tablet Floating Cart Bar */}
+      {isMobileLayout && (
+        <div className={`fixed bottom-0 left-0 right-0 z-40 px-3 pb-3 pt-2 ${
+          theme === 'dark' ? 'bg-gradient-to-t from-slate-900 via-slate-900 to-slate-900/80' : 'bg-gradient-to-t from-white via-white to-white/80'
+        }`}>
+          <div className="flex items-center gap-2">
+            {/* Cart preview button */}
+            <button
+              onClick={() => setShowMobileCart(true)}
+              className={`flex items-center gap-2 px-3 py-3 rounded-xl border transition-all ${
+                theme === 'dark'
+                  ? 'bg-slate-800 border-slate-700 text-white'
+                  : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+              }`}
+            >
+              <div className="relative">
+                <ShoppingCart className="w-5 h-5 text-emerald-500" />
+                {items.length > 0 && (
+                  <span className="absolute -top-2 -right-2 w-4 h-4 bg-emerald-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {items.length}
+                  </span>
+                )}
+              </div>
+              <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                Rs. {total.toLocaleString()}
+              </span>
+            </button>
+
+            {/* Action button */}
+            <div className="flex-1">
+              {step < 3 ? (
+                <button
+                  onClick={() => setStep((step + 1) as Step)}
+                  disabled={step === 1 ? !canProceedToStep2 : !canProceedToStep3}
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {step === 1 ? 'Add Products' : 'Review Order'}
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleCreateInvoice}
+                  disabled={items.length === 0 || isSubmitting}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Create Invoice
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile/Tablet Cart Bottom Sheet */}
+      {isMobileLayout && showMobileCart && (
+        <div className="fixed inset-0 z-50 flex flex-col items-end justify-end">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowMobileCart(false)}
+          />
+          
+          {/* Bottom Sheet */}
+          <div className={`relative w-full max-h-[85vh] rounded-t-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300 ${
+            theme === 'dark' ? 'bg-slate-900 border-t border-slate-700' : 'bg-white border-t border-slate-200'
+          }`}>
+            {/* Handle bar */}
+            <div className="flex justify-center pt-2 pb-1">
+              <div className={`w-10 h-1 rounded-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'}`} />
+            </div>
+
+            {/* Header */}
+            <div className={`flex items-center justify-between px-4 py-2 border-b ${
+              theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
+            }`}>
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-emerald-500" />
+                <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  Cart ({items.length} {items.length === 1 ? 'item' : 'items'})
+                </span>
+              </div>
+              <button
+                onClick={() => setShowMobileCart(false)}
+                className={`p-2 rounded-xl transition-colors ${
+                  theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Customer Info */}
+            <div className={`px-4 py-2.5 border-b ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'}`}>
+              <div className="flex items-center gap-2">
+                {isWalkIn ? (
+                  <>
+                    <UserX className="w-4 h-4 text-purple-400" />
+                    <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                      Walk-in Customer
+                    </span>
+                  </>
+                ) : currentCustomer ? (
+                  <>
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                      theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
+                    }`}>
+                      {currentCustomer.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        {currentCustomer.name}
+                      </p>
+                      <p className={`text-xs truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {currentCustomer.phone}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <User className="w-4 h-4 text-slate-400" />
+                    <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      No customer selected
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Cart Items - Scrollable */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
+              {items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <ShoppingCart className={`w-12 h-12 mb-3 ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
+                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Cart is empty — add products from the list
+                  </p>
+                </div>
+              ) : (
+                items.map((item) => (
+                  <div
+                    key={item.productId}
+                    className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/70' : 'bg-slate-50'}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className={`text-sm font-medium flex-1 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        {item.productName}
+                      </p>
+                      <button
+                        onClick={() => removeItem(item.productId)}
+                        className="text-red-500 hover:text-red-600 p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    
+                    {/* Price */}
+                    <div className="mb-2">
+                      <div className={`inline-flex items-center gap-1 ${
+                        item.isCustomPrice ? 'text-amber-500' : theme === 'dark' ? 'text-slate-300' : 'text-slate-600'
+                      }`}>
+                        <span className="text-xs">
+                          {item.originalPrice && item.originalPrice !== item.unitPrice ? (
+                            <>
+                              <span className="line-through text-red-400 mr-1">Rs. {item.originalPrice.toLocaleString()}</span>
+                              <span className="text-emerald-400">Rs. {item.unitPrice.toLocaleString()}</span>
+                            </>
+                          ) : (
+                            <>Rs. {item.unitPrice.toLocaleString()} /unit</>
+                          )}
+                        </span>
+                        {item.isCustomPrice && (
+                          <span className="text-[10px] px-1 py-0.5 bg-amber-500/20 rounded text-amber-500">Custom</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Warranty */}
+                    <div className="mb-2">
+                      <SearchableSelect
+                        options={warrantyOptions.map(opt => ({ value: opt.value, label: opt.label }))}
+                        value={warrantyOptions.find(o => {
+                          if (!item.warrantyDueDate) return o.value === '';
+                          const buyDate = new Date(buyingDate);
+                          const warDate = new Date(item.warrantyDueDate);
+                          const diffDays = Math.round((warDate.getTime() - buyDate.getTime()) / (1000 * 60 * 60 * 24));
+                          return Math.abs(o.days - diffDays) < 30;
+                        })?.value || ''}
+                        onValueChange={val => updateItemWarranty(item.productId, val)}
+                        placeholder="Warranty"
+                        theme={theme === 'dark' ? 'dark' : 'light'}
+                        triggerClassName="w-full text-xs"
+                      />
+                    </div>
+
+                    {/* Quantity + Total */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => updateItemQuantity(item.productId, item.quantity - 1)}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                            theme === 'dark' ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-200 hover:bg-slate-300'
+                          }`}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className={`w-8 text-center text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => updateItemQuantity(item.productId, item.quantity + 1)}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                            theme === 'dark' ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-200 hover:bg-slate-300'
+                          }`}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <span className="text-sm font-bold text-emerald-500">
+                        Rs. {item.total.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Totals */}
+            <div className={`px-4 py-3 border-t space-y-1.5 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+              <div className="flex justify-between text-sm">
+                <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Subtotal</span>
+                <span className={theme === 'dark' ? 'text-white' : 'text-slate-900'}>
+                  Rs. {subtotal.toLocaleString()}
+                </span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Discount</span>
+                  <span className="text-red-500">-Rs. {discountAmount.toLocaleString()}</span>
+                </div>
+              )}
+              {enableTax && tax > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Tax ({taxRate}%)</span>
+                  <span className={theme === 'dark' ? 'text-white' : 'text-slate-900'}>
+                    Rs. {tax.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              <div className={`flex justify-between pt-2 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Total</span>
+                <span className="text-lg font-bold text-emerald-500">
+                  Rs. {total.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            {/* Close button */}
+            <div className={`px-4 py-3 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+              <button
+                onClick={() => setShowMobileCart(false)}
+                className={`w-full py-2.5 rounded-xl font-medium transition-all ${
+                  theme === 'dark' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Customer Registration Modal */}
       <CustomerFormModal
