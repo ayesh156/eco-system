@@ -278,7 +278,72 @@ export const ViewInvoice: React.FC = () => {
   };
 
   const handleActualPrint = () => {
-    window.print();
+    // Use new-window approach to prevent duplicate pages on mobile
+    // and ensure A4 paper size is the default
+    const printElement = printRef.current;
+    if (!printElement) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      // Fallback if popup blocked
+      window.print();
+      return;
+    }
+
+    const content = printElement.innerHTML;
+    printWindow.document.write(`<!DOCTYPE html>
+<html><head>
+<title>Invoice - ${invoice?.id || ''}</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 210mm;
+    background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+</style>
+</head>
+<body>${content}</body>
+</html>`);
+    printWindow.document.close();
+
+    // Wait for images to load, then trigger print
+    const images = printWindow.document.querySelectorAll('img');
+    let loaded = 0;
+    let printTriggered = false;
+
+    const triggerPrint = () => {
+      if (printTriggered) return;
+      printTriggered = true;
+      printWindow.focus();
+      printWindow.print();
+    };
+
+    if (images.length === 0) {
+      setTimeout(triggerPrint, 300);
+    } else {
+      images.forEach(img => {
+        if (img.complete) {
+          loaded++;
+        } else {
+          img.onload = () => { loaded++; if (loaded >= images.length) triggerPrint(); };
+          img.onerror = () => { loaded++; if (loaded >= images.length) triggerPrint(); };
+        }
+      });
+      if (loaded >= images.length) {
+        setTimeout(triggerPrint, 300);
+      }
+      // Fallback timeout in case images take too long
+      setTimeout(triggerPrint, 3000);
+    }
   };
 
   // WhatsApp payment reminder function
