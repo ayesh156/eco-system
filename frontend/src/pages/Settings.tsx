@@ -1128,29 +1128,29 @@ export const Settings: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-8">
-      {/* Hero Header with Gradient */}
-      <div className="relative overflow-hidden mb-8">
+      {/* Hero Header with Gradient - Samsung S20 (360px) + iPad Mini (768px) optimized */}
+      <div className="relative overflow-hidden mb-4 sm:mb-6 md:mb-8">
         <div className={`absolute inset-0 ${
           theme === 'dark' 
             ? 'bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900' 
             : 'bg-gradient-to-br from-slate-50 via-purple-50 to-slate-50'
         }`} />
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-full blur-3xl" />
+          <div className="absolute -top-20 -right-20 sm:-top-40 sm:-right-40 w-40 sm:w-80 h-40 sm:h-80 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 sm:-bottom-40 sm:-left-40 w-40 sm:w-80 h-40 sm:h-80 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-full blur-3xl" />
         </div>
         
-        <div className="relative p-6 md:p-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
-                <Settings2 className="w-7 h-7 text-white" />
+        <div className="relative p-4 sm:p-6 md:p-8">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30 flex-shrink-0">
+                <Settings2 className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 text-white" />
               </div>
-              <div>
-                <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              <div className="min-w-0">
+                <h1 className={`text-xl sm:text-2xl md:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                   Settings
                 </h1>
-                <p className={`${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                <p className={`text-xs sm:text-sm md:text-base truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                   Customize your experience and preferences
                 </p>
               </div>
@@ -1160,26 +1160,27 @@ export const Settings: React.FC = () => {
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className={`relative px-6 py-2.5 rounded-xl font-semibold text-white transition-all overflow-hidden ${
+                className={`relative px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 rounded-xl font-semibold text-white text-xs sm:text-sm md:text-base transition-all overflow-hidden flex-shrink-0 ${
                   saveSuccess 
                     ? 'bg-green-500' 
                     : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 hover:shadow-lg hover:shadow-purple-500/30'
                 }`}
               >
                 {isSaving ? (
-                  <span className="flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Saving...
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                    <span className="hidden sm:inline">Saving...</span>
                   </span>
                 ) : saveSuccess ? (
-                  <span className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Saved!
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Saved!</span>
                   </span>
                 ) : (
-                  <span className="flex items-center gap-2">
-                    <Save className="w-4 h-4" />
-                    Save Changes
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Save Changes</span>
+                    <span className="sm:hidden">Save</span>
                   </span>
                 )}
               </button>
@@ -1188,7 +1189,7 @@ export const Settings: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4">
         {/* Shop Viewing Banner for SUPER_ADMIN */}
         {isSuperAdmin && isViewingShop && viewingShop && (
           <div className={`mb-6 rounded-2xl border p-4 ${
@@ -1214,15 +1215,15 @@ export const Settings: React.FC = () => {
           </div>
         )}
 
-        {/* Modern Tab Navigation - World Class Design */}
-        <div className={`rounded-2xl p-1.5 mb-8 ${
+        {/* Modern Tab Navigation - World Class Design - Samsung S20 (360px) + iPad Mini (768px) optimized */}
+        <div className={`rounded-xl sm:rounded-2xl p-1 sm:p-1.5 mb-4 sm:mb-6 md:mb-8 ${
           theme === 'dark' ? 'bg-slate-800/50 backdrop-blur-sm' : 'bg-white shadow-lg shadow-slate-200/50'
         }`}>
           {/* Shop Admin Section Divider - Show when SUPER_ADMIN viewing shop */}
           {canViewShopAdminSettings && (
-            <div className="px-4 py-2 mb-2">
-              <div className="flex items-center gap-3">
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+            <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 mb-1 sm:mb-2">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                   General Settings
                 </span>
                 <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-200'}`} />
@@ -1230,10 +1231,10 @@ export const Settings: React.FC = () => {
             </div>
           )}
           
-          <div className={`grid gap-2 ${
+          <div className={`grid gap-1 sm:gap-1.5 md:gap-2 ${
             canViewShopAdminSettings 
-              ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' 
-              : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
+              ? 'grid-cols-3 sm:grid-cols-3 md:grid-cols-6' 
+              : 'grid-cols-3 sm:grid-cols-3 md:grid-cols-6'
           }`}>
             {tabs.slice(0, canViewShopAdminSettings ? 6 : tabs.length).map((tab) => {
               const Icon = tab.icon;
@@ -1272,17 +1273,18 @@ export const Settings: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                  className={`relative flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 px-1.5 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-medium transition-all duration-300 ${
                     isActive
                       ? `bg-gradient-to-r ${getGradient()} text-white shadow-lg`
                       : theme === 'dark' 
                         ? 'text-slate-400 hover:text-white hover:bg-slate-700/50' 
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
-                  style={isActive ? { boxShadow: `0 10px 30px -10px ${getShadowColor()}` } : {}}
+                  style={isActive ? { boxShadow: `0 8px 24px -8px ${getShadowColor()}` } : {}}
                 >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="hidden sm:inline text-sm">{tab.label}</span>
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                  <span className="text-[9px] sm:text-xs md:text-sm leading-tight text-center sm:text-left truncate max-w-full">{tab.label.split(' ')[0]}</span>
+                  <span className="hidden md:inline text-sm">{tab.label.includes(' ') ? tab.label.substring(tab.label.indexOf(' ')) : ''}</span>
                 </button>
               );
             })}
@@ -1291,15 +1293,15 @@ export const Settings: React.FC = () => {
           {/* Shop Admin Section - Only for SUPER_ADMIN viewing shop */}
           {canViewShopAdminSettings && (
             <>
-              <div className="px-4 py-2 mt-3">
-                <div className="flex items-center gap-3">
-                  <span className={`text-[10px] font-bold uppercase tracking-widest ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600'}`}>
+              <div className="px-2.5 sm:px-4 py-1.5 sm:py-2 mt-2 sm:mt-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-widest ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600'}`}>
                     Shop Administration
                   </span>
                   <div className={`flex-1 h-px ${theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-200'}`} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1 sm:gap-1.5 md:gap-2">
                 {tabs.slice(6).map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -1323,17 +1325,17 @@ export const Settings: React.FC = () => {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`relative flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                      className={`relative flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-medium transition-all duration-300 ${
                         isActive
                           ? `bg-gradient-to-r ${getGradient()} text-white shadow-lg`
                           : theme === 'dark' 
                             ? 'text-slate-400 hover:text-white hover:bg-slate-700/50' 
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                       }`}
-                      style={isActive ? { boxShadow: `0 10px 30px -10px ${getShadowColor()}` } : {}}
+                      style={isActive ? { boxShadow: `0 8px 24px -8px ${getShadowColor()}` } : {}}
                     >
-                      <Icon className="w-5 h-5 flex-shrink-0" />
-                      <span className="hidden sm:inline text-sm">{tab.label}</span>
+                      <Icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                      <span className="text-xs sm:text-sm">{tab.label}</span>
                       {/* Unsaved changes indicator */}
                       {tab.id === 'supplierOrders' && supplierOrderTemplateHasChanges && (
                         <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : 'bg-orange-500'}`} />
@@ -1348,32 +1350,32 @@ export const Settings: React.FC = () => {
 
         {/* Appearance Tab */}
         {activeTab === 'appearance' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-300">
             {/* Theme Toggle Card */}
-            <div className={`rounded-3xl border overflow-hidden ${
+            <div className={`rounded-2xl sm:rounded-3xl border overflow-hidden ${
               theme === 'dark' 
                 ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
                 : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
             }`}>
-              <div className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div className={`w-11 h-11 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center transition-all duration-500 flex-shrink-0 ${
                       theme === 'dark' 
                         ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20' 
                         : 'bg-gradient-to-br from-amber-100 to-orange-100'
                     }`}>
                       {theme === 'dark' ? (
-                        <Moon className="w-8 h-8 text-indigo-400" />
+                        <Moon className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-indigo-400" />
                       ) : (
-                        <Sun className="w-8 h-8 text-amber-500" />
+                        <Sun className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-amber-500" />
                       )}
                     </div>
-                    <div>
-                      <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <div className="min-w-0">
+                      <h2 className={`text-base sm:text-lg md:text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
                       </h2>
-                      <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                         {theme === 'dark' ? 'Easier on the eyes in low light' : 'Clean and bright interface'}
                       </p>
                     </div>
@@ -1382,7 +1384,7 @@ export const Settings: React.FC = () => {
                   {/* Modern Toggle Switch */}
                   <button
                     onClick={toggleTheme}
-                    className={`relative w-20 h-10 rounded-full transition-all duration-500 ${
+                    className={`relative w-16 h-8 sm:w-20 sm:h-10 rounded-full transition-all duration-500 flex-shrink-0 ${
                       theme === 'dark' 
                         ? 'bg-gradient-to-r from-indigo-600 to-purple-600' 
                         : 'bg-gradient-to-r from-amber-400 to-orange-400'
@@ -1393,15 +1395,15 @@ export const Settings: React.FC = () => {
                         : '0 0 20px rgba(245, 158, 11, 0.4)'
                     }}
                   >
-                    <div className={`absolute top-1 w-8 h-8 rounded-full bg-white flex items-center justify-center transition-all duration-500 ${
-                      theme === 'dark' ? 'translate-x-11' : 'translate-x-1'
+                    <div className={`absolute top-1 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white flex items-center justify-center transition-all duration-500 ${
+                      theme === 'dark' ? 'translate-x-[1.95rem] sm:translate-x-11' : 'translate-x-1'
                     }`}
                     style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
                     >
                       {theme === 'dark' ? (
-                        <Moon className="w-5 h-5 text-indigo-600" />
+                        <Moon className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-indigo-600" />
                       ) : (
-                        <Sun className="w-5 h-5 text-amber-500" />
+                        <Sun className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-amber-500" />
                       )}
                     </div>
                   </button>
@@ -1409,15 +1411,15 @@ export const Settings: React.FC = () => {
               </div>
               
               {/* Preview Cards */}
-              <div className={`p-6 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-                <p className={`text-sm font-medium mb-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              <div className={`p-4 sm:p-6 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                <p className={`text-xs sm:text-sm font-medium mb-3 sm:mb-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                   Preview
                 </p>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
                   {['Primary', 'Secondary', 'Accent'].map((color, i) => (
                     <div
                       key={color}
-                      className={`h-20 rounded-xl flex items-center justify-center font-medium text-sm ${
+                      className={`h-14 sm:h-20 rounded-lg sm:rounded-xl flex items-center justify-center font-medium text-[10px] sm:text-sm ${
                         i === 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white' :
                         i === 1 ? (theme === 'dark' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-700') :
                         'bg-gradient-to-br from-purple-500 to-pink-500 text-white'
@@ -1436,21 +1438,21 @@ export const Settings: React.FC = () => {
                 ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
                 : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
             }`}>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-pink-500/20 to-rose-500/20 rounded-xl flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-pink-500" />
+              <div className="flex items-center gap-2.5 sm:gap-3 mb-4 sm:mb-6">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-pink-500/20 to-rose-500/20 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-4 h-4 sm:w-6 sm:h-6 text-pink-500" />
                 </div>
-                <div>
-                  <h3 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="min-w-0">
+                  <h3 className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Accent Color
                   </h3>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     Choose your primary accent color
                   </p>
                 </div>
               </div>
               
-              <div className="flex flex-wrap gap-3">
+              <div className="grid grid-cols-6 gap-2 sm:flex sm:flex-wrap sm:gap-3">
                 {[
                   { name: 'Emerald', colors: 'from-emerald-500 to-teal-500' },
                   { name: 'Blue', colors: 'from-blue-500 to-cyan-500' },
@@ -1461,7 +1463,7 @@ export const Settings: React.FC = () => {
                 ].map((accent) => (
                   <button
                     key={accent.name}
-                    className={`relative w-14 h-14 rounded-xl bg-gradient-to-br ${accent.colors} transition-all hover:scale-110 ${
+                    className={`relative aspect-square w-full sm:w-14 sm:h-14 rounded-lg sm:rounded-xl bg-gradient-to-br ${accent.colors} transition-all hover:scale-110 ${
                       accent.name === 'Emerald' 
                         ? `ring-2 ring-offset-2 ring-emerald-500 ${theme === 'dark' ? 'ring-offset-slate-900' : 'ring-offset-white'}` 
                         : ''
@@ -1473,7 +1475,7 @@ export const Settings: React.FC = () => {
                   >
                     {accent.name === 'Emerald' && (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <Check className="w-6 h-6 text-white" />
+                        <Check className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                       </div>
                     )}
                   </button>
@@ -1483,36 +1485,36 @@ export const Settings: React.FC = () => {
 
             {/* Tax Configuration Card - Show for shop admins AND SuperAdmin viewing a shop */}
             {canViewBusinessSettings && (
-              <div className={`rounded-3xl border overflow-hidden ${
+              <div className={`rounded-2xl sm:rounded-3xl border overflow-hidden ${
                 theme === 'dark' 
                   ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
                   : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
               }`}>
-                <div className="p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-xl flex items-center justify-center">
-                      <Settings2 className="w-6 h-6 text-emerald-500" />
+                <div className="p-4 sm:p-6">
+                  <div className="flex items-center gap-2.5 sm:gap-3 mb-4 sm:mb-6">
+                    <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Settings2 className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-500" />
                     </div>
-                    <div>
-                      <h3 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <div className="min-w-0">
+                      <h3 className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         Tax Configuration
                       </h3>
-                      <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                         Set default tax settings for invoices
                       </p>
                     </div>
                   </div>
 
-                  <div className="space-y-6">
+                  <div className="space-y-4 sm:space-y-6">
                     {/* Tax Enable/Disable Toggle */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                        <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center transition-all duration-500 flex-shrink-0 ${
                           taxSettings.enabled
                             ? 'bg-gradient-to-br from-emerald-500/20 to-green-500/20' 
                             : 'bg-gradient-to-br from-slate-500/20 to-slate-600/20'
                         }`}>
-                          <CheckCircle2 className={`w-7 h-7 transition-colors ${
+                          <CheckCircle2 className={`w-5 h-5 sm:w-7 sm:h-7 transition-colors ${
                             taxSettings.enabled ? 'text-emerald-500' : 'text-slate-500'
                           }`} />
                         </div>
@@ -1532,7 +1534,7 @@ export const Settings: React.FC = () => {
                           updateTaxSettings({ enabled: !taxSettings.enabled });
                           saveTaxSettings();
                         }}
-                        className={`relative w-20 h-10 rounded-full transition-all duration-500 ${
+                        className={`relative w-16 h-8 sm:w-20 sm:h-10 rounded-full transition-all duration-500 flex-shrink-0 ${
                           taxSettings.enabled
                             ? 'bg-gradient-to-r from-emerald-600 to-green-600' 
                             : 'bg-gradient-to-r from-slate-400 to-slate-500'
@@ -1543,27 +1545,27 @@ export const Settings: React.FC = () => {
                             : '0 0 10px rgba(100, 116, 139, 0.2)'
                         }}
                       >
-                        <div className={`absolute top-1 w-8 h-8 rounded-full bg-white flex items-center justify-center transition-all duration-500 ${
-                          taxSettings.enabled ? 'translate-x-11' : 'translate-x-1'
+                        <div className={`absolute top-1 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white flex items-center justify-center transition-all duration-500 ${
+                          taxSettings.enabled ? 'translate-x-[1.95rem] sm:translate-x-11' : 'translate-x-1'
                         }`}
                         style={{ boxShadow: '0 2px 10px rgba(0,0,0,0.2)' }}
                         >
                           {taxSettings.enabled ? (
-                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                            <CheckCircle2 className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-600" />
                           ) : (
-                            <AlertCircle className="w-5 h-5 text-slate-500" />
+                            <AlertCircle className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-slate-500" />
                           )}
                         </div>
                       </button>
                     </div>
 
                     {/* Default Tax Percentage */}
-                    <div className={`p-4 rounded-2xl border transition-all ${
+                    <div className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all ${
                       taxSettings.enabled
                         ? theme === 'dark' ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'
                         : theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50 opacity-50' : 'bg-slate-50 border-slate-200 opacity-50'
                     }`}>
-                      <label className={`block text-sm font-semibold mb-3 ${
+                      <label className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
                         taxSettings.enabled
                           ? theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'
                           : theme === 'dark' ? 'text-slate-500' : 'text-slate-600'
@@ -1677,27 +1679,27 @@ export const Settings: React.FC = () => {
 
         {/* Notifications Tab */}
         {activeTab === 'notifications' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            <div className={`rounded-3xl border p-6 ${
+          <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-300">
+            <div className={`rounded-2xl sm:rounded-3xl border p-3 sm:p-6 ${
               theme === 'dark' 
                 ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
                 : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
             }`}>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl flex items-center justify-center">
-                  <Bell className="w-6 h-6 text-amber-500" />
+              <div className="flex items-center gap-2.5 sm:gap-3 mb-4 sm:mb-6">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-4 h-4 sm:w-6 sm:h-6 text-amber-500" />
                 </div>
-                <div>
-                  <h3 className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="min-w-0">
+                  <h3 className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Notification Preferences
                   </h3>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     Control how you receive notifications
                   </p>
                 </div>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-2 sm:space-y-4">
                 {[
                   { label: 'Email Notifications', desc: 'Receive updates via email', icon: Mail, enabled: true },
                   { label: 'Low Stock Alerts', desc: 'Get notified when stock is low', icon: AlertCircle, enabled: true },
@@ -1709,32 +1711,32 @@ export const Settings: React.FC = () => {
                   return (
                     <div 
                       key={item.label}
-                      className={`flex items-center justify-between p-4 rounded-xl transition-all ${
+                      className={`flex items-center justify-between p-2.5 sm:p-4 rounded-lg sm:rounded-xl transition-all gap-3 ${
                         theme === 'dark' ? 'bg-slate-800/50 hover:bg-slate-800' : 'bg-slate-50 hover:bg-slate-100'
                       }`}
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                           theme === 'dark' ? 'bg-slate-700' : 'bg-white shadow'
                         }`}>
-                          <Icon className={`w-5 h-5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`} />
+                          <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`} />
                         </div>
-                        <div>
-                          <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        <div className="min-w-0">
+                          <p className={`text-xs sm:text-sm font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                             {item.label}
                           </p>
-                          <p className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                          <p className={`text-[10px] sm:text-sm truncate ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
                             {item.desc}
                           </p>
                         </div>
                       </div>
-                      <button className={`relative w-14 h-8 rounded-full transition-all duration-300 ${
+                      <button className={`relative w-11 h-6 sm:w-14 sm:h-8 rounded-full transition-all duration-300 flex-shrink-0 ${
                         item.enabled 
                           ? 'bg-gradient-to-r from-amber-500 to-orange-500' 
                           : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
                       }`}>
-                        <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all duration-300 ${
-                          item.enabled ? 'translate-x-7' : 'translate-x-1'
+                        <div className={`absolute top-0.5 sm:top-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white transition-all duration-300 ${
+                          item.enabled ? 'translate-x-[1.25rem] sm:translate-x-7' : 'translate-x-0.5 sm:translate-x-1'
                         }`} />
                       </button>
                     </div>
@@ -1747,22 +1749,22 @@ export const Settings: React.FC = () => {
 
         {/* Invoice Settings Tab */}
         {activeTab === 'invoice' && (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-300">
             {/* Enable/Disable Card */}
-            <div className={`rounded-3xl border overflow-hidden ${
+            <div className={`rounded-2xl sm:rounded-3xl border overflow-hidden ${
               theme === 'dark' 
                 ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
                 : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
             }`}>
-              <div className="relative h-24 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">
-                <div className="absolute inset-0 flex items-center px-6">
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
-                      <MessageCircle className="w-8 h-8 text-white" />
+              <div className="relative h-16 sm:h-24 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600">
+                <div className="absolute inset-0 flex items-center px-3 sm:px-6">
+                  <div className="flex items-center gap-2.5 sm:gap-4 flex-1 min-w-0">
+                    <div className="w-9 h-9 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0">
+                      <MessageCircle className="w-4 h-4 sm:w-8 sm:h-8 text-white" />
                     </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-white">WhatsApp Reminder Templates</h2>
-                      <p className="text-blue-100 text-sm">Customize payment reminder messages sent to customers</p>
+                    <div className="min-w-0">
+                      <h2 className="text-sm sm:text-xl font-bold text-white truncate">WhatsApp Reminder Templates</h2>
+                      <p className="text-blue-100 text-[10px] sm:text-sm truncate">Customize payment reminder messages</p>
                     </div>
                   </div>
                   <button
@@ -2043,22 +2045,22 @@ export const Settings: React.FC = () => {
 
         {/* ========== GRN SETTINGS TAB ========== */}
         {activeTab === 'grn' && canViewBusinessSettings && (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-300">
             {/* ========== GRN REMINDER TEMPLATES ========== */}
-            <div className={`rounded-3xl border overflow-hidden ${
+            <div className={`rounded-2xl sm:rounded-3xl border overflow-hidden ${
               theme === 'dark' 
                 ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
                 : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
             }`}>
-              <div className="relative h-24 bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600">
-                <div className="absolute inset-0 flex items-center px-6">
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
-                      <Package className="w-8 h-8 text-white" />
+              <div className="relative h-16 sm:h-24 bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600">
+                <div className="absolute inset-0 flex items-center px-3 sm:px-6">
+                  <div className="flex items-center gap-2.5 sm:gap-4 flex-1 min-w-0">
+                    <div className="w-9 h-9 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0">
+                      <Package className="w-4 h-4 sm:w-8 sm:h-8 text-white" />
                     </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-white">GRN Reminder Templates</h2>
-                      <p className="text-emerald-100 text-sm">Send WhatsApp payment reminders to suppliers for GRNs</p>
+                    <div className="min-w-0">
+                      <h2 className="text-sm sm:text-xl font-bold text-white truncate">GRN Reminder Templates</h2>
+                      <p className="text-emerald-100 text-[10px] sm:text-sm truncate">WhatsApp payment reminders for suppliers</p>
                     </div>
                   </div>
                   <button
@@ -2309,39 +2311,40 @@ export const Settings: React.FC = () => {
         {activeTab === 'supplierOrders' && canViewBusinessSettings && (
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Creative Header with Orange Gradient */}
-            <div className={`relative overflow-hidden rounded-3xl border ${theme === 'dark' ? 'bg-gradient-to-br from-orange-900/30 via-slate-800/50 to-amber-900/30 border-orange-500/20' : 'bg-gradient-to-br from-orange-50 via-white to-amber-50 border-orange-200 shadow-xl'}`}>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-orange-500/20 to-amber-500/10 rounded-full blur-3xl -translate-y-32 translate-x-32" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-yellow-500/10 to-orange-500/10 rounded-full blur-3xl translate-y-24 -translate-x-24" />
-              <div className="relative p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                  <div className="flex items-start gap-4">
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/30">
-                      <Truck className="w-8 h-8 text-white" />
+            <div className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border ${theme === 'dark' ? 'bg-gradient-to-br from-orange-900/30 via-slate-800/50 to-amber-900/30 border-orange-500/20' : 'bg-gradient-to-br from-orange-50 via-white to-amber-50 border-orange-200 shadow-xl'}`}>
+              <div className="absolute top-0 right-0 w-40 sm:w-64 h-40 sm:h-64 bg-gradient-to-br from-orange-500/20 to-amber-500/10 rounded-full blur-3xl -translate-y-32 translate-x-32" />
+              <div className="absolute bottom-0 left-0 w-32 sm:w-48 h-32 sm:h-48 bg-gradient-to-tr from-yellow-500/10 to-orange-500/10 rounded-full blur-3xl translate-y-24 -translate-x-24" />
+              <div className="relative p-3 sm:p-4 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="p-2.5 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/30">
+                      <Truck className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-white" />
                     </div>
-                    <div>
-                      <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <div className="min-w-0">
+                      <h2 className={`text-base sm:text-xl md:text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         Supplier Order Template
                       </h2>
-                      <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm mt-0.5 sm:mt-1 line-clamp-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                         Customize the WhatsApp message template for placing orders with suppliers
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <button
                       onClick={() => {
                         updateSettings({ supplierOrderTemplate: defaultTemplates.supplierOrder });
                         setSupplierOrderTemplateHasChanges(false);
                         toast.success('Template reset to default');
                       }}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
                         theme === 'dark'
                           ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
                           : 'bg-white/80 text-slate-700 hover:bg-white shadow-sm'
                       }`}
                     >
-                      <RotateCcw className="w-4 h-4" />
-                      Reset Default
+                      <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span className="hidden sm:inline">Reset Default</span>
+                      <span className="sm:hidden">Reset</span>
                     </button>
                   </div>
                 </div>
@@ -2349,25 +2352,25 @@ export const Settings: React.FC = () => {
             </div>
 
             {/* Available Placeholders Card */}
-            <div className={`rounded-2xl border overflow-hidden ${
+            <div className={`rounded-xl sm:rounded-2xl border overflow-hidden ${
               theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-lg'
             }`}>
-              <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20">
-                    <Info className={`w-5 h-5 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
+              <div className={`px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b ${theme === 'dark' ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20">
+                    <Info className={`w-4 h-4 sm:w-5 sm:h-5 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
                   </div>
-                  <div>
-                    <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <div className="min-w-0">
+                    <h3 className={`text-sm sm:text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                       Available Placeholders
                     </h3>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                       Click to copy • These will be replaced with actual values
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="p-6">
+              <div className="p-3 sm:p-4 md:p-6">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {[
                     { key: 'supplierName', label: 'Supplier Name', desc: 'Contact person name' },
@@ -2414,20 +2417,20 @@ export const Settings: React.FC = () => {
             </div>
 
             {/* Template Editor & Preview Card */}
-            <div className={`rounded-2xl border overflow-hidden ${
+            <div className={`rounded-xl sm:rounded-2xl border overflow-hidden ${
               theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-lg'
             }`}>
-              <div className={`px-6 py-4 border-b ${theme === 'dark' ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
+              <div className={`px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b ${theme === 'dark' ? 'border-slate-700/50 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20">
-                      <MessageCircle className={`w-5 h-5 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-500/20">
+                      <MessageCircle className={`w-4 h-4 sm:w-5 sm:h-5 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
                     </div>
-                    <div>
-                      <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <div className="min-w-0">
+                      <h3 className={`text-sm sm:text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         Order Message Template
                       </h3>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <p className={`text-[10px] sm:text-xs hidden sm:block ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                         This message will be sent when you click "Place Order" on a supplier
                       </p>
                     </div>
@@ -2443,8 +2446,8 @@ export const Settings: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="p-3 sm:p-4 md:p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   {/* Editor */}
                   <div>
                     <textarea
@@ -2552,20 +2555,20 @@ export const Settings: React.FC = () => {
         {activeTab === 'sections' && canViewShopAdminSettings && (
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Creative Header with Gradient */}
-            <div className={`relative overflow-hidden rounded-3xl border ${theme === 'dark' ? 'bg-gradient-to-br from-violet-900/30 via-slate-800/50 to-purple-900/30 border-violet-500/20' : 'bg-gradient-to-br from-violet-50 via-white to-purple-50 border-violet-200 shadow-xl'}`}>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-violet-500/20 to-purple-500/10 rounded-full blur-3xl -translate-y-32 translate-x-32" />
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-pink-500/10 to-violet-500/10 rounded-full blur-3xl translate-y-24 -translate-x-24" />
-              <div className="relative p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                  <div className="flex items-start gap-4">
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/30">
-                      <Layers className="w-8 h-8 text-white" />
+            <div className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border ${theme === 'dark' ? 'bg-gradient-to-br from-violet-900/30 via-slate-800/50 to-purple-900/30 border-violet-500/20' : 'bg-gradient-to-br from-violet-50 via-white to-purple-50 border-violet-200 shadow-xl'}`}>
+              <div className="absolute top-0 right-0 w-40 sm:w-64 h-40 sm:h-64 bg-gradient-to-br from-violet-500/20 to-purple-500/10 rounded-full blur-3xl -translate-y-32 translate-x-32" />
+              <div className="absolute bottom-0 left-0 w-32 sm:w-48 h-32 sm:h-48 bg-gradient-to-tr from-pink-500/10 to-violet-500/10 rounded-full blur-3xl translate-y-24 -translate-x-24" />
+              <div className="relative p-3 sm:p-4 md:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="p-2.5 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/30">
+                      <Layers className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-white" />
                     </div>
-                    <div>
-                      <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <div className="min-w-0">
+                      <h2 className={`text-base sm:text-xl md:text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         Section Control Center
                       </h2>
-                      <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm mt-0.5 sm:mt-1 line-clamp-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                         {isSuperAdmin 
                           ? 'Manage section visibility for all shop users (Admin + Users)' 
                           : 'Manage section visibility for your shop users'
@@ -2574,40 +2577,40 @@ export const Settings: React.FC = () => {
                     </div>
                   </div>
                   {/* Stats Pills - Show different stats based on role */}
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     {isSuperAdmin ? (
                       <>
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-100 border border-emerald-200'}`}>
-                          <Eye className={`w-4 h-4 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
-                          <span className={`font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        <div className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full ${theme === 'dark' ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-100 border border-emerald-200'}`}>
+                          <Eye className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                          <span className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'}`}>
                             {ALL_SECTIONS.length - localHiddenSections.length}
                           </span>
-                          <span className={`text-sm ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600'}`}>Visible</span>
+                          <span className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600'}`}>Visible</span>
                         </div>
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-red-500/20 border border-red-500/30' : 'bg-red-100 border border-red-200'}`}>
-                          <EyeOff className={`w-4 h-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
-                          <span className={`font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-700'}`}>
+                        <div className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full ${theme === 'dark' ? 'bg-red-500/20 border border-red-500/30' : 'bg-red-100 border border-red-200'}`}>
+                          <EyeOff className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
+                          <span className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-700'}`}>
                             {localHiddenSections.length}
                           </span>
-                          <span className={`text-sm ${theme === 'dark' ? 'text-red-400/70' : 'text-red-600'}`}>Hidden</span>
+                          <span className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-red-400/70' : 'text-red-600'}`}>Hidden</span>
                         </div>
                       </>
                     ) : (
                       <>
                         {/* Shop ADMIN sees only sections not hidden by SuperAdmin */}
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-100 border border-emerald-200'}`}>
-                          <Eye className={`w-4 h-4 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
-                          <span className={`font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        <div className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full ${theme === 'dark' ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-emerald-100 border border-emerald-200'}`}>
+                          <Eye className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                          <span className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'}`}>
                             {getAdminVisibleSections().filter(s => !s.isHidden).length}
                           </span>
-                          <span className={`text-sm ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600'}`}>Visible to Users</span>
+                          <span className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-emerald-400/70' : 'text-emerald-600'}`}>Visible to Users</span>
                         </div>
-                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-amber-500/20 border border-amber-500/30' : 'bg-amber-100 border border-amber-200'}`}>
-                          <EyeOff className={`w-4 h-4 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
-                          <span className={`font-bold ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>
+                        <div className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full ${theme === 'dark' ? 'bg-amber-500/20 border border-amber-500/30' : 'bg-amber-100 border border-amber-200'}`}>
+                          <EyeOff className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
+                          <span className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-amber-400' : 'text-amber-700'}`}>
                             {localAdminHiddenSections.length}
                           </span>
-                          <span className={`text-sm ${theme === 'dark' ? 'text-amber-400/70' : 'text-amber-600'}`}>Hidden from Users</span>
+                          <span className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-amber-400/70' : 'text-amber-600'}`}>Hidden from Users</span>
                         </div>
                       </>
                     )}
@@ -2627,14 +2630,14 @@ export const Settings: React.FC = () => {
               </div>
             ) : isSuperAdmin ? (
               /* SuperAdmin View: All sections with SuperAdmin-level hiding */
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {ALL_SECTIONS.map((section) => {
                   const isHidden = localHiddenSections.includes(section.path);
                   const isVisible = !isHidden;
                   return (
                     <div
                       key={section.path}
-                      className={`group relative overflow-hidden rounded-2xl border p-5 transition-all duration-300 cursor-pointer ${
+                      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl border p-3 sm:p-5 transition-all duration-300 cursor-pointer ${
                         isVisible 
                           ? theme === 'dark' 
                             ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-emerald-500/30 hover:border-emerald-400/50 hover:shadow-lg hover:shadow-emerald-500/10' 
@@ -2653,48 +2656,48 @@ export const Settings: React.FC = () => {
                       )}
                       
                       <div className="relative flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${
+                        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex-shrink-0 flex items-center justify-center text-xl sm:text-2xl transition-all ${
                             isVisible
                               ? theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20' : 'bg-emerald-100'
                               : theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-200'
                           }`}>
                             {section.icon}
                           </div>
-                          <div>
-                            <p className={`font-semibold transition-colors ${
+                          <div className="min-w-0">
+                            <p className={`text-sm sm:text-base font-semibold transition-colors truncate ${
                               isVisible
                                 ? theme === 'dark' ? 'text-white' : 'text-slate-900'
                                 : theme === 'dark' ? 'text-slate-500 line-through' : 'text-slate-400 line-through'
                             }`}>
                               {section.label}
                             </p>
-                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                            <p className={`text-[10px] sm:text-xs truncate ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                               {section.path}
                             </p>
                           </div>
                         </div>
                         
                         {/* Toggle Switch */}
-                        <div className={`relative w-14 h-8 rounded-full transition-all duration-300 ${
+                        <div className={`relative w-11 h-6 sm:w-14 sm:h-8 rounded-full transition-all duration-300 flex-shrink-0 ${
                           isVisible
                             ? 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30'
                             : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
                         }`}>
-                          <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300 flex items-center justify-center ${
-                            isVisible ? 'left-7' : 'left-1'
+                          <div className={`absolute top-0.5 sm:top-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white shadow-md transition-all duration-300 flex items-center justify-center ${
+                            isVisible ? 'left-[22px] sm:left-7' : 'left-0.5 sm:left-1'
                           }`}>
                             {isVisible ? (
-                              <Eye className="w-3.5 h-3.5 text-emerald-500" />
+                              <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500" />
                             ) : (
-                              <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                              <EyeOff className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400" />
                             )}
                           </div>
                         </div>
                       </div>
                       
                       {/* Status indicator */}
-                      <div className={`mt-4 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                      <div className={`mt-3 sm:mt-4 pt-2 sm:pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'}`}>
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${isVisible ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
                           <span className={`text-xs font-medium ${
@@ -2712,14 +2715,14 @@ export const Settings: React.FC = () => {
               </div>
             ) : (
               /* Shop ADMIN View: Only sections NOT hidden by SuperAdmin, with Admin-level hiding */
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {getAdminVisibleSections().map((section) => {
                   const isHidden = localAdminHiddenSections.includes(section.path);
                   const isVisible = !isHidden;
                   return (
                     <div
                       key={section.path}
-                      className={`group relative overflow-hidden rounded-2xl border p-5 transition-all duration-300 cursor-pointer ${
+                      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl border p-3 sm:p-5 transition-all duration-300 cursor-pointer ${
                         isVisible 
                           ? theme === 'dark' 
                             ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-cyan-500/30 hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-500/10' 
@@ -2738,48 +2741,48 @@ export const Settings: React.FC = () => {
                       )}
                       
                       <div className="relative flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all ${
+                        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex-shrink-0 flex items-center justify-center text-xl sm:text-2xl transition-all ${
                             isVisible
                               ? theme === 'dark' ? 'bg-gradient-to-br from-cyan-500/20 to-blue-500/20' : 'bg-cyan-100'
                               : theme === 'dark' ? 'bg-amber-500/20' : 'bg-amber-200'
                           }`}>
                             {section.icon}
                           </div>
-                          <div>
-                            <p className={`font-semibold transition-colors ${
+                          <div className="min-w-0">
+                            <p className={`text-sm sm:text-base font-semibold transition-colors truncate ${
                               isVisible
                                 ? theme === 'dark' ? 'text-white' : 'text-slate-900'
                                 : theme === 'dark' ? 'text-amber-400' : 'text-amber-600'
                             }`}>
                               {section.label}
                             </p>
-                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                            <p className={`text-[10px] sm:text-xs truncate ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                               {section.path}
                             </p>
                           </div>
                         </div>
                         
                         {/* Toggle Switch */}
-                        <div className={`relative w-14 h-8 rounded-full transition-all duration-300 ${
+                        <div className={`relative w-11 h-6 sm:w-14 sm:h-8 rounded-full transition-all duration-300 flex-shrink-0 ${
                           isVisible
                             ? 'bg-gradient-to-r from-cyan-500 to-blue-500 shadow-lg shadow-cyan-500/30'
                             : 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-amber-500/30'
                         }`}>
-                          <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300 flex items-center justify-center ${
-                            isVisible ? 'left-7' : 'left-1'
+                          <div className={`absolute top-0.5 sm:top-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white shadow-md transition-all duration-300 flex items-center justify-center ${
+                            isVisible ? 'left-[22px] sm:left-7' : 'left-0.5 sm:left-1'
                           }`}>
                             {isVisible ? (
-                              <Eye className="w-3.5 h-3.5 text-cyan-500" />
+                              <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-cyan-500" />
                             ) : (
-                              <EyeOff className="w-3.5 h-3.5 text-amber-500" />
+                              <EyeOff className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
                             )}
                           </div>
                         </div>
                       </div>
                       
                       {/* Status indicator */}
-                      <div className={`mt-4 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                      <div className={`mt-3 sm:mt-4 pt-2 sm:pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'}`}>
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${isVisible ? 'bg-cyan-500 animate-pulse' : 'bg-amber-500'}`} />
                           <span className={`text-xs font-medium ${
@@ -2798,11 +2801,11 @@ export const Settings: React.FC = () => {
             )}
 
             {/* Info Note */}
-            <div className={`flex items-start gap-3 p-4 rounded-xl ${theme === 'dark' ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
-              <Info className={`w-5 h-5 flex-shrink-0 mt-0.5 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+            <div className={`flex items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
+              <Info className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
               <div>
-                <p className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}`}>Section Visibility Control</p>
-                <p className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-blue-400/70' : 'text-blue-600'}`}>
+                <p className={`text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}`}>Section Visibility Control</p>
+                <p className={`text-[10px] sm:text-xs mt-0.5 ${theme === 'dark' ? 'text-blue-400/70' : 'text-blue-600'}`}>
                   Toggle sections on/off, then click the "Save Changes" button at the top right to apply your changes.
                 </p>
               </div>
@@ -2814,20 +2817,21 @@ export const Settings: React.FC = () => {
         {activeTab === 'users' && canViewShopAdminSettings && (
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Header Card - Creative 2-Line Layout */}
-            <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <div className={`rounded-xl sm:rounded-2xl border overflow-hidden ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
               {/* Line 1: Title, Description & Add User Button */}
-              <div className={`flex items-center justify-between gap-4 px-6 py-4 border-b ${theme === 'dark' ? 'border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-slate-900/30' : 'border-slate-200 bg-gradient-to-r from-slate-50 to-white'}`}>
-                <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 ${theme === 'dark' ? 'shadow-lg shadow-cyan-500/5' : 'shadow-cyan-500/10'}`}>
-                    <Users className="w-6 h-6 text-cyan-500" />
+              <div className={`flex items-center justify-between gap-3 sm:gap-4 px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b ${theme === 'dark' ? 'border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-slate-900/30' : 'border-slate-200 bg-gradient-to-r from-slate-50 to-white'}`}>
+                <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                  <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 ${theme === 'dark' ? 'shadow-lg shadow-cyan-500/5' : 'shadow-cyan-500/10'}`}>
+                    <Users className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-500" />
                   </div>
-                  <div>
-                    <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <div className="min-w-0">
+                    <h3 className={`text-base sm:text-lg md:text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                       Shop Users
                     </h3>
-                    <p className={`text-sm flex items-center gap-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                      <span>Manage users for</span>
-                      <span className={`font-medium ${theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'}`}>
+                    <p className={`text-xs sm:text-sm flex items-center gap-1 sm:gap-2 truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span className="hidden sm:inline">Manage users for</span>
+                      <span className="sm:hidden">Users:</span>
+                      <span className={`font-medium truncate ${theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'}`}>
                         {viewingShop?.name || effectiveShop?.name}
                       </span>
                     </p>
@@ -2835,30 +2839,31 @@ export const Settings: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setIsCreateUserModalOpen(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-cyan-500/25 transition-all hover:scale-105"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg sm:rounded-xl text-sm font-medium shadow-lg hover:shadow-cyan-500/25 transition-all hover:scale-105 flex-shrink-0"
                 >
-                  <UserPlus className="w-5 h-5" />
+                  <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span className="hidden sm:inline">Add User</span>
+                  <span className="sm:hidden">Add</span>
                 </button>
               </div>
 
               {/* Line 2: Search & Filters */}
-              <div className="flex flex-wrap items-center gap-3 px-6 py-4">
+              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 md:px-6 py-3 sm:py-4">
                 {/* Search */}
-                <div className="relative flex-1 min-w-[240px]">
+                <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
                   <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
                   <input
                     type="text"
-                    placeholder="Search by name or email..."
+                    placeholder="Search name or email..."
                     value={userSearchQuery}
                     onChange={(e) => setUserSearchQuery(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl border transition-all ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20' : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'}`}
+                    className={`w-full pl-10 pr-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl border text-sm transition-all ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20' : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'}`}
                   />
                 </div>
                 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto">
                   {/* Status Filter */}
-                  <div className="w-40">
+                  <div className="w-32 sm:w-40 flex-shrink-0">
                     <SearchableSelect
                       value={statusFilter}
                       onValueChange={(value) => setStatusFilter(value as StatusFilter)}
@@ -2874,7 +2879,7 @@ export const Settings: React.FC = () => {
                     />
                   </div>
                   {/* Role Filter */}
-                  <div className="w-44">
+                  <div className="w-36 sm:w-44 flex-shrink-0">
                     <SearchableSelect
                       value={roleFilter}
                       onValueChange={(value) => setRoleFilter(value as RoleFilter)}
@@ -2890,7 +2895,7 @@ export const Settings: React.FC = () => {
                     />
                   </div>
                   {/* View Toggle */}
-                  <div className={`flex rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                  <div className={`hidden sm:flex rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
                     <button
                       onClick={() => setViewMode('card')}
                       className={`p-2 transition-all ${viewMode === 'card' ? (theme === 'dark' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-50 text-cyan-600') : (theme === 'dark' ? 'text-slate-400 hover:bg-slate-700/50' : 'text-slate-500 hover:bg-slate-50')}`}
@@ -3117,9 +3122,9 @@ export const Settings: React.FC = () => {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className={`flex items-center justify-between rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Showing {startIndex + 1} to {Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} users
+              <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl sm:rounded-2xl border p-3 sm:p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  {startIndex + 1}-{Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length}
                 </p>
                 <div className="flex items-center gap-2">
                   <button

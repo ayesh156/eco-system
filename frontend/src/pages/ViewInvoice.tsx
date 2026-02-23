@@ -1241,9 +1241,9 @@ Thank you for your business! 🙏`;
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
         {/* Main Invoice Preview */}
-        <div className="lg:col-span-2 min-w-0">
+        <div className="md:col-span-2 min-w-0">
           <div className={`rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl ${
             theme === 'dark' ? 'shadow-black/50' : 'shadow-slate-300/50'
           }`}>
@@ -1407,7 +1407,7 @@ Thank you for your business! 🙏`;
                   theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
                 }`}>
                   {/* Mobile Card Layout */}
-                  <div className="lg:hidden">
+                  <div className="md:hidden">
                     <div className={`py-2.5 px-3 text-xs font-bold uppercase tracking-wider ${
                       theme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
                     }`}>
@@ -1480,7 +1480,7 @@ Thank you for your business! 🙏`;
                   </div>
 
                   {/* Desktop Table Layout */}
-                  <table className="w-full hidden lg:table">
+                  <table className="w-full hidden md:table">
                     <thead>
                       <tr className={theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}>
                         <th className={`py-3 sm:py-4 px-3 sm:px-4 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
@@ -1645,7 +1645,7 @@ Thank you for your business! 🙏`;
         </div>
 
         {/* Right Sidebar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
           {/* Quick Stats */}
           <div className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border ${
             theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
