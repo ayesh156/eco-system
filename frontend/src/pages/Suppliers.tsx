@@ -323,9 +323,12 @@ export const Suppliers: React.FC = () => {
     }
     
     return (
-      <div className={`absolute top-full left-0 mt-2 p-3 rounded-xl shadow-xl border z-50 w-max ${
+      <>
+      <div className="fixed inset-0 bg-black/40 z-[59] sm:hidden" onClick={() => setShow(false)} />
+      <div className={`fixed sm:absolute bottom-0 sm:bottom-auto left-0 sm:left-0 right-0 sm:right-auto sm:top-full sm:mt-2 p-4 pt-3 rounded-t-3xl sm:rounded-2xl border-t sm:border shadow-2xl z-[60] w-full sm:w-[280px] ${
         theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
       }`}>
+        <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))}
@@ -354,6 +357,7 @@ export const Suppliers: React.FC = () => {
         </div>
         <div className="grid grid-cols-7 gap-1">{days}</div>
       </div>
+      </>
     );
   };
 
@@ -830,119 +834,119 @@ ECOTEC Computer Solutions`;
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+          <h1 className={`text-xl sm:text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
             Suppliers
           </h1>
-          <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+          <p className={`mt-0.5 sm:mt-1 text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             Manage supplier relationships and credit accounts
           </p>
         </div>
         <button 
           onClick={handleAddSupplier}
-          className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl font-medium hover:opacity-90 transition-opacity shadow-lg bg-gradient-to-r from-violet-500 to-purple-500 shadow-violet-500/20"
+          className="flex items-center justify-center gap-2 px-4 py-2 sm:py-2.5 text-sm sm:text-base text-white rounded-xl font-medium hover:opacity-90 transition-opacity shadow-lg bg-gradient-to-r from-violet-500 to-purple-500 shadow-violet-500/20"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
           Add Supplier
         </button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className={`rounded-2xl border p-4 ${
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className={`rounded-xl sm:rounded-2xl border p-3 sm:p-4 ${
           theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
         }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
-              <CreditCard className="w-5 h-5 text-red-500" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl flex-shrink-0 ${theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
+              <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
             </div>
-            <div>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Credit Owed</p>
-              <p className="text-lg font-bold text-red-500">{formatCurrency(stats.totalCredit)}</p>
+            <div className="min-w-0">
+              <p className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Credit Owed</p>
+              <p className="text-sm sm:text-lg font-bold text-red-500 truncate">{formatCurrency(stats.totalCredit)}</p>
             </div>
           </div>
         </div>
 
-        <div className={`rounded-2xl border p-4 ${
+        <div className={`rounded-xl sm:rounded-2xl border p-3 sm:p-4 ${
           theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
         }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl flex-shrink-0 ${theme === 'dark' ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
             </div>
-            <div>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Overdue Payments</p>
-              <p className="text-lg font-bold text-amber-500">{stats.overdueCount} Suppliers</p>
+            <div className="min-w-0">
+              <p className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Overdue Payments</p>
+              <p className="text-sm sm:text-lg font-bold text-amber-500">{stats.overdueCount} <span className="text-[10px] sm:text-xs font-medium">Suppliers</span></p>
             </div>
           </div>
         </div>
 
-        <div className={`rounded-2xl border p-4 ${
+        <div className={`rounded-xl sm:rounded-2xl border p-3 sm:p-4 ${
           theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
         }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-              <Clock className="w-5 h-5 text-blue-500" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl flex-shrink-0 ${theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
             </div>
-            <div>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Active Credit</p>
-              <p className="text-lg font-bold text-blue-500">{stats.activeCount} Suppliers</p>
+            <div className="min-w-0">
+              <p className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Active Credit</p>
+              <p className="text-sm sm:text-lg font-bold text-blue-500">{stats.activeCount} <span className="text-[10px] sm:text-xs font-medium">Suppliers</span></p>
             </div>
           </div>
         </div>
 
-        <div className={`rounded-2xl border p-4 ${
+        <div className={`rounded-xl sm:rounded-2xl border p-3 sm:p-4 ${
           theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
         }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <CheckCircle className="w-5 h-5 text-emerald-500" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl flex-shrink-0 ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
             </div>
-            <div>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Clear Accounts</p>
-              <p className="text-lg font-bold text-emerald-500">{stats.clearCount} Suppliers</p>
+            <div className="min-w-0">
+              <p className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Clear Accounts</p>
+              <p className="text-sm sm:text-lg font-bold text-emerald-500">{stats.clearCount} <span className="text-[10px] sm:text-xs font-medium">Suppliers</span></p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className={`p-3 sm:p-4 rounded-2xl border ${
+      <div className={`p-2.5 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl border ${
         theme === 'dark' 
           ? 'bg-slate-800/30 border-slate-700/50' 
           : 'bg-white border-slate-200'
       }`}>
-        <div className="flex flex-col lg:flex-row gap-3">
+        <div className="flex flex-col lg:flex-row gap-2 sm:gap-3">
           {/* Search Input */}
-          <div className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border flex-1 ${
+          <div className={`flex items-center gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border flex-1 ${
             theme === 'dark' 
               ? 'bg-slate-800/50 border-slate-700/50' 
               : 'bg-slate-50 border-slate-200'
           }`}>
-            <Search className={`w-5 h-5 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+            <Search className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
             <input
               type="text"
               placeholder="Search suppliers by name, company or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`bg-transparent border-none outline-none flex-1 min-w-0 text-sm ${
+              className={`bg-transparent border-none outline-none flex-1 min-w-0 text-xs sm:text-sm ${
                 theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
               }`}
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             )}
           </div>
 
           {/* Filters Row */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             {/* Filter Toggle Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-colors ${
+              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-colors ${
                 showFilters || advancedFiltersCount > 0
                   ? 'bg-emerald-500 text-white'
                   : theme === 'dark'
@@ -950,10 +954,10 @@ ECOTEC Computer Solutions`;
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
               }`}
             >
-              <SlidersHorizontal className="w-4 h-4" />
-              <span className="text-sm hidden sm:inline">Filters</span>
+              <SlidersHorizontal className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-[10px] sm:text-sm hidden sm:inline">Filters</span>
               {advancedFiltersCount > 0 && (
-                <span className="px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
+                <span className="px-1 sm:px-1.5 py-0.5 text-[10px] sm:text-xs bg-white/20 rounded-full">
                   {advancedFiltersCount}
                 </span>
               )}
@@ -965,35 +969,35 @@ ECOTEC Computer Solutions`;
                 const nextSort = sortBy === 'name' ? 'credit' : sortBy === 'credit' ? 'lastOrder' : 'name';
                 setSortBy(nextSort);
               }}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors ${
+              className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border transition-colors ${
                 theme === 'dark' 
                   ? 'border-slate-700 hover:bg-slate-800 text-slate-300' 
                   : 'border-slate-200 hover:bg-slate-50 text-slate-700'
               }`}
               title="Sort by"
             >
-              <ArrowDownUp className="w-4 h-4" />
-              <span className="text-sm hidden sm:inline capitalize">{sortBy}</span>
+              <ArrowDownUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-[10px] sm:text-sm hidden sm:inline capitalize">{sortBy}</span>
             </button>
 
             {/* Sort Order Toggle */}
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className={`p-2 rounded-xl border transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl border transition-colors ${
                 theme === 'dark' ? 'border-slate-700 hover:bg-slate-800 text-slate-400' : 'border-slate-200 hover:bg-slate-50 text-slate-600'
               }`}
               title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
             >
-              {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+              {sortOrder === 'asc' ? <SortAsc className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <SortDesc className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
             </button>
 
             {/* View Mode Toggle */}
-            <div className={`flex items-center rounded-xl overflow-hidden border ${
+            <div className={`flex items-center rounded-lg sm:rounded-xl overflow-hidden border ${
               theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
             }`}>
               <button
                 onClick={() => setViewMode('card')}
-                className={`p-2 transition-colors ${
+                className={`p-1.5 sm:p-2 transition-colors ${
                   viewMode === 'card'
                     ? 'bg-emerald-500 text-white'
                     : theme === 'dark'
@@ -1002,11 +1006,11 @@ ECOTEC Computer Solutions`;
                 }`}
                 title="Card view"
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 transition-colors ${
+                className={`p-1.5 sm:p-2 transition-colors ${
                   viewMode === 'list'
                     ? 'bg-emerald-500 text-white'
                     : theme === 'dark'
@@ -1023,12 +1027,14 @@ ECOTEC Computer Solutions`;
 
         {/* Advanced Filters (Collapsible) */}
         {showFilters && (
-          <div className={`pt-4 mt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-            <div className="flex flex-wrap items-center gap-4">
+          <div className={`pt-3 sm:pt-4 mt-3 sm:mt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center gap-3 sm:gap-4">
               {/* Status Filter Dropdown */}
-              <div className="flex items-center gap-2">
-                <Filter className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
-                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Status:</span>
+              <div className={`flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2`}>
+                <div className="flex items-center gap-1.5">
+                  <Filter className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                  <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Status</span>
+                </div>
                 <SearchableSelect
                   options={[
                     { value: 'all', label: 'All Suppliers', icon: <Package className="w-4 h-4 text-violet-500" />, count: suppliers.length },
@@ -1041,14 +1047,16 @@ ECOTEC Computer Solutions`;
                   placeholder="Select status..."
                   searchPlaceholder="Search status..."
                   theme={theme}
-                  triggerClassName="w-[180px]"
+                  triggerClassName="w-full sm:w-[180px]"
                 />
               </div>
 
               {/* Category Filter Dropdown */}
-              <div className="flex items-center gap-2">
-                <Package className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
-                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Category:</span>
+              <div className={`flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2`}>
+                <div className="flex items-center gap-1.5">
+                  <Package className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                  <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Category</span>
+                </div>
                 <SearchableSelect
                   options={[
                     { value: 'all', label: 'All Categories', count: suppliers.length },
@@ -1063,81 +1071,99 @@ ECOTEC Computer Solutions`;
                   placeholder="Select category..."
                   searchPlaceholder="Search category..."
                   theme={theme}
-                  triggerClassName="w-[180px]"
+                  triggerClassName="w-full sm:w-[180px]"
                 />
               </div>
 
               {/* Credit Balance Range */}
-              <div className="flex items-center gap-2">
-                <CreditCard className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
-                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Credit:</span>
-                <input
-                  type="number"
-                  placeholder="Min"
-                  value={minCreditBalance}
-                  onChange={(e) => setMinCreditBalance(e.target.value)}
-                  className={`w-28 px-3 py-1.5 rounded-xl border text-sm ${
+              <div className={`flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2`}>
+                <div className="flex items-center gap-1.5">
+                  <CreditCard className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                  <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Credit Range</span>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className={`flex items-center gap-1.5 flex-1 sm:flex-none sm:w-28 px-3 py-2 sm:py-1.5 rounded-xl border ${
                     theme === 'dark' 
-                      ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500' 
-                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                  }`}
-                />
-                <span className={`${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>-</span>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={maxCreditBalance}
-                  onChange={(e) => setMaxCreditBalance(e.target.value)}
-                  className={`w-28 px-3 py-1.5 rounded-xl border text-sm ${
+                      ? 'bg-slate-800/50 border-slate-700/50' 
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <CreditCard className={`w-3.5 h-3.5 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={minCreditBalance}
+                      onChange={(e) => setMinCreditBalance(e.target.value)}
+                      className={`w-full bg-transparent border-none outline-none text-sm ${
+                        theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
+                      }`}
+                    />
+                  </div>
+                  <span className={`text-xs flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>to</span>
+                  <div className={`flex items-center gap-1.5 flex-1 sm:flex-none sm:w-28 px-3 py-2 sm:py-1.5 rounded-xl border ${
                     theme === 'dark' 
-                      ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500' 
-                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                  }`}
-                />
+                      ? 'bg-slate-800/50 border-slate-700/50' 
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <CreditCard className={`w-3.5 h-3.5 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={maxCreditBalance}
+                      onChange={(e) => setMaxCreditBalance(e.target.value)}
+                      className={`w-full bg-transparent border-none outline-none text-sm ${
+                        theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Date Range with Calendar */}
-              <div className="flex items-center gap-2">
-                <Calendar className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
-                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Last Order:</span>
-                {/* Start Date */}
-                <div className="relative overflow-visible" ref={startCalendarRef}>
-                  <button
-                    onClick={() => {
-                      setShowStartCalendar(!showStartCalendar);
-                      setShowEndCalendar(false);
-                      setCalendarMonth(startDate ? new Date(startDate) : new Date());
-                    }}
-                    className={`px-3 py-1.5 rounded-xl border text-sm min-w-[110px] text-left ${
-                      theme === 'dark' 
-                        ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
-                        : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    {startDate ? formatDateDisplay(startDate) : 'Start Date'}
-                  </button>
-                  {showStartCalendar && renderCalendar(startDate, setStartDate, setShowStartCalendar)}
+              <div className={`flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2`}>
+                <div className="flex items-center gap-1.5">
+                  <Calendar className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                  <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Date Range</span>
                 </div>
-                
-                <span className={`${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>-</span>
-                
-                {/* End Date */}
-                <div className="relative overflow-visible" ref={endCalendarRef}>
-                  <button
-                    onClick={() => {
-                      setShowEndCalendar(!showEndCalendar);
-                      setShowStartCalendar(false);
-                      setCalendarMonth(endDate ? new Date(endDate) : new Date());
-                    }}
-                    className={`px-3 py-1.5 rounded-xl border text-sm min-w-[110px] text-left ${
-                      theme === 'dark' 
-                        ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
-                        : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    {endDate ? formatDateDisplay(endDate) : 'End Date'}
-                  </button>
-                  {showEndCalendar && renderCalendar(endDate, setEndDate, setShowEndCalendar)}
+                <div className="flex items-center gap-2">
+                  {/* Start Date */}
+                  <div className="relative flex-1 overflow-visible" ref={startCalendarRef}>
+                    <button
+                      onClick={() => {
+                        setShowStartCalendar(!showStartCalendar);
+                        setShowEndCalendar(false);
+                        setCalendarMonth(startDate ? new Date(startDate) : new Date());
+                      }}
+                      className={`w-full px-3 py-2 sm:py-1.5 rounded-xl border text-sm text-left ${
+                        theme === 'dark' 
+                          ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
+                          : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      {startDate ? formatDateDisplay(startDate) : 'Start Date'}
+                    </button>
+                    {showStartCalendar && renderCalendar(startDate, setStartDate, setShowStartCalendar)}
+                  </div>
+                  
+                  <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>to</span>
+                  
+                  {/* End Date */}
+                  <div className="relative flex-1 overflow-visible" ref={endCalendarRef}>
+                    <button
+                      onClick={() => {
+                        setShowEndCalendar(!showEndCalendar);
+                        setShowStartCalendar(false);
+                        setCalendarMonth(endDate ? new Date(endDate) : new Date());
+                      }}
+                      className={`w-full px-3 py-2 sm:py-1.5 rounded-xl border text-sm text-left ${
+                        theme === 'dark' 
+                          ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
+                          : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      {endDate ? formatDateDisplay(endDate) : 'End Date'}
+                    </button>
+                    {showEndCalendar && renderCalendar(endDate, setEndDate, setShowEndCalendar)}
+                  </div>
                 </div>
               </div>
 
@@ -1145,14 +1171,14 @@ ECOTEC Computer Solutions`;
               {advancedFiltersCount > 0 && (
                 <button
                   onClick={clearAdvancedFilters}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                  className={`flex items-center justify-center gap-2 px-4 py-2 sm:py-1.5 rounded-xl text-sm font-medium transition-colors ${
                     theme === 'dark'
                       ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400'
                       : 'bg-red-50 hover:bg-red-100 text-red-600'
                   }`}
                 >
                   <X className="w-4 h-4" />
-                  <span>Clear Filters</span>
+                  <span>Clear All</span>
                 </button>
               )}
             </div>
@@ -1162,18 +1188,18 @@ ECOTEC Computer Solutions`;
 
       {/* Empty State */}
       {filteredSuppliers.length === 0 && (
-        <div className={`text-center py-16 rounded-2xl border ${
+        <div className={`text-center py-10 sm:py-16 rounded-xl sm:rounded-2xl border ${
           theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
         }`}>
-          <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+          <div className={`w-14 h-14 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 rounded-xl sm:rounded-2xl flex items-center justify-center ${
             theme === 'dark' ? 'bg-gradient-to-br from-violet-500/20 to-purple-500/20' : 'bg-gradient-to-br from-violet-50 to-purple-50'
           }`}>
-            <Package className={`w-10 h-10 ${theme === 'dark' ? 'text-violet-400' : 'text-violet-500'}`} />
+            <Package className={`w-7 h-7 sm:w-10 sm:h-10 ${theme === 'dark' ? 'text-violet-400' : 'text-violet-500'}`} />
           </div>
-          <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+          <h3 className={`text-base sm:text-xl font-bold mb-1.5 sm:mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
             No suppliers found
           </h3>
-          <p className={`mb-6 max-w-sm mx-auto ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+          <p className={`text-xs sm:text-base mb-4 sm:mb-6 max-w-sm mx-auto px-4 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || minCreditBalance || maxCreditBalance || startDate || endDate
               ? 'Try adjusting your search or filter criteria to find what you\'re looking for'
               : 'Get started by adding your first supplier to manage your supply chain'}
@@ -1462,7 +1488,7 @@ ECOTEC Computer Solutions`;
         </div>
       ) : (
         /* Card View */
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        <div className="grid gap-2.5 sm:gap-4 grid-cols-1 lg:grid-cols-2">
           {paginatedSuppliers.map((supplier) => {
             const daysUntilDue = getDaysUntilDue(supplier.creditDueDate);
             const creditPercentage = (supplier.creditBalance / supplier.creditLimit) * 100;
@@ -1472,7 +1498,7 @@ ECOTEC Computer Solutions`;
             return (
             <div 
               key={supplier.id}
-              className={`rounded-2xl border overflow-hidden transition-all hover:shadow-xl ${
+              className={`rounded-xl sm:rounded-2xl border overflow-hidden transition-all hover:shadow-xl ${
                 isOverdue
                   ? theme === 'dark' 
                     ? 'bg-slate-800/30 border-red-500/50 shadow-red-500/10' 
@@ -1484,47 +1510,47 @@ ECOTEC Computer Solutions`;
             >
               {/* Overdue Warning Banner */}
               {isOverdue && (
-                <div className="bg-gradient-to-r from-red-500 to-rose-500 px-4 py-2 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-white" />
-                  <span className="text-white text-sm font-medium">
-                    ⚠️ Payment Overdue! Due date was {supplier.creditDueDate ? new Date(supplier.creditDueDate).toLocaleDateString('en-GB') : 'N/A'}
+                <div className="bg-gradient-to-r from-red-500 to-rose-500 px-3 sm:px-4 py-1.5 sm:py-2 flex items-center gap-1.5 sm:gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white flex-shrink-0" />
+                  <span className="text-white text-[10px] sm:text-sm font-medium truncate">
+                    ⚠️ Overdue! Due {supplier.creditDueDate ? new Date(supplier.creditDueDate).toLocaleDateString('en-GB') : 'N/A'}
                   </span>
                 </div>
               )}
 
               {/* Due Soon Warning */}
               {isDueSoon && !isOverdue && (
-                <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-2 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-white" />
-                  <span className="text-white text-sm font-medium">
-                    ⏰ Payment due in {daysUntilDue} days!
+                <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-3 sm:px-4 py-1.5 sm:py-2 flex items-center gap-1.5 sm:gap-2">
+                  <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white flex-shrink-0" />
+                  <span className="text-white text-[10px] sm:text-sm font-medium">
+                    ⏰ Due in {daysUntilDue} days!
                   </span>
                 </div>
               )}
 
-              <div className="p-5">
+              <div className="p-3 sm:p-5">
                 {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-lg ${
+                <div className="flex items-start justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl flex items-center justify-center text-white font-bold text-sm sm:text-lg flex-shrink-0 ${
                       isOverdue 
                         ? 'bg-gradient-to-br from-red-500 to-rose-600' 
                         : 'bg-gradient-to-br from-violet-500 to-purple-600'
                     }`}>
                       {supplier.company.charAt(0)}
                     </div>
-                    <div>
-                      <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                    <div className="min-w-0">
+                      <h3 className={`font-semibold text-sm sm:text-base truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         {supplier.company}
                       </h3>
-                      <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                         {supplier.name}
                       </p>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border ${getCreditStatusStyle(supplier.creditStatus)}`}>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium rounded-full border ${getCreditStatusStyle(supplier.creditStatus)}`}>
                       {getCreditStatusIcon(supplier.creditStatus)}
                       {supplier.creditStatus === 'clear' ? 'No Credit' : supplier.creditStatus === 'active' ? 'Credit Active' : 'Overdue'}
                     </span>
@@ -1532,27 +1558,27 @@ ECOTEC Computer Solutions`;
                 </div>
 
                 {/* Contact Info */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Phone className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
-                    <span className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <Phone className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <span className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                       {supplier.phone}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
-                    <span className={`text-sm truncate ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <Mail className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <span className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                       {supplier.email}
                     </span>
                   </div>
                 </div>
 
                 {/* Categories */}
-                <div className="flex flex-wrap gap-1.5 mb-4">
+                <div className="flex flex-wrap gap-1 sm:gap-1.5 mb-3 sm:mb-4">
                   {supplier.categories.map((cat) => (
                     <span 
                       key={cat}
-                      className={`px-2 py-0.5 rounded-md text-xs font-medium ${
+                      className={`px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-medium ${
                         theme === 'dark' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-600'
                       }`}
                     >
@@ -1563,16 +1589,16 @@ ECOTEC Computer Solutions`;
 
                 {/* Credit Section */}
                 {supplier.creditBalance > 0 && (
-                  <div className={`p-4 rounded-xl mb-4 ${
+                  <div className={`p-3 sm:p-4 rounded-xl mb-3 sm:mb-4 ${
                     isOverdue
                       ? theme === 'dark' ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'
                       : theme === 'dark' ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-slate-50 border border-slate-200'
                   }`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Credit Balance (Naya)
+                      <span className={`text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Credit Balance
                       </span>
-                      <span className={`text-lg font-bold ${isOverdue ? 'text-red-500' : 'text-blue-500'}`}>
+                      <span className={`text-sm sm:text-lg font-bold ${isOverdue ? 'text-red-500' : 'text-blue-500'}`}>
                         {formatCurrency(supplier.creditBalance)}
                       </span>
                     </div>
@@ -1614,16 +1640,16 @@ ECOTEC Computer Solutions`;
                 )}
 
                 {/* Stats Row */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Total Purchases</p>
-                    <p className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4">
+                  <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                    <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Total Purchases</p>
+                    <p className={`text-sm sm:text-base font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                       {formatCurrency(supplier.totalPurchases)}
                     </p>
                   </div>
-                  <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Orders</p>
-                    <p className={`text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                    <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Orders</p>
+                    <p className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                       {supplier.totalOrders} orders
                     </p>
                   </div>
@@ -1631,7 +1657,7 @@ ECOTEC Computer Solutions`;
 
                 {/* WhatsApp Reminder Section for Credit Balance */}
                 {supplier.creditBalance > 0 && (
-                  <div className={`mb-4 p-3 rounded-xl border ${
+                  <div className={`mb-3 sm:mb-4 p-2.5 sm:p-3 rounded-lg sm:rounded-xl border ${
                     isOverdue
                       ? theme === 'dark' 
                         ? 'bg-red-950/30 border-red-500/30' 
@@ -1644,16 +1670,16 @@ ECOTEC Computer Solutions`;
                           ? 'bg-green-950/20 border-green-500/20'
                           : 'bg-green-50 border-green-200'
                   }`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <MessageCircle className={`w-4 h-4 ${
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <MessageCircle className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${
                           isOverdue 
                             ? 'text-red-500' 
                             : isDueSoon 
                               ? 'text-amber-500' 
                               : 'text-green-500'
                         }`} />
-                        <span className={`text-sm font-medium ${
+                        <span className={`text-[10px] sm:text-sm font-medium truncate ${
                           isOverdue 
                             ? 'text-red-600 dark:text-red-400' 
                             : isDueSoon 
@@ -1661,15 +1687,15 @@ ECOTEC Computer Solutions`;
                               : 'text-green-600 dark:text-green-400'
                         }`}>
                           {isOverdue 
-                            ? 'Send Urgent Payment Reminder' 
+                            ? 'Urgent Reminder' 
                             : isDueSoon 
-                              ? 'Payment Due Soon - Send Reminder' 
-                              : 'Send Friendly Reminder'}
+                              ? 'Due Soon - Remind' 
+                              : 'Send Reminder'}
                         </span>
                       </div>
                       <button
                         onClick={() => isOverdue ? sendUrgentReminder(supplier) : sendFriendlyReminder(supplier)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-semibold transition-all flex-shrink-0 ${
                           isOverdue
                             ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white hover:from-red-600 hover:to-rose-600 shadow-lg shadow-red-500/25 animate-pulse'
                             : isDueSoon
@@ -1685,49 +1711,49 @@ ECOTEC Computer Solutions`;
                 )}
 
                 {/* Actions */}
-                <div className={`flex gap-2 pt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                <div className={`flex gap-1.5 sm:gap-2 pt-3 sm:pt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
                   <button 
                     onClick={() => handleViewSupplier(supplier)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-sm font-medium transition-all ${
                       theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
                     }`}
                   >
-                    <Eye className="w-4 h-4" /> View
+                    <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> View
                   </button>
                   <button 
                     onClick={() => handleOrderFromSupplier(supplier)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-sm font-medium transition-all ${
                       theme === 'dark' ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                     }`}
                   >
-                    <ShoppingCart className="w-4 h-4" /> Order
+                    <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Order
                   </button>
                   <button 
                     onClick={() => handleEditSupplier(supplier)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-sm font-medium transition-all ${
                       theme === 'dark' ? 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20' : 'bg-violet-50 text-violet-600 hover:bg-violet-100'
                     }`}
                   >
-                    <Edit className="w-4 h-4" /> Edit
+                    <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Edit
                   </button>
                   
                   {supplier.creditBalance > 0 ? (
                     <button 
                       onClick={() => handlePayCreditClick(supplier)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-sm font-medium transition-all ${
                         theme === 'dark' ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                       }`}
                     >
-                      <DollarSign className="w-4 h-4" /> Pay
+                      <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Pay
                     </button>
                   ) : (
                     <button 
                       onClick={() => handleDeleteClick(supplier)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-sm font-medium transition-all ${
                         theme === 'dark' ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-50 text-red-600 hover:bg-red-100'
                       }`}
                     >
-                      <Trash2 className="w-4 h-4" /> Delete
+                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Delete
                     </button>
                   )}
                 </div>
@@ -1740,21 +1766,21 @@ ECOTEC Computer Solutions`;
 
       {/* Pagination */}
       {filteredSuppliers.length > 0 && (
-        <div className={`p-4 rounded-2xl border ${
+        <div className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border ${
           theme === 'dark' 
             ? 'bg-slate-800/30 border-slate-700/50' 
             : 'bg-white border-slate-200'
         }`}>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
             {/* Results Info */}
-            <div className="flex items-center gap-4">
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                Showing <span className="font-medium">{startIndex + 1}</span> - <span className="font-medium">{Math.min(endIndex, filteredSuppliers.length)}</span> of <span className="font-medium">{filteredSuppliers.length}</span> suppliers
+            <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-center">
+              <p className={`text-[10px] sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                <span className="font-medium">{startIndex + 1}</span>-<span className="font-medium">{Math.min(endIndex, filteredSuppliers.length)}</span> of <span className="font-medium">{filteredSuppliers.length}</span>
               </p>
               
               {/* Items Per Page Selector - Creative Pill Buttons */}
-              <div className="flex items-center gap-2">
-                <span className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Show:</span>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className={`text-[10px] sm:text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Show:</span>
                 <div className={`flex items-center rounded-full p-0.5 ${
                   theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
                 }`}>
@@ -1765,7 +1791,7 @@ ECOTEC Computer Solutions`;
                         setItemsPerPage(num);
                         setCurrentPage(1);
                       }}
-                      className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
+                      className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-sm font-medium transition-all ${
                         itemsPerPage === num
                           ? 'bg-emerald-500 text-white shadow-md'
                           : theme === 'dark'
@@ -1782,33 +1808,33 @@ ECOTEC Computer Solutions`;
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 sm:gap-1">
                 {/* First Page */}
                 <button
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                     currentPage === 1
                       ? theme === 'dark' ? 'text-slate-600 cursor-not-allowed' : 'text-slate-300 cursor-not-allowed'
                       : theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                   title="First page"
                 >
-                  <ChevronsLeft className="w-4 h-4" />
+                  <ChevronsLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
 
                 {/* Previous Page */}
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                     currentPage === 1
                       ? theme === 'dark' ? 'text-slate-600 cursor-not-allowed' : 'text-slate-300 cursor-not-allowed'
                       : theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                   title="Previous page"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
 
                 {/* Page Numbers */}
@@ -1822,7 +1848,7 @@ ECOTEC Computer Solutions`;
                       <button
                         key={page}
                         onClick={() => setCurrentPage(page as number)}
-                        className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${
+                        className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                           currentPage === page
                             ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
                             : theme === 'dark'
@@ -1837,38 +1863,38 @@ ECOTEC Computer Solutions`;
                 </div>
 
                 {/* Mobile Page Indicator */}
-                <div className={`sm:hidden px-3 py-1 rounded-lg text-sm font-medium ${
+                <div className={`sm:hidden px-2.5 py-0.5 rounded-lg text-[10px] font-medium ${
                   theme === 'dark' ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'
                 }`}>
-                  {currentPage} / {totalPages}
+                  {currentPage}/{totalPages}
                 </div>
 
                 {/* Next Page */}
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                     currentPage === totalPages
                       ? theme === 'dark' ? 'text-slate-600 cursor-not-allowed' : 'text-slate-300 cursor-not-allowed'
                       : theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                   title="Next page"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
 
                 {/* Last Page */}
                 <button
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage === totalPages}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                     currentPage === totalPages
                       ? theme === 'dark' ? 'text-slate-600 cursor-not-allowed' : 'text-slate-300 cursor-not-allowed'
                       : theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                   title="Last page"
                 >
-                  <ChevronsRight className="w-4 h-4" />
+                  <ChevronsRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               </div>
             )}
@@ -1939,25 +1965,25 @@ ECOTEC Computer Solutions`;
 
       {/* Order Modal - Creative Preview & Edit Design */}
       {isOrderModalOpen && supplierForOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className={`w-full max-w-2xl max-h-[90vh] rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm">
+          <div className={`w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] rounded-t-2xl sm:rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
             theme === 'dark' 
               ? 'bg-slate-900 border-slate-700' 
               : 'bg-white border-slate-200'
           }`}>
             {/* Modal Header - Orange Gradient */}
-            <div className={`px-6 py-4 border-b flex items-center justify-between flex-shrink-0 ${
+            <div className={`px-4 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between flex-shrink-0 ${
               theme === 'dark' ? 'border-slate-700 bg-gradient-to-r from-orange-900/50 to-amber-900/30' : 'border-slate-200 bg-gradient-to-r from-orange-50 to-amber-50'
             }`}>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/30">
-                  <ShoppingCart className="w-6 h-6" />
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center text-white font-bold text-sm bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/30 flex-shrink-0">
+                  <ShoppingCart className="w-4 h-4 sm:w-6 sm:h-6" />
                 </div>
-                <div>
-                  <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="min-w-0">
+                  <h2 className={`text-base sm:text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Place Order
                   </h2>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-orange-300/70' : 'text-orange-700'}`}>
+                  <p className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-orange-300/70' : 'text-orange-700'}`}>
                     {supplierForOrder.company}
                   </p>
                 </div>
@@ -1980,30 +2006,30 @@ ECOTEC Computer Solutions`;
             {/* Modal Body - Scrollable */}
             <div className="flex-1 overflow-y-auto">
               {/* Supplier Info Cards */}
-              <div className={`px-6 py-4 ${theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'}`}>
-                    <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Contact Person</p>
-                    <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{supplierForOrder.name}</p>
+              <div className={`px-4 sm:px-6 py-3 sm:py-4 ${theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'}`}>
+                    <p className={`text-[10px] sm:text-xs font-medium mb-0.5 sm:mb-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Contact</p>
+                    <p className={`text-xs sm:text-sm font-semibold truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{supplierForOrder.name}</p>
                   </div>
-                  <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'}`}>
-                    <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Phone</p>
-                    <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{supplierForOrder.phone}</p>
+                  <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'}`}>
+                    <p className={`text-[10px] sm:text-xs font-medium mb-0.5 sm:mb-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Phone</p>
+                    <p className={`text-xs sm:text-sm font-semibold truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{supplierForOrder.phone}</p>
                   </div>
-                  <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'}`}>
-                    <p className={`text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Email</p>
-                    <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{supplierForOrder.email}</p>
+                  <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white shadow-sm'}`}>
+                    <p className={`text-[10px] sm:text-xs font-medium mb-0.5 sm:mb-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Email</p>
+                    <p className={`text-xs sm:text-sm font-semibold truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>{supplierForOrder.email}</p>
                   </div>
                 </div>
               </div>
 
               {/* Message Section */}
-              <div className="px-6 py-4">
+              <div className="px-3 sm:px-6 py-3 sm:py-4">
                 {/* Section Header with Edit Toggle */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <MessageCircle className={`w-5 h-5 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
-                    <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <MessageCircle className={`w-4 h-4 sm:w-5 sm:h-5 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
+                    <h3 className={`text-sm sm:text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                       Order Message
                     </h3>
                   </div>
@@ -2087,7 +2113,7 @@ ECOTEC Computer Solutions`;
                     }} />
                     <div className="relative p-4">
                       {/* Message Bubble */}
-                      <div className={`max-w-[85%] ml-auto rounded-2xl rounded-tr-sm p-4 ${
+                      <div className={`max-w-[95%] sm:max-w-[85%] ml-auto rounded-2xl rounded-tr-sm p-3 sm:p-4 ${
                         theme === 'dark' ? 'bg-[#005c4b]' : 'bg-[#d9fdd3]'
                       }`}>
                         <div className={`text-sm whitespace-pre-wrap break-words ${
@@ -2113,7 +2139,7 @@ ECOTEC Computer Solutions`;
             </div>
 
             {/* Modal Footer - Fixed at Bottom */}
-            <div className={`px-6 py-4 border-t flex gap-3 ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+            <div className={`px-3 sm:px-6 py-3 sm:py-4 border-t flex gap-2 sm:gap-3 ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
               <button
                 onClick={() => {
                   setIsOrderModalOpen(false);
@@ -2121,7 +2147,7 @@ ECOTEC Computer Solutions`;
                   setOrderMessage('');
                   setIsEditingOrderMessage(false);
                 }}
-                className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
                   theme === 'dark'
                     ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
@@ -2154,7 +2180,7 @@ ECOTEC Computer Solutions`;
                   setOrderMessage('');
                   setIsEditingOrderMessage(false);
                 }}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/25"
+                className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/25"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>

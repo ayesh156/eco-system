@@ -222,89 +222,89 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
   if (!isOpen || !supplier) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className={`relative w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 ${
+      <div className={`relative w-full sm:max-w-5xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 ${
         theme === 'dark' ? 'bg-slate-900' : 'bg-white'
       }`}>
         <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600" />
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZ2LTRoLTJ2NGgyek0zNCAyNmgtMnYtNGgydjR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
           
-          <div className="relative px-6 py-5">
+          <div className="relative px-4 sm:px-6 py-4 sm:py-5">
             <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl font-bold text-white">
+              <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-lg sm:text-2xl font-bold text-white flex-shrink-0">
                   {supplier.company.charAt(0)}
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">{supplier.company}</h2>
-                  <p className="text-white/80 text-sm">{supplier.name} - {supplier.phone}</p>
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-2xl font-bold text-white truncate">{supplier.company}</h2>
+                  <p className="text-white/80 text-xs sm:text-sm truncate">{supplier.name} - {supplier.phone}</p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-colors flex-shrink-0 ml-2"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-              <div className="p-3 rounded-xl bg-white/10 backdrop-blur">
-                <div className="text-white/70 text-xs mb-1">Total GRNs</div>
-                <div className="text-xl font-bold text-white flex items-center gap-2">
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : stats.totalGRNs}
-                  <ClipboardList className="w-4 h-4 text-white/50" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mt-3 sm:mt-4">
+              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-white/10 backdrop-blur">
+                <div className="text-white/70 text-[10px] sm:text-xs mb-0.5 sm:mb-1">Total GRNs</div>
+                <div className="text-base sm:text-xl font-bold text-white flex items-center gap-1 sm:gap-2">
+                  {isLoading ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : stats.totalGRNs}
+                  <ClipboardList className="w-3 h-3 sm:w-4 sm:h-4 text-white/50" />
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-white/10 backdrop-blur">
-                <div className="text-white/70 text-xs mb-1">Total Value</div>
-                <div className="text-xl font-bold text-white">
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(stats.totalValue)}
+              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-white/10 backdrop-blur">
+                <div className="text-white/70 text-[10px] sm:text-xs mb-0.5 sm:mb-1">Total Value</div>
+                <div className="text-sm sm:text-xl font-bold text-white truncate">
+                  {isLoading ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : formatCurrency(stats.totalValue)}
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-white/10 backdrop-blur">
-                <div className="text-white/70 text-xs mb-1">Paid</div>
-                <div className="text-xl font-bold text-emerald-300 flex items-center gap-1">
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(stats.totalPaid)}
-                  <ArrowUpRight className="w-4 h-4" />
+              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-white/10 backdrop-blur">
+                <div className="text-white/70 text-[10px] sm:text-xs mb-0.5 sm:mb-1">Paid</div>
+                <div className="text-sm sm:text-xl font-bold text-emerald-300 flex items-center gap-1 truncate">
+                  {isLoading ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : formatCurrency(stats.totalPaid)}
+                  <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-white/10 backdrop-blur">
-                <div className="text-white/70 text-xs mb-1">Pending</div>
-                <div className="text-xl font-bold text-amber-300 flex items-center gap-1">
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(stats.totalPending)}
-                  <ArrowDownRight className="w-4 h-4" />
+              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-white/10 backdrop-blur">
+                <div className="text-white/70 text-[10px] sm:text-xs mb-0.5 sm:mb-1">Pending</div>
+                <div className="text-sm sm:text-xl font-bold text-amber-300 flex items-center gap-1 truncate">
+                  {isLoading ? <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" /> : formatCurrency(stats.totalPending)}
+                  <ArrowDownRight className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="relative px-6 pb-0 flex gap-1">
+          <div className="relative px-3 sm:px-6 pb-0 flex gap-0.5 sm:gap-1 overflow-x-auto">
             {[
               { id: 'overview', label: 'Overview', icon: TrendingUp },
-              { id: 'grn', label: `GRN History (${stats.totalGRNs})`, icon: ClipboardList },
-              { id: 'payments', label: 'Payment Summary', icon: History },
+              { id: 'grn', label: `GRN (${stats.totalGRNs})`, icon: ClipboardList },
+              { id: 'payments', label: 'Payments', icon: History },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id as 'overview' | 'grn' | 'payments')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-medium transition-all ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-t-lg sm:rounded-t-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                   activeTab === id
                     ? theme === 'dark' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-indigo-600 shadow-lg'
                     : 'text-white/70 hover:text-white hover:bg-white/10'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {label}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-280px)]">
+        <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(95vh-300px)] sm:max-h-[calc(90vh-280px)]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mb-4" />
@@ -314,26 +314,26 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
             <>
               {activeTab === 'overview' && (
                 <div className="space-y-6 animate-in fade-in duration-200">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className={`p-5 rounded-2xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center">
-                          <ClipboardList className="w-5 h-5 text-white" />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                    <div className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                      <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center">
+                          <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                         </div>
-                        <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>GRN Status</h3>
+                        <h3 className={`text-sm sm:text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>GRN Status</h3>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-white'}`}>
-                          <div className="text-2xl font-bold text-emerald-500">{stats.completed}</div>
-                          <div className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Completed</div>
+                        <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-white'}`}>
+                          <div className="text-lg sm:text-2xl font-bold text-emerald-500">{stats.completed}</div>
+                          <div className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Completed</div>
                         </div>
-                        <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-white'}`}>
-                          <div className="text-2xl font-bold text-amber-500">{stats.pending}</div>
-                          <div className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Pending</div>
+                        <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-white'}`}>
+                          <div className="text-lg sm:text-2xl font-bold text-amber-500">{stats.pending}</div>
+                          <div className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Pending</div>
                         </div>
-                        <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-white'}`}>
-                          <div className="text-2xl font-bold text-orange-500">{stats.partial}</div>
-                          <div className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Partial</div>
+                        <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-white'}`}>
+                          <div className="text-lg sm:text-2xl font-bold text-orange-500">{stats.partial}</div>
+                          <div className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Partial</div>
                         </div>
                       </div>
                       <div className={`mt-4 pt-3 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
@@ -344,12 +344,12 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                       </div>
                     </div>
 
-                    <div className={`p-5 rounded-2xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center">
-                          <CreditCard className="w-5 h-5 text-white" />
+                    <div className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                      <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center">
+                          <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                         </div>
-                        <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Payment Status</h3>
+                        <h3 className={`text-sm sm:text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Payment Status</h3>
                       </div>
                       <div className="space-y-3">
                         <div className="flex justify-between">
@@ -387,12 +387,12 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                       </div>
                     </div>
 
-                    <div className={`p-5 rounded-2xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-center">
-                          <Building2 className="w-5 h-5 text-white" />
+                    <div className={`p-4 sm:p-5 rounded-xl sm:rounded-2xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                      <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-center">
+                          <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                         </div>
-                        <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Supplier Info</h3>
+                        <h3 className={`text-sm sm:text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Supplier Info</h3>
                       </div>
                       <div className="space-y-3 text-sm">
                         <div className="flex justify-between">
@@ -520,7 +520,8 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                     </div>
                   ) : (
                     <div className={`rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-                      <table className="w-full">
+                      <div className="overflow-x-auto">
+                      <table className="w-full min-w-[700px]">
                         <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
                           <tr>
                             <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>GRN #</th>
@@ -615,6 +616,7 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
                           })}
                         </tbody>
                       </table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -622,43 +624,43 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
 
               {activeTab === 'payments' && (
                 <div className="space-y-6 animate-in fade-in duration-200">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className={`p-5 rounded-2xl ${theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
-                      <div className="flex items-center gap-3 mb-2">
-                        <Banknote className={theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'} />
-                        <span className={`text-sm ${theme === 'dark' ? 'text-emerald-300' : 'text-emerald-700'}`}>Total Paid</span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+                    <div className={`p-3 sm:p-5 rounded-xl sm:rounded-2xl ${theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                        <Banknote className={`w-4 h-4 sm:w-5 sm:h-5 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                        <span className={`text-[10px] sm:text-sm ${theme === 'dark' ? 'text-emerald-300' : 'text-emerald-700'}`}>Total Paid</span>
                       </div>
-                      <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                      <div className={`text-base sm:text-2xl font-bold truncate ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
                         {formatCurrency(stats.totalPaid)}
                       </div>
                     </div>
                     
-                    <div className={`p-5 rounded-2xl ${theme === 'dark' ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
-                      <div className="flex items-center gap-3 mb-2">
-                        <DollarSign className={theme === 'dark' ? 'text-amber-400' : 'text-amber-600'} />
-                        <span className={`text-sm ${theme === 'dark' ? 'text-amber-300' : 'text-amber-700'}`}>Pending</span>
+                    <div className={`p-3 sm:p-5 rounded-xl sm:rounded-2xl ${theme === 'dark' ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                        <DollarSign className={`w-4 h-4 sm:w-5 sm:h-5 ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
+                        <span className={`text-[10px] sm:text-sm ${theme === 'dark' ? 'text-amber-300' : 'text-amber-700'}`}>Pending</span>
                       </div>
-                      <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                      <div className={`text-base sm:text-2xl font-bold truncate ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
                         {formatCurrency(stats.totalPending)}
                       </div>
                     </div>
                     
-                    <div className={`p-5 rounded-2xl ${theme === 'dark' ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
-                      <div className="flex items-center gap-3 mb-2">
-                        <ShoppingCart className={theme === 'dark' ? 'text-blue-400' : 'text-blue-600'} />
-                        <span className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>Total Orders</span>
+                    <div className={`p-3 sm:p-5 rounded-xl sm:rounded-2xl ${theme === 'dark' ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                        <ShoppingCart className={`w-4 h-4 sm:w-5 sm:h-5 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+                        <span className={`text-[10px] sm:text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-700'}`}>Orders</span>
                       </div>
-                      <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                      <div className={`text-base sm:text-2xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
                         {stats.totalGRNs}
                       </div>
                     </div>
                     
-                    <div className={`p-5 rounded-2xl ${theme === 'dark' ? 'bg-gradient-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/30' : 'bg-violet-50 border border-violet-200'}`}>
-                      <div className="flex items-center gap-3 mb-2">
-                        <TrendingUp className={theme === 'dark' ? 'text-violet-400' : 'text-violet-600'} />
-                        <span className={`text-sm ${theme === 'dark' ? 'text-violet-300' : 'text-violet-700'}`}>Payment %</span>
+                    <div className={`p-3 sm:p-5 rounded-xl sm:rounded-2xl ${theme === 'dark' ? 'bg-gradient-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/30' : 'bg-violet-50 border border-violet-200'}`}>
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                        <TrendingUp className={`w-4 h-4 sm:w-5 sm:h-5 ${theme === 'dark' ? 'text-violet-400' : 'text-violet-600'}`} />
+                        <span className={`text-[10px] sm:text-sm ${theme === 'dark' ? 'text-violet-300' : 'text-violet-700'}`}>Paid %</span>
                       </div>
-                      <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-violet-400' : 'text-violet-600'}`}>
+                      <div className={`text-base sm:text-2xl font-bold ${theme === 'dark' ? 'text-violet-400' : 'text-violet-600'}`}>
                         {stats.paymentPercentage.toFixed(1)}%
                       </div>
                     </div>
@@ -815,10 +817,10 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
           )}
         </div>
 
-        <div className={`px-6 py-4 border-t flex justify-end ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+        <div className={`px-4 sm:px-6 py-3 sm:py-4 border-t flex justify-end ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
           <button
             onClick={onClose}
-            className={`px-6 py-2.5 rounded-xl font-medium transition-colors ${
+            className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-colors ${
               theme === 'dark' 
                 ? 'bg-slate-700 text-white hover:bg-slate-600' 
                 : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
@@ -831,12 +833,12 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
 
       {/* Payment History Popup Modal */}
       {selectedPaymentGRN && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200">
           <div 
             className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
             onClick={() => setSelectedPaymentGRN(null)} 
           />
-          <div className={`relative w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${
+          <div className={`relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${
             theme === 'dark' ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'
           }`}>
             {/* Header */}
@@ -862,23 +864,23 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
             </div>
 
             {/* Summary */}
-            <div className={`px-5 py-4 border-b ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
-              <div className="grid grid-cols-3 gap-4 text-center">
+            <div className={`px-4 sm:px-5 py-3 sm:py-4 border-b ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
                 <div>
-                  <p className={`text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Total</p>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <p className={`text-[10px] sm:text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Total</p>
+                  <p className={`text-sm sm:text-lg font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     {formatCurrency(selectedPaymentGRN.totalAmount || 0)}
                   </p>
                 </div>
                 <div>
-                  <p className={`text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Paid</p>
-                  <p className="text-lg font-bold text-emerald-500">
+                  <p className={`text-[10px] sm:text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Paid</p>
+                  <p className="text-sm sm:text-lg font-bold text-emerald-500 truncate">
                     {formatCurrency(selectedPaymentGRN.paidAmount || 0)}
                   </p>
                 </div>
                 <div>
-                  <p className={`text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Pending</p>
-                  <p className="text-lg font-bold text-amber-500">
+                  <p className={`text-[10px] sm:text-xs uppercase tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Pending</p>
+                  <p className="text-sm sm:text-lg font-bold text-amber-500 truncate">
                     {formatCurrency((selectedPaymentGRN.totalAmount || 0) - (selectedPaymentGRN.paidAmount || 0))}
                   </p>
                 </div>
@@ -886,7 +888,7 @@ export const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
             </div>
 
             {/* Payment List */}
-            <div className="p-5 max-h-[400px] overflow-y-auto">
+            <div className="p-4 sm:p-5 max-h-[50vh] sm:max-h-[400px] overflow-y-auto">
               {loadingPayments[selectedPaymentGRN.apiId || selectedPaymentGRN.id] ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className={`w-6 h-6 animate-spin ${theme === 'dark' ? 'text-violet-400' : 'text-violet-600'}`} />

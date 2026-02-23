@@ -491,19 +491,19 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         </DialogHeader>
 
         {/* Gradient Header */}
-        <div className={`p-6 text-white ${isEditing 
+        <div className={`p-4 sm:p-6 text-white ${isEditing 
           ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500' 
           : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500'
         }`} aria-hidden="true">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-              {isEditing ? <FolderTree className="w-7 h-7" /> : <Plus className="w-7 h-7" />}
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+              {isEditing ? <FolderTree className="w-5 h-5 sm:w-7 sm:h-7" /> : <Plus className="w-5 h-5 sm:w-7 sm:h-7" />}
             </div>
             <div>
-              <h2 className="text-2xl font-bold">
+              <h2 className="text-lg sm:text-2xl font-bold">
                 {isEditing ? 'Edit Category' : 'Add New Category'}
               </h2>
-              <p className="text-sm text-emerald-100">
+              <p className="text-xs sm:text-sm text-emerald-100">
                 {isEditing ? 'Update category details' : 'Create a new product category'}
               </p>
             </div>
@@ -540,7 +540,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-6 relative">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6 relative">
             {/* Suggestion Fill Loading Overlay */}
             {isFillingFromSuggestion && (
               <div className="absolute inset-0 z-50 bg-gradient-to-br from-slate-900/95 via-slate-900/98 to-slate-950/95 backdrop-blur-sm flex flex-col items-center justify-center rounded-b-2xl">
@@ -844,7 +844,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 <Package className="w-4 h-4" />
                 Icon
               </Label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                 {categoryIconOptions.map((option) => {
                   const IconComponent = option.icon;
                   return (
@@ -853,7 +853,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                       type="button"
                       onClick={() => handleChange('icon', option.value)}
                       disabled={isSaving}
-                      className={`p-3 rounded-lg border transition-all flex flex-col items-center gap-1 disabled:opacity-50 ${
+                      className={`p-2 sm:p-3 rounded-lg border transition-all flex flex-col items-center gap-0.5 sm:gap-1 disabled:opacity-50 ${
                         formData.icon === option.value
                           ? theme === 'dark'
                             ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
@@ -863,8 +863,8 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                             : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}
                     >
-                      <IconComponent className="w-5 h-5" />
-                      <span className="text-xs">{option.label}</span>
+                      <IconComponent className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="text-[10px] sm:text-xs">{option.label}</span>
                     </button>
                   );
                 })}
@@ -893,11 +893,11 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             </div>
 
             {/* Action Buttons */}
-            <div className={`flex gap-3 pt-4 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+            <div className={`flex gap-2 sm:gap-3 pt-3 sm:pt-4 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-xl text-sm sm:text-base font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
                   <>
@@ -915,7 +915,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 type="button"
                 onClick={onClose}
                 disabled={isSaving}
-                className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-colors border ${
+                className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm sm:text-base font-medium transition-colors border ${
                   theme === 'dark'
                     ? 'bg-slate-700/50 hover:bg-slate-700 text-white border-slate-600/50'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-900 border-slate-300'

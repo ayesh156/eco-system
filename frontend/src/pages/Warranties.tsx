@@ -422,7 +422,7 @@ export function Warranties() {
     selectedDate: string, 
     setSelectedDate: (date: string) => void, 
     setShowCalendar: (show: boolean) => void,
-    alignRight: boolean = false
+    _alignRight: boolean = false
   ) => {
     const { daysInMonth, startingDay } = getDaysInMonth(calendarMonth);
     const days = [];
@@ -462,11 +462,12 @@ export function Warranties() {
     }
 
     return (
-      <div className={`absolute top-full mt-2 p-3 rounded-xl border shadow-xl z-50 min-w-[280px] ${
-        alignRight ? 'right-0' : 'left-0'
-      } ${
+      <>
+      <div className="fixed inset-0 bg-black/40 z-[59] sm:hidden" onClick={() => setShowCalendar(false)} />
+      <div className={`fixed sm:absolute bottom-0 sm:bottom-auto left-0 sm:left-0 right-0 sm:right-auto sm:top-full sm:mt-2 p-4 pt-3 rounded-t-3xl sm:rounded-2xl border-t sm:border shadow-2xl z-[60] w-full sm:w-[280px] ${
         theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
       }`}>
+        <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
@@ -517,6 +518,7 @@ export function Warranties() {
           Clear
         </button>
       </div>
+      </>
     );
   };
 
@@ -1008,7 +1010,7 @@ export function Warranties() {
         {/* Expanded Filters */}
         {showFilters && (
           <div className={`pt-3 sm:pt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center gap-3">
               {/* Status Filter */}
               <div className="w-full sm:w-44">
                 <SearchableSelect
@@ -1074,48 +1076,49 @@ export function Warranties() {
               </div>
 
               {/* Date Range Filter */}
-              <div className="flex items-center gap-2">
-                <Calendar className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
-                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Date:</span>
-                
-                {/* Start Date */}
-                <div className="relative" ref={startCalendarRef}>
-                  <button
-                    onClick={() => {
-                      setShowStartCalendar(!showStartCalendar);
-                      setShowEndCalendar(false);
-                      setCalendarMonth(startDate ? new Date(startDate) : new Date());
-                    }}
-                    className={`px-3 py-1.5 rounded-xl border text-sm min-w-[110px] text-left ${
-                      theme === 'dark' 
-                        ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
-                        : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    {startDate ? formatDateDisplay(startDate) : 'Start Date'}
-                  </button>
-                  {showStartCalendar && renderCalendar(startDate, setStartDate, setShowStartCalendar, false)}
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2 sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                  <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Date</span>
                 </div>
-                
-                <span className={`${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>-</span>
-                
-                {/* End Date */}
-                <div className="relative" ref={endCalendarRef}>
-                  <button
-                    onClick={() => {
-                      setShowEndCalendar(!showEndCalendar);
-                      setShowStartCalendar(false);
-                      setCalendarMonth(endDate ? new Date(endDate) : new Date());
-                    }}
-                    className={`px-3 py-1.5 rounded-xl border text-sm min-w-[110px] text-left ${
-                      theme === 'dark' 
-                        ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
-                        : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    {endDate ? formatDateDisplay(endDate) : 'End Date'}
-                  </button>
-                  {showEndCalendar && renderCalendar(endDate, setEndDate, setShowEndCalendar, true)}
+                <div className="flex items-center gap-2">
+                  {/* Start Date */}
+                  <div className="relative flex-1" ref={startCalendarRef}>
+                    <button
+                      onClick={() => {
+                        setShowStartCalendar(!showStartCalendar);
+                        setShowEndCalendar(false);
+                        setCalendarMonth(startDate ? new Date(startDate) : new Date());
+                      }}
+                      className={`w-full px-3 py-2 sm:py-1.5 rounded-xl border text-sm text-left ${
+                        theme === 'dark' 
+                          ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
+                          : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      {startDate ? formatDateDisplay(startDate) : 'Start Date'}
+                    </button>
+                    {showStartCalendar && renderCalendar(startDate, setStartDate, setShowStartCalendar, false)}
+                  </div>
+                  <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>to</span>
+                  {/* End Date */}
+                  <div className="relative flex-1" ref={endCalendarRef}>
+                    <button
+                      onClick={() => {
+                        setShowEndCalendar(!showEndCalendar);
+                        setShowStartCalendar(false);
+                        setCalendarMonth(endDate ? new Date(endDate) : new Date());
+                      }}
+                      className={`w-full px-3 py-2 sm:py-1.5 rounded-xl border text-sm text-left ${
+                        theme === 'dark' 
+                          ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
+                          : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      {endDate ? formatDateDisplay(endDate) : 'End Date'}
+                    </button>
+                    {showEndCalendar && renderCalendar(endDate, setEndDate, setShowEndCalendar, true)}
+                  </div>
                 </div>
               </div>
             </div>

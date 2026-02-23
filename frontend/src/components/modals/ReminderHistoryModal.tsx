@@ -137,7 +137,7 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`max-w-2xl max-h-[85vh] overflow-hidden p-0 ${
+      <DialogContent className={`w-[95vw] max-w-2xl max-h-[92vh] sm:max-h-[85vh] overflow-hidden p-0 rounded-2xl ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
         <DialogHeader className="sr-only">
@@ -145,15 +145,18 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
         </DialogHeader>
 
         {/* Header */}
-        <div className="relative h-20 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600">
-          <div className="absolute inset-0 flex items-center px-6">
-            <div className="flex items-center gap-4 flex-1">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-                <History className="w-6 h-6 text-white" />
+        <div className="relative overflow-hidden bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600">
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
+          </div>
+          <div className="relative flex items-center px-3 sm:px-5 py-3 sm:py-4">
+            <div className="flex items-center gap-2.5 sm:gap-4 flex-1 min-w-0">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center flex-shrink-0">
+                <History className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">Reminder History</h2>
-                <p className="text-green-100 text-sm">
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-lg font-bold text-white">Reminder History</h2>
+                <p className="text-green-100 text-[11px] sm:text-sm truncate">
                   {getModalTitle()}{getSubtitle() ? ` • ${getSubtitle()}` : ''}
                 </p>
               </div>
@@ -161,15 +164,15 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
             <button
               onClick={loadReminders}
               disabled={isLoading}
-              className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+              className="p-1.5 sm:p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors flex-shrink-0"
             >
-              <RefreshCw className={`w-5 h-5 text-white ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 text-white ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
+        <div className="p-3 sm:p-5 overflow-y-auto max-h-[calc(92vh-140px)] sm:max-h-[calc(85vh-140px)]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <RefreshCw className={`w-8 h-8 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'} animate-spin`} />
@@ -205,28 +208,27 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
           ) : (
             <div className="space-y-4">
               {/* Summary */}
-              <div className={`flex items-center gap-4 p-4 rounded-xl ${
+              <div className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl ${
                 theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
               }`}>
-                <div className="flex-1">
-                  <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Total Reminders Sent
                   </p>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Last reminder: {formatDate(reminders[0]?.sentAt || '')}
+                  <p className={`text-[11px] sm:text-sm truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Last: {formatDate(reminders[0]?.sentAt || '')}
                   </p>
                 </div>
-                <div className="text-3xl font-bold text-green-500">
+                <div className="text-2xl sm:text-3xl font-bold text-green-500">
                   {reminders.length}
                 </div>
               </div>
 
               {/* Reminder List */}
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {paginatedReminders.map((reminder, index) => {
                   const typeInfo = getReminderTypeInfo(reminder.type);
                   const TypeIcon = typeInfo.icon;
-                  // Calculate global index for numbering
                   const globalIndex = (currentPage - 1) * itemsPerPage + index;
 
                   return (
@@ -238,17 +240,14 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
                           : 'bg-white border-slate-200 hover:shadow-md'
                       }`}
                     >
-                      <div className="p-4">
-                        <div className="flex items-start gap-4">
-                          {/* Type Icon */}
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${typeInfo.bgColor}`}>
-                            <TypeIcon className={`w-5 h-5 ${typeInfo.color}`} />
+                      <div className="p-2.5 sm:p-4">
+                        <div className="flex items-start gap-2.5 sm:gap-4">
+                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${typeInfo.bgColor}`}>
+                            <TypeIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${typeInfo.color}`} />
                           </div>
-
-                          {/* Content */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                            <div className="flex items-center justify-between mb-0.5 sm:mb-1">
+                              <span className={`font-medium text-xs sm:text-sm ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                                 {typeInfo.label}
                               </span>
                               <span className={`text-xs px-2 py-1 rounded-full ${
@@ -258,7 +257,7 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
                               </span>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-3 text-sm mb-2">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-sm mb-1.5 sm:mb-2">
                               <span className={`flex items-center gap-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                                 <Clock className="w-3.5 h-3.5" />
                                 {formatDate(reminder.sentAt)}
@@ -282,7 +281,7 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
 
                             {/* Message Preview */}
                             {reminder.message && (
-                              <div className={`text-sm p-3 rounded-lg mt-2 ${
+                              <div className={`text-xs sm:text-sm p-2 sm:p-3 rounded-lg mt-1.5 sm:mt-2 ${
                                 theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-50'
                               }`}>
                                 <p className={`line-clamp-3 whitespace-pre-wrap ${
@@ -302,11 +301,10 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
 
               {/* Pagination */}
               {reminders.length > itemsPerPage && (
-                <div className={`flex items-center justify-between mt-6 pt-4 border-t ${
+                <div className={`flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t ${
                   theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
                 }`}>
-                  {/* Page Info */}
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className={`text-[11px] sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, reminders.length)} of {reminders.length}
                   </p>
 
@@ -397,12 +395,12 @@ export const ReminderHistoryModal: React.FC<ReminderHistoryModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className={`px-6 py-4 border-t ${
+        <div className={`px-3 sm:px-5 py-2.5 sm:py-3 border-t ${
           theme === 'dark' ? 'border-slate-700/50 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
         }`}>
           <button
             onClick={onClose}
-            className={`w-full py-3 rounded-xl font-medium transition-all ${
+            className={`w-full py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all ${
               theme === 'dark'
                 ? 'bg-slate-700 text-white hover:bg-slate-600'
                 : 'bg-slate-200 text-slate-700 hover:bg-slate-300'

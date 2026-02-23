@@ -746,11 +746,14 @@ export const CreateInvoice: React.FC = () => {
     }
 
     return (
-      <div className={`absolute z-50 mt-2 p-4 rounded-2xl shadow-2xl border ${
+      <>
+      <div className="fixed inset-0 bg-black/40 z-[59] sm:hidden" onClick={() => closeSetter(false)} />
+      <div className={`fixed sm:absolute bottom-0 sm:bottom-auto left-0 sm:left-0 right-0 sm:right-auto sm:top-full sm:mt-2 p-4 pt-3 rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border z-[60] w-full sm:w-[280px] ${
         theme === 'dark' 
           ? 'bg-slate-800 border-slate-700' 
           : 'bg-white border-emerald-100'
       }`}>
+        <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-3 sm:hidden" />
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <button
@@ -817,6 +820,7 @@ export const CreateInvoice: React.FC = () => {
           </button>
         </div>
       </div>
+      </>
     );
   };
 

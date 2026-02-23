@@ -211,7 +211,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
   const labelClass = `block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -219,7 +219,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
       />
 
       {/* Modal - Full scroll */}
-      <div className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 ${
+      <div className={`relative w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 ${
         theme === 'dark' ? 'bg-slate-900' : 'bg-white'
       }`}>
         {/* Header with gradient */}
@@ -227,45 +227,45 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
           <div className="absolute inset-0 bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600" />
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZ2LTRoLTJ2NGgyek0zNCAyNmgtMnYtNGgydjR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
           
-          <div className="relative px-6 py-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-white" />
+          <div className="relative px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-xl font-bold text-white truncate">
                   {isEditing ? 'Edit Supplier' : 'Add New Supplier'}
                 </h2>
-                <p className="text-white/70 text-sm">
+                <p className="text-white/70 text-xs sm:text-sm truncate">
                   {isEditing ? 'Update supplier information' : 'Create a new supplier account'}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-colors flex-shrink-0 ml-2"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
 
           {/* Tabs */}
-          <div className="relative px-6 pb-0 flex gap-1">
+          <div className="relative px-3 sm:px-6 pb-0 flex gap-0.5 sm:gap-1 overflow-x-auto">
             {[
               { id: 'basic', label: 'Basic Info', icon: User },
-              { id: 'credit', label: 'Credit & Payment', icon: CreditCard },
+              { id: 'credit', label: 'Credit', icon: CreditCard },
               { id: 'extra', label: 'Additional', icon: FileText },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id as 'basic' | 'credit' | 'extra')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-sm font-medium transition-all ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-t-lg sm:rounded-t-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                   activeTab === id
                     ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-lg'
                     : 'text-white/70 hover:text-white hover:bg-white/10'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {label}
               </button>
             ))}
@@ -274,7 +274,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
 
         {/* Form Content */}
         <form onSubmit={handleSubmit}>
-          <div className="p-6 space-y-5">
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
             {/* Basic Info Tab */}
             {activeTab === 'basic' && (
               <div className="space-y-5 animate-in fade-in duration-200">
@@ -373,10 +373,10 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
                         key={star}
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, rating: star }))}
-                        className="p-1 transition-transform hover:scale-110"
+                        className="p-0.5 sm:p-1 transition-transform hover:scale-110"
                       >
                         <Star 
-                          className={`w-8 h-8 transition-colors ${
+                          className={`w-6 h-6 sm:w-8 sm:h-8 transition-colors ${
                             star <= formData.rating 
                               ? 'text-amber-400 fill-amber-400' 
                               : theme === 'dark' ? 'text-slate-600' : 'text-slate-300'
@@ -398,7 +398,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
                 {/* Credit Status Cards */}
                 <div>
                   <label className={labelClass}>Credit Status</label>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
                     {[
                       { value: 'clear', label: 'Clear', icon: '✅', color: 'emerald', desc: 'No credit balance' },
                       { value: 'active', label: 'Active', icon: '🔵', color: 'blue', desc: 'Has active credit' },
@@ -408,15 +408,15 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
                         key={value}
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, creditStatus: value as 'clear' | 'active' | 'overdue' }))}
-                        className={`p-4 rounded-2xl border-2 transition-all ${
+                        className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all ${
                           formData.creditStatus === value
                             ? `border-${color}-500 bg-${color}-500/10 ring-2 ring-${color}-500/30`
                             : theme === 'dark' ? 'border-slate-700 hover:border-slate-600' : 'border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        <div className="text-2xl mb-1">{icon}</div>
-                        <div className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{label}</div>
-                        <div className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{desc}</div>
+                        <div className="text-xl sm:text-2xl mb-0.5 sm:mb-1">{icon}</div>
+                        <div className={`text-xs sm:text-base font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{label}</div>
+                        <div className={`text-[10px] sm:text-xs hidden sm:block ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>{desc}</div>
                       </button>
                     ))}
                   </div>
@@ -709,14 +709,14 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className={`sticky bottom-0 px-6 py-4 border-t ${
+          <div className={`sticky bottom-0 px-4 sm:px-6 py-3 sm:py-4 border-t ${
             theme === 'dark' ? 'bg-slate-900/95 border-slate-800 backdrop-blur' : 'bg-white/95 border-slate-200 backdrop-blur'
           }`}>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className={`px-5 py-2.5 rounded-xl font-medium transition-colors ${
+                className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-colors ${
                   theme === 'dark' 
                     ? 'text-slate-400 hover:text-white hover:bg-slate-800' 
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -726,10 +726,10 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
               </button>
               <button
                 type="submit"
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity shadow-lg shadow-violet-500/30"
+                className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-lg shadow-violet-500/30"
               >
-                <Sparkles className="w-4 h-4" />
-                {isEditing ? 'Update Supplier' : 'Create Supplier'}
+                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                {isEditing ? 'Update' : 'Create'}
               </button>
             </div>
           </div>

@@ -384,8 +384,11 @@ export const JobNoteForm: React.FC = () => {
     }
 
     return (
-      <div className={`absolute top-full left-0 mt-2 p-3 rounded-xl border shadow-xl z-50 min-w-[280px] ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+      <>
+      <div className="fixed inset-0 bg-black/40 z-[59] sm:hidden" onClick={() => setShowCalendar(false)} />
+      <div className={`fixed sm:absolute bottom-0 sm:bottom-auto left-0 sm:left-0 right-0 sm:right-auto sm:top-full sm:mt-2 p-4 pt-3 rounded-t-3xl sm:rounded-2xl border-t sm:border shadow-2xl z-[60] w-full sm:w-[280px] ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
         }`}>
+        <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between mb-3">
           <button
             type="button"
@@ -421,6 +424,7 @@ export const JobNoteForm: React.FC = () => {
           {days}
         </div>
       </div>
+      </>
     );
   };
 

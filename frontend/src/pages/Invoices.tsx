@@ -628,9 +628,12 @@ export const Invoices: React.FC = () => {
     }
 
     return (
-      <div className={`absolute top-full left-0 mt-2 p-3 rounded-xl border shadow-xl z-50 min-w-[280px] ${
+      <>
+      <div className="fixed inset-0 bg-black/40 z-[59] sm:hidden" onClick={() => setShowCalendar(false)} />
+      <div className={`fixed sm:absolute bottom-0 sm:bottom-auto left-0 sm:left-0 right-0 sm:right-auto sm:top-full sm:mt-2 p-4 pt-3 rounded-t-3xl sm:rounded-2xl border-t sm:border shadow-2xl z-[60] w-full sm:w-[280px] ${
         theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
       }`}>
+        <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-3 sm:hidden" />
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
@@ -681,6 +684,7 @@ export const Invoices: React.FC = () => {
           Clear
         </button>
       </div>
+      </>
     );
   };
 
@@ -1313,7 +1317,7 @@ export const Invoices: React.FC = () => {
         {/* Expanded Filters */}
         {showFilters && (
           <div className={`pt-3 sm:pt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center gap-3">
               {/* Status Filter */}
               <div className="w-full sm:w-40">
                 <SearchableSelect
@@ -1349,78 +1353,93 @@ export const Invoices: React.FC = () => {
               </div>
 
               {/* Date Range with Calendar */}
-              <div className="flex items-center gap-2">
-                <Calendar className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
-                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Date:</span>
-                
-                {/* Start Date */}
-                <div className="relative" ref={startCalendarRef}>
-                  <button
-                    onClick={() => {
-                      setShowStartCalendar(!showStartCalendar);
-                      setShowEndCalendar(false);
-                      setCalendarMonth(startDate ? new Date(startDate) : new Date());
-                    }}
-                    className={`px-3 py-1.5 rounded-xl border text-sm min-w-[110px] text-left ${
-                      theme === 'dark' 
-                        ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
-                        : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    {startDate ? formatDateDisplay(startDate) : 'Start Date'}
-                  </button>
-                  {showStartCalendar && renderCalendar(startDate, setStartDate, setShowStartCalendar)}
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2 sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                  <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Date</span>
                 </div>
-                
-                <span className={`${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>-</span>
-                
-                {/* End Date */}
-                <div className="relative" ref={endCalendarRef}>
-                  <button
-                    onClick={() => {
-                      setShowEndCalendar(!showEndCalendar);
-                      setShowStartCalendar(false);
-                      setCalendarMonth(endDate ? new Date(endDate) : new Date());
-                    }}
-                    className={`px-3 py-1.5 rounded-xl border text-sm min-w-[110px] text-left ${
-                      theme === 'dark' 
-                        ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
-                        : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    {endDate ? formatDateDisplay(endDate) : 'End Date'}
-                  </button>
-                  {showEndCalendar && renderCalendar(endDate, setEndDate, setShowEndCalendar)}
+                <div className="flex items-center gap-2">
+                  {/* Start Date */}
+                  <div className="relative flex-1" ref={startCalendarRef}>
+                    <button
+                      onClick={() => {
+                        setShowStartCalendar(!showStartCalendar);
+                        setShowEndCalendar(false);
+                        setCalendarMonth(startDate ? new Date(startDate) : new Date());
+                      }}
+                      className={`w-full px-3 py-2 sm:py-1.5 rounded-xl border text-sm text-left ${
+                        theme === 'dark' 
+                          ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
+                          : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      {startDate ? formatDateDisplay(startDate) : 'Start Date'}
+                    </button>
+                    {showStartCalendar && renderCalendar(startDate, setStartDate, setShowStartCalendar)}
+                  </div>
+                  <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>to</span>
+                  {/* End Date */}
+                  <div className="relative flex-1" ref={endCalendarRef}>
+                    <button
+                      onClick={() => {
+                        setShowEndCalendar(!showEndCalendar);
+                        setShowStartCalendar(false);
+                        setCalendarMonth(endDate ? new Date(endDate) : new Date());
+                      }}
+                      className={`w-full px-3 py-2 sm:py-1.5 rounded-xl border text-sm text-left ${
+                        theme === 'dark' 
+                          ? 'bg-slate-800/50 border-slate-700/50 text-white hover:bg-slate-700/50' 
+                          : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
+                      }`}
+                    >
+                      {endDate ? formatDateDisplay(endDate) : 'End Date'}
+                    </button>
+                    {showEndCalendar && renderCalendar(endDate, setEndDate, setShowEndCalendar)}
+                  </div>
                 </div>
               </div>
 
               {/* Price Range */}
-              <div className="flex items-center gap-2">
-                <DollarSign className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
-                <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Price:</span>
-                <input
-                  type="number"
-                  placeholder="Min"
-                  value={minPrice}
-                  onChange={(e) => setMinPrice(e.target.value)}
-                  className={`w-24 px-3 py-1.5 rounded-xl border text-sm ${
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className={`w-4 h-4 flex-shrink-0 ${theme === 'dark' ? 'text-emerald-500' : 'text-emerald-600'}`} />
+                  <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Price</span>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className={`flex items-center gap-1.5 flex-1 sm:flex-none sm:w-24 px-3 py-2 sm:py-1.5 rounded-xl border ${
                     theme === 'dark' 
-                      ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500' 
-                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                  }`}
-                />
-                <span className={`${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>-</span>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={maxPrice}
-                  onChange={(e) => setMaxPrice(e.target.value)}
-                  className={`w-24 px-3 py-1.5 rounded-xl border text-sm ${
+                      ? 'bg-slate-800/50 border-slate-700/50' 
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <DollarSign className={`w-3.5 h-3.5 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={minPrice}
+                      onChange={(e) => setMinPrice(e.target.value)}
+                      className={`w-full bg-transparent border-none outline-none text-sm ${
+                        theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
+                      }`}
+                    />
+                  </div>
+                  <span className={`text-xs flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>to</span>
+                  <div className={`flex items-center gap-1.5 flex-1 sm:flex-none sm:w-24 px-3 py-2 sm:py-1.5 rounded-xl border ${
                     theme === 'dark' 
-                      ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500' 
-                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
-                  }`}
-                />
+                      ? 'bg-slate-800/50 border-slate-700/50' 
+                      : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <DollarSign className={`w-3.5 h-3.5 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(e.target.value)}
+                      className={`w-full bg-transparent border-none outline-none text-sm ${
+                        theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Warranty Issues Filter */}

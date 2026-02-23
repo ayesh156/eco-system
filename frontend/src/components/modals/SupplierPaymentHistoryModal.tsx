@@ -298,12 +298,12 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`max-w-5xl max-h-[90vh] overflow-hidden flex flex-col ${
+      <DialogContent className={`max-w-5xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col p-3 sm:p-6 ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
         <DialogHeader className="flex-shrink-0">
           <div className="flex items-center justify-between">
-            <DialogTitle className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            <DialogTitle className={`text-base sm:text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
               Supplier Transaction History
             </DialogTitle>
             <button
@@ -321,42 +321,41 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
 
         <div className="flex-1 overflow-y-auto space-y-6 py-4">
           {/* Supplier Info Card */}
-          <div className={`relative overflow-hidden rounded-2xl border p-5 bg-gradient-to-br from-indigo-500/20 to-purple-500/10 ${
+          <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl border p-3 sm:p-5 bg-gradient-to-br from-indigo-500/20 to-purple-500/10 ${
             theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
           }`}>
             <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             
-            <div className="relative flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-white/10' : 'bg-white/80'}`}>
-                  <Building2 className="w-8 h-8 text-indigo-500" />
+            <div className="relative flex flex-col lg:flex-row lg:items-start justify-between gap-3 sm:gap-4">
+              <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-white/10' : 'bg-white/80'}`}>
+                  <Building2 className="w-5 h-5 sm:w-8 sm:h-8 text-indigo-500" />
                 </div>
-                <div>
-                  <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="min-w-0">
+                  <h2 className={`text-base sm:text-xl font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     {supplier.company}
                   </h2>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     {supplier.name} • {supplier.phone}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-6">
-                {/* GRN Summary */}
+              <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
                 <div className="text-center">
-                  <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total GRNs</p>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>GRNs</p>
+                  <p className={`text-sm sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     {grnStats.totalGRNs}
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Items Received</p>
-                  <p className={`text-lg font-bold text-blue-500`}>
+                  <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Items</p>
+                  <p className={`text-sm sm:text-lg font-bold text-blue-500`}>
                     {grnStats.totalItems.toLocaleString()}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Outstanding Balance</p>
-                  <p className={`text-2xl font-bold ${supplier.creditBalance > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                  <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Balance</p>
+                  <p className={`text-lg sm:text-2xl font-bold ${supplier.creditBalance > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
                     {formatCurrency(supplier.creditBalance)}
                   </p>
                 </div>
@@ -365,10 +364,10 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
           </div>
 
           {/* Tab Navigation */}
-          <div className={`flex gap-2 p-1 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+          <div className={`flex gap-1 sm:gap-2 p-0.5 sm:p-1 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
             <button
               onClick={() => { setActiveTab('payments'); setSearchQuery(''); }}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 rounded-md sm:rounded-lg text-xs sm:text-sm font-medium transition-all ${
                 activeTab === 'payments'
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
                   : theme === 'dark' 
@@ -376,9 +375,10 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white'
               }`}
             >
-              <Wallet className="w-4 h-4" />
-              Payment History
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
+              <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Payment History</span>
+              <span className="sm:hidden">Payments</span>
+              <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${
                 activeTab === 'payments' 
                   ? 'bg-white/20' 
                   : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'
@@ -388,7 +388,7 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
             </button>
             <button
               onClick={() => { setActiveTab('grn'); setSearchQuery(''); }}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 rounded-md sm:rounded-lg text-xs sm:text-sm font-medium transition-all ${
                 activeTab === 'grn'
                   ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
                   : theme === 'dark' 
@@ -396,9 +396,10 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white'
               }`}
             >
-              <Package className="w-4 h-4" />
-              GRN History
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
+              <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">GRN History</span>
+              <span className="sm:hidden">GRNs</span>
+              <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${
                 activeTab === 'grn' 
                   ? 'bg-white/20' 
                   : theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'
@@ -412,51 +413,51 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
           {activeTab === 'payments' && (
             <>
               {/* Payment Summary Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wallet className="w-4 h-4 text-emerald-500" />
-                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Paid</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                    <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+                    <span className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Paid</span>
                   </div>
-                  <p className="text-lg font-bold text-emerald-500">{formatCurrency(stats.totalPaid)}</p>
-                  <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{stats.count} payments</p>
+                  <p className="text-sm sm:text-lg font-bold text-emerald-500 truncate">{formatCurrency(stats.totalPaid)}</p>
+                  <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{stats.count} payments</p>
                 </div>
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Banknote className="w-4 h-4 text-emerald-500" />
-                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Cash</span>
+                <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                    <Banknote className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+                    <span className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Cash</span>
                   </div>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(stats.byMethod.cash)}</p>
+                  <p className={`text-sm sm:text-lg font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(stats.byMethod.cash)}</p>
                 </div>
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Landmark className="w-4 h-4 text-blue-500" />
-                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Bank</span>
+                <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                    <Landmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
+                    <span className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Bank</span>
                   </div>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(stats.byMethod.bank)}</p>
+                  <p className={`text-sm sm:text-lg font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(stats.byMethod.bank)}</p>
                 </div>
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <CreditCard className="w-4 h-4 text-purple-500" />
-                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Card/Cheque</span>
+                <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                    <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />
+                    <span className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Card/Cheque</span>
                   </div>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(stats.byMethod.card + stats.byMethod.cheque)}</p>
+                  <p className={`text-sm sm:text-lg font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(stats.byMethod.card + stats.byMethod.cheque)}</p>
                 </div>
               </div>
 
               {/* Search and Filters */}
-              <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border flex-1 ${
+              <div className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <div className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border flex-1 ${
                     theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
                   }`}>
-                    <Search className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <Search className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
                     <input
                       type="text"
-                      placeholder="Search by product, note, or ID..."
+                      placeholder="Search payment or product..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className={`bg-transparent border-none outline-none flex-1 text-sm ${
+                      className={`bg-transparent border-none outline-none flex-1 text-xs sm:text-sm ${
                         theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
                       }`}
                     />
@@ -467,141 +468,146 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
                     onValueChange={setMethodFilter}
                     placeholder="Filter by method"
                     searchPlaceholder="Search method..."
-                    emptyMessage="No methods found"
+                    emptyMessage="No method found"
                     theme={theme}
                     className="w-full sm:w-48"
                   />
                 </div>
               </div>
 
-          {/* Payments Table */}
-          <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
-                  <tr>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Date & Time</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Product</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden sm:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Method</th>
-                    <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Amount</th>
-                    <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Notes</th>
-                  </tr>
-                </thead>
-                <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}`}>
-                  {paginatedPayments.map((payment) => {
-                    const MethodIcon = getPaymentMethodIcon(payment.paymentMethod);
-                    const methodColor = getPaymentMethodColor(payment.paymentMethod, theme);
-                    
-                    return (
-                      <tr key={payment.id} className={`transition-colors ${theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}`}>
-                        <td className="px-4 py-4">
-                          <div>
-                            <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                              {formatDate(payment.paymentDate)}
-                            </p>
-                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                              {new Date(payment.paymentDate).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div>
-                            <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                              {payment.productName}
-                            </p>
-                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                              {payment.productCategory}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 hidden sm:table-cell">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${methodColor}`}>
-                            <MethodIcon className="w-3.5 h-3.5" />
-                            {getPaymentMethodLabel(payment.paymentMethod)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <span className="text-lg font-bold text-emerald-500">
-                            {formatCurrency(payment.amount)}
-                          </span>
-                        </td>
-                        <td className={`px-4 py-4 hidden md:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                          <p className="text-sm max-w-[200px] truncate" title={payment.notes || '-'}>
-                            {payment.notes || '-'}
-                          </p>
-                        </td>
+              {/* Payments Table */}
+              <div className={`rounded-xl sm:rounded-2xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[500px]">
+                    <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
+                      <tr>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Date & Time</th>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Product</th>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden sm:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Method</th>
+                        <th className={`px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Amount</th>
+                        <th className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Notes</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {paginatedPayments.length === 0 && (
-              <div className={`p-12 text-center ${theme === 'dark' ? 'bg-slate-800/20' : 'bg-slate-50'}`}>
-                <Receipt className={`w-12 h-12 mx-auto ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
-                <h3 className={`mt-4 text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>No payments found</h3>
-                <p className={`mt-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {searchQuery || methodFilter !== 'all' ? 'Try adjusting your filters' : 'No payments recorded for this supplier yet'}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Showing <span className="font-medium">{startIndex + 1}</span> - <span className="font-medium">{Math.min(startIndex + itemsPerPage, filteredPayments.length)}</span> of <span className="font-medium">{filteredPayments.length}</span> payments
-                </p>
-                
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={() => setCurrentPage(1)} 
-                    disabled={currentPage === 1} 
-                    className={`p-2 rounded-lg ${currentPage === 1 ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
-                  >
-                    <ChevronsLeft className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
-                    disabled={currentPage === 1} 
-                    className={`p-2 rounded-lg ${currentPage === 1 ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  {getPageNumbers.map((page, idx) => (
-                    page === '...' ? (
-                      <span key={`dots-${idx}`} className={`px-2 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>...</span>
-                    ) : (
-                      <button 
-                        key={page} 
-                        onClick={() => setCurrentPage(page as number)} 
-                        className={`w-9 h-9 rounded-lg text-sm font-medium ${currentPage === page ? 'bg-emerald-500 text-white' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-700'}`}
-                      >
-                        {page}
-                      </button>
-                    )
-                  ))}
-                  <button 
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
-                    disabled={currentPage === totalPages} 
-                    className={`p-2 rounded-lg ${currentPage === totalPages ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => setCurrentPage(totalPages)} 
-                    disabled={currentPage === totalPages} 
-                    className={`p-2 rounded-lg ${currentPage === totalPages ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
-                  >
-                    <ChevronsRight className="w-4 h-4" />
-                  </button>
+                    </thead>
+                    <tbody className={`divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}`}>
+                      {paginatedPayments.map((payment) => {
+                        const MethodIcon = getPaymentMethodIcon(payment.paymentMethod);
+                        const methodColor = getPaymentMethodColor(payment.paymentMethod, theme);
+                        
+                        return (
+                          <tr key={payment.id} className={`transition-colors ${theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}`}>
+                            <td className="px-4 py-4">
+                              <div>
+                                <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                  {formatDate(payment.paymentDate)}
+                                </p>
+                                <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {new Date(payment.paymentDate).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div>
+                                <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                  {payment.productName}
+                                </p>
+                                <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                  {payment.productCategory}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 hidden sm:table-cell">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${methodColor}`}>
+                                <MethodIcon className="w-3.5 h-3.5" />
+                                {getPaymentMethodLabel(payment.paymentMethod)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <span className="text-lg font-bold text-emerald-500">
+                                {formatCurrency(payment.amount)}
+                              </span>
+                            </td>
+                            <td className={`px-4 py-4 hidden md:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                              <p className="text-sm max-w-[200px] truncate" title={payment.notes || '-'}>
+                                {payment.notes || '-'}
+                              </p>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
+
+                {paginatedPayments.length === 0 && (
+                  <div className={`p-12 text-center ${theme === 'dark' ? 'bg-slate-800/20' : 'bg-slate-50'}`}>
+                    <Receipt className={`w-12 h-12 mx-auto ${theme === 'dark' ? 'text-slate-600' : 'text-slate-300'}`} />
+                    <h3 className={`mt-4 text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>No payments found</h3>
+                    <p className={`mt-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {searchQuery || methodFilter !== 'all' ? 'Try adjusting your filters' : 'No payments recorded for this supplier yet'}
+                    </p>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-4">
+                    <p className={`text-[10px] sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Showing <span className="font-medium">{startIndex + 1}</span> - <span className="font-medium">{Math.min(startIndex + itemsPerPage, filteredPayments.length)}</span> of <span className="font-medium">{filteredPayments.length}</span> payments
+                    </p>
+                    
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => setCurrentPage(1)} 
+                        disabled={currentPage === 1} 
+                        className={`p-1.5 sm:p-2 rounded-lg ${currentPage === 1 ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+                      >
+                        <ChevronsLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+                        disabled={currentPage === 1} 
+                        className={`p-1.5 sm:p-2 rounded-lg ${currentPage === 1 ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                      {/* Mobile: simple page indicator */}
+                      <span className={`sm:hidden px-2 text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {currentPage}/{totalPages}
+                      </span>
+                      {/* Desktop: page number buttons */}
+                      {getPageNumbers.map((page, idx) => (
+                        page === '...' ? (
+                          <span key={`dots-${idx}`} className={`hidden sm:inline px-2 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>...</span>
+                        ) : (
+                          <button 
+                            key={page} 
+                            onClick={() => setCurrentPage(page as number)} 
+                            className={`hidden sm:flex w-9 h-9 items-center justify-center rounded-lg text-sm font-medium ${currentPage === page ? 'bg-emerald-500 text-white' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-700'}`}
+                          >
+                            {page}
+                          </button>
+                        )
+                      ))}
+                      <button 
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
+                        disabled={currentPage === totalPages} 
+                        className={`p-1.5 sm:p-2 rounded-lg ${currentPage === totalPages ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+                      >
+                        <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setCurrentPage(totalPages)} 
+                        disabled={currentPage === totalPages} 
+                        className={`p-1.5 sm:p-2 rounded-lg ${currentPage === totalPages ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+                      >
+                        <ChevronsRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -609,50 +615,50 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
           {activeTab === 'grn' && (
             <>
               {/* GRN Summary Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <ClipboardList className="w-4 h-4 text-blue-500" />
-                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total GRNs</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                    <ClipboardList className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
+                    <span className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total GRNs</span>
                   </div>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{grnStats.totalGRNs}</p>
+                  <p className={`text-sm sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{grnStats.totalGRNs}</p>
                 </div>
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-500" />
-                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Value</span>
+                <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                    <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+                    <span className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Value</span>
                   </div>
-                  <p className="text-lg font-bold text-emerald-500">{formatCurrency(grnStats.totalValue)}</p>
+                  <p className="text-sm sm:text-lg font-bold text-emerald-500 truncate">{formatCurrency(grnStats.totalValue)}</p>
                 </div>
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Completed</span>
+                <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                    <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
+                    <span className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Completed</span>
                   </div>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{grnStats.completed}</p>
+                  <p className={`text-sm sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{grnStats.completed}</p>
                 </div>
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 text-amber-500" />
-                    <span className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Pending</span>
+                <div className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                    <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
+                    <span className={`text-[10px] sm:text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Pending</span>
                   </div>
-                  <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{grnStats.pending}</p>
+                  <p className={`text-sm sm:text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{grnStats.pending}</p>
                 </div>
               </div>
 
               {/* GRN Search and Filters */}
-              <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border flex-1 ${
+              <div className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <div className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border flex-1 ${
                     theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
                   }`}>
-                    <Search className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <Search className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
                     <input
                       type="text"
-                      placeholder="Search by GRN number or product..."
+                      placeholder="Search GRN or product..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className={`bg-transparent border-none outline-none flex-1 text-sm ${
+                      className={`bg-transparent border-none outline-none flex-1 text-xs sm:text-sm ${
                         theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
                       }`}
                     />
@@ -686,7 +692,7 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
                   <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>No GRNs found for this supplier</p>
                 </div>
               ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {paginatedGRNs.map((grn) => {
                   const statusConfig = getGrnStatusConfig(grn.status);
                   const StatusIcon = statusConfig.icon;
@@ -694,7 +700,7 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
                   return (
                     <div 
                       key={grn.id}
-                      className={`relative overflow-hidden rounded-2xl border p-5 transition-all hover:shadow-lg ${
+                      className={`relative overflow-hidden rounded-xl sm:rounded-2xl border p-3 sm:p-5 transition-all hover:shadow-lg ${
                         theme === 'dark' 
                           ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50 hover:border-slate-600' 
                           : 'bg-white border-slate-200 hover:border-slate-300'
@@ -784,9 +790,9 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
 
               {/* GRN Pagination */}
               {grnTotalPages > 1 && (
-                <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                <div className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-4">
+                    <p className={`text-[10px] sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                       Showing <span className="font-medium">{grnStartIndex + 1}</span> - <span className="font-medium">{Math.min(grnStartIndex + grnItemsPerPage, filteredGRNs.length)}</span> of <span className="font-medium">{filteredGRNs.length}</span> GRNs
                     </p>
                     
@@ -794,25 +800,30 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
                       <button 
                         onClick={() => setGrnCurrentPage(1)} 
                         disabled={grnCurrentPage === 1} 
-                        className={`p-2 rounded-lg ${grnCurrentPage === 1 ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+                        className={`p-1.5 sm:p-2 rounded-lg ${grnCurrentPage === 1 ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
                       >
-                        <ChevronsLeft className="w-4 h-4" />
+                        <ChevronsLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                       <button 
                         onClick={() => setGrnCurrentPage(p => Math.max(1, p - 1))} 
                         disabled={grnCurrentPage === 1} 
-                        className={`p-2 rounded-lg ${grnCurrentPage === 1 ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+                        className={`p-1.5 sm:p-2 rounded-lg ${grnCurrentPage === 1 ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
                       >
-                        <ChevronLeft className="w-4 h-4" />
+                        <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
+                      {/* Mobile: simple page indicator */}
+                      <span className={`sm:hidden px-2 text-xs font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {grnCurrentPage}/{grnTotalPages}
+                      </span>
+                      {/* Desktop: page number buttons */}
                       {getGrnPageNumbers.map((page, idx) => (
                         page === '...' ? (
-                          <span key={`grn-dots-${idx}`} className={`px-2 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>...</span>
+                          <span key={`grn-dots-${idx}`} className={`hidden sm:inline px-2 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>...</span>
                         ) : (
                           <button 
                             key={`grn-page-${page}`} 
                             onClick={() => setGrnCurrentPage(page as number)} 
-                            className={`w-9 h-9 rounded-lg text-sm font-medium ${grnCurrentPage === page ? 'bg-blue-500 text-white' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-700'}`}
+                            className={`hidden sm:flex w-9 h-9 items-center justify-center rounded-lg text-sm font-medium ${grnCurrentPage === page ? 'bg-blue-500 text-white' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-700'}`}
                           >
                             {page}
                           </button>
@@ -821,16 +832,16 @@ export const SupplierPaymentHistoryModal: React.FC<SupplierPaymentHistoryModalPr
                       <button 
                         onClick={() => setGrnCurrentPage(p => Math.min(grnTotalPages, p + 1))} 
                         disabled={grnCurrentPage === grnTotalPages} 
-                        className={`p-2 rounded-lg ${grnCurrentPage === grnTotalPages ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+                        className={`p-1.5 sm:p-2 rounded-lg ${grnCurrentPage === grnTotalPages ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
                       >
-                        <ChevronRight className="w-4 h-4" />
+                        <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                       <button 
                         onClick={() => setGrnCurrentPage(grnTotalPages)} 
                         disabled={grnCurrentPage === grnTotalPages} 
-                        className={`p-2 rounded-lg ${grnCurrentPage === grnTotalPages ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
+                        className={`p-1.5 sm:p-2 rounded-lg ${grnCurrentPage === grnTotalPages ? 'text-slate-400' : theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600'}`}
                       >
-                        <ChevronsRight className="w-4 h-4" />
+                        <ChevronsRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                     </div>
                   </div>

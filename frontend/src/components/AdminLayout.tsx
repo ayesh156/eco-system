@@ -1587,20 +1587,24 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
         {/* Viewing Shop Banner for SUPER_ADMIN */}
         {isViewingShop && viewingShop && (
-          <div className="sticky top-16 z-20 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2.5 shadow-lg">
-            <div className="flex items-center justify-between max-w-screen-2xl mx-auto">
-              <div className="flex items-center gap-3">
-                <Shield className="w-5 h-5" />
-                <span className="font-medium">
-                  Viewing as Super Admin: <span className="font-bold">{viewingShop.name}</span>
-                </span>
-                <span className="text-purple-200 text-sm">(@{viewingShop.slug})</span>
+          <div className="sticky top-16 z-20 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 sm:px-4 py-2 sm:py-2.5 shadow-lg">
+            <div className="flex items-center justify-between max-w-screen-2xl mx-auto gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-2 min-w-0">
+                  <span className="text-xs sm:text-sm font-medium truncate">
+                    <span className="hidden sm:inline">Viewing as Super Admin: </span>
+                    <span className="sm:hidden">Viewing as Super Admin: </span>
+                    <span className="font-bold">{viewingShop.name}</span>
+                  </span>
+                  <span className="text-purple-200 text-[10px] sm:text-sm truncate">(@{viewingShop.slug})</span>
+                </div>
               </div>
               <button
                 onClick={handleExitViewingShop}
-                className="flex items-center gap-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-all"
+                className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-1 sm:py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs sm:text-sm font-medium transition-all flex-shrink-0"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Exit View
               </button>
             </div>

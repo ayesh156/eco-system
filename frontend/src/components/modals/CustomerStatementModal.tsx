@@ -306,89 +306,74 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
   if (!isOpen || !customer) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
       
-      {/* Modal - Full scroll */}
-      <div className={`relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl ${
+      {/* Modal */}
+      <div className={`relative w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl shadow-2xl ${
         theme === 'dark' ? 'bg-slate-900' : 'bg-white'
       }`}>
-        {/* Header */}
-        <div className={`p-6 border-b ${theme === 'dark' ? 'border-slate-800' : 'border-slate-200'}`}>
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-white font-bold text-xl ${
-                totals.overdueCount > 0 
-                  ? 'bg-gradient-to-br from-red-500 to-rose-600' 
-                  : 'bg-gradient-to-br from-emerald-500 to-teal-600'
-              }`}>
-                {customer.name.charAt(0)}
-              </div>
-              <div>
-                <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                  {customer.name}
-                </h2>
-                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {customer.email} • {customer.phone}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className={`p-2 rounded-xl transition-colors ${
-                theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
-              }`}
-            >
-              <X className="w-5 h-5" />
-            </button>
+        {/* Creative Gradient Header */}
+        <div className={`relative overflow-hidden ${
+          totals.overdueCount > 0
+            ? 'bg-gradient-to-br from-red-600 via-rose-500 to-orange-500'
+            : 'bg-gradient-to-br from-emerald-600 via-teal-500 to-cyan-600'
+        }`}>
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
+            <div className="absolute -bottom-4 -left-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
           </div>
+          <div className="relative p-3 sm:p-5">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0">
+                  {customer.name.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-lg font-bold text-white truncate">
+                    {customer.name}
+                  </h2>
+                  <p className="text-[11px] sm:text-xs text-white/70 truncate">
+                    {customer.phone}{customer.email ? ` • ${customer.email}` : ''}
+                  </p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white transition-colors flex-shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-            <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Total Outstanding
-              </p>
-              <p className={`text-lg font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
-                {formatCurrency(totals.totalOutstanding)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Overdue Amount
-              </p>
-              <p className={`text-lg font-bold text-red-500`}>
-                {formatCurrency(totals.overdueAmount)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Unpaid Invoices
-              </p>
-              <p className={`text-lg font-bold ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
-                {totals.unpaidCount}
-              </p>
-            </div>
-            <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                Overdue Invoices
-              </p>
-              <p className={`text-lg font-bold text-red-500`}>
-                {totals.overdueCount}
-              </p>
+            {/* Summary Row */}
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+              <div className="bg-white/15 backdrop-blur rounded-lg p-1.5 sm:p-2.5 text-center">
+                <p className="text-[10px] sm:text-xs text-white/70">Outstanding</p>
+                <p className="text-xs sm:text-base font-bold text-white truncate">{formatCurrency(totals.totalOutstanding)}</p>
+              </div>
+              <div className="bg-white/15 backdrop-blur rounded-lg p-1.5 sm:p-2.5 text-center">
+                <p className="text-[10px] sm:text-xs text-white/70">Overdue</p>
+                <p className="text-xs sm:text-base font-bold text-white truncate">{formatCurrency(totals.overdueAmount)}</p>
+              </div>
+              <div className="bg-white/15 backdrop-blur rounded-lg p-1.5 sm:p-2.5 text-center">
+                <p className="text-[10px] sm:text-xs text-white/70">Unpaid</p>
+                <p className="text-xs sm:text-base font-bold text-white">{totals.unpaidCount}</p>
+              </div>
+              <div className="bg-white/15 backdrop-blur rounded-lg p-1.5 sm:p-2.5 text-center">
+                <p className="text-[10px] sm:text-xs text-white/70">Overdue</p>
+                <p className="text-xs sm:text-base font-bold text-white">{totals.overdueCount}</p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              <FileText className="w-5 h-5 inline mr-2" />
+        <div className="p-2.5 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <h3 className={`text-sm sm:text-lg font-semibold flex items-center gap-1.5 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
               Invoice Statement
             </h3>
             {selectedInvoices.size > 0 && (
@@ -447,18 +432,18 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
                   >
                     {/* Invoice Header */}
                     <div 
-                      className="p-4 cursor-pointer"
+                      className="p-2.5 sm:p-4 cursor-pointer"
                       onClick={() => setExpandedInvoice(isExpanded ? null : invoice.id)}
                     >
-                      <div className="flex items-center gap-3">
-                        {/* Checkbox for selection */}
+                      <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+                        {/* Checkbox */}
                         {invoice.status !== 'fullpaid' && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleInvoiceSelection(invoice.id);
                             }}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                            className={`w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 mt-0.5 sm:mt-0 ${
                               selectedInvoices.has(invoice.id)
                                 ? 'bg-emerald-500 border-emerald-500 text-white'
                                 : theme === 'dark'
@@ -466,73 +451,71 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
                                   : 'border-slate-300 hover:border-slate-400'
                             }`}
                           >
-                            {selectedInvoices.has(invoice.id) && <Check className="w-3 h-3" />}
+                            {selectedInvoices.has(invoice.id) && <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
                           </button>
                         )}
 
-                        <div className="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-4 items-center">
-                          {/* Invoice Number */}
-                          <div>
-                            <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                              #{invoice.id}
-                            </p>
-                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                              {new Date(invoice.date).toLocaleDateString('en-GB', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric'
-                              })}
-                            </p>
-                          </div>
-
-                          {/* Status */}
-                          <div>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(invoice.status, invoice.dueDate)}`}>
-                              {getStatusIcon(invoice.status, invoice.dueDate)}
-                              {getStatusLabel(invoice.status, invoice.dueDate)}
-                            </span>
-                            {isOverdue && (
-                              <p className="text-xs text-red-500 mt-1">
-                                {daysOverdue} days overdue
+                        <div className="flex-1 min-w-0">
+                          {/* Mobile: Stacked layout */}
+                          <div className="sm:hidden">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>#{invoice.id}</p>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full border flex-shrink-0 ${getStatusStyle(invoice.status, invoice.dueDate)}`}>
+                                {getStatusIcon(invoice.status, invoice.dueDate)}
+                                {getStatusLabel(invoice.status, invoice.dueDate)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className={`text-[11px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {new Date(invoice.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                {isOverdue && <span className="text-red-500 ml-1">• {daysOverdue}d overdue</span>}
                               </p>
-                            )}
+                              <p className={`text-sm font-bold ${outstanding > 0 ? 'text-red-500' : theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                                {formatCurrency(outstanding)}
+                              </p>
+                            </div>
                           </div>
 
-                          {/* Total */}
-                          <div className="hidden sm:block">
-                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Total</p>
-                            <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                              {formatCurrency(invoice.total)}
-                            </p>
-                          </div>
-
-                          {/* Paid */}
-                          <div className="hidden sm:block">
-                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Paid</p>
-                            <p className={`font-medium ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                              {formatCurrency(invoice.paidAmount || 0)}
-                            </p>
-                          </div>
-
-                          {/* Outstanding */}
-                          <div>
-                            <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Balance</p>
-                            <p className={`font-bold ${outstanding > 0 ? 'text-red-500' : theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                              {formatCurrency(outstanding)}
-                            </p>
+                          {/* Desktop: Grid layout */}
+                          <div className="hidden sm:grid sm:grid-cols-5 gap-4 items-center">
+                            <div>
+                              <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>#{invoice.id}</p>
+                              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {new Date(invoice.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </p>
+                            </div>
+                            <div>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${getStatusStyle(invoice.status, invoice.dueDate)}`}>
+                                {getStatusIcon(invoice.status, invoice.dueDate)}
+                                {getStatusLabel(invoice.status, invoice.dueDate)}
+                              </span>
+                              {isOverdue && <p className="text-xs text-red-500 mt-1">{daysOverdue} days overdue</p>}
+                            </div>
+                            <div>
+                              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Total</p>
+                              <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(invoice.total)}</p>
+                            </div>
+                            <div>
+                              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Paid</p>
+                              <p className={`font-medium ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>{formatCurrency(invoice.paidAmount || 0)}</p>
+                            </div>
+                            <div>
+                              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Balance</p>
+                              <p className={`font-bold ${outstanding > 0 ? 'text-red-500' : theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>{formatCurrency(outstanding)}</p>
+                            </div>
                           </div>
                         </div>
 
                         {/* Expand Icon */}
-                        <div className={`${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        <div className={`flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {isExpanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />}
                         </div>
                       </div>
                     </div>
 
                     {/* Expanded Content */}
                     {isExpanded && (
-                      <div className={`px-4 pb-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                      <div className={`px-2.5 pb-2.5 sm:px-4 sm:pb-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
                         {/* Invoice Items */}
                         <div className="mt-4">
                           <p className={`text-xs font-medium mb-2 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -586,7 +569,7 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
                                   .map((payment) => (
                                     <div 
                                       key={payment.id}
-                                      className={`flex items-center justify-between p-3 rounded-lg ${
+                                      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0 p-2 sm:p-3 rounded-lg ${
                                         payment.source === 'bulk'
                                           ? theme === 'dark' 
                                             ? 'bg-blue-500/10 border border-blue-500/20' 
@@ -626,7 +609,7 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
                                           </p>
                                         </div>
                                       </div>
-                                      <div className="flex items-center justify-end gap-2">
+                                      <div className="flex items-center gap-2 flex-wrap">
                                         {/* Source badge */}
                                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
                                           payment.source === 'bulk'
@@ -694,44 +677,40 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
 
                             <div className="flex flex-col gap-3">
                               {/* Payment Amount Input Row */}
-                              <div className="flex items-center gap-2">
-                                <div className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                              <div className="space-y-2">
+                                <div className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-lg border ${
                                   theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
                                 }`}>
-                                  <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Rs.</span>
+                                  <span className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Rs.</span>
                                   <input
                                     type="number"
-                                    placeholder={`Enter amount (Max: ${outstanding.toLocaleString()})`}
+                                    placeholder={`Max: ${outstanding.toLocaleString()}`}
                                     value={paymentAmounts[invoice.id] || ''}
                                     onChange={(e) => setPaymentAmounts(prev => ({ 
                                       ...prev, 
                                       [invoice.id]: e.target.value 
                                     }))}
                                     max={outstanding}
-                                    className={`flex-1 bg-transparent outline-none text-sm ${
-                                      theme === 'dark' ? 'text-white' : 'text-slate-900'
+                                    className={`flex-1 bg-transparent outline-none text-sm min-w-0 ${
+                                      theme === 'dark' ? 'text-white placeholder:text-slate-600' : 'text-slate-900 placeholder:text-slate-400'
                                     }`}
                                   />
                                 </div>
-                                {/* Quick amount buttons */}
-                                <button
-                                  onClick={() => setPaymentAmounts(prev => ({ ...prev, [invoice.id]: String(Math.floor(outstanding / 2)) }))}
-                                  className={`px-2 py-2 rounded-lg text-xs font-medium ${
-                                    theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                  }`}
-                                  title="Half amount"
-                                >
-                                  50%
-                                </button>
-                                <button
-                                  onClick={() => setPaymentAmounts(prev => ({ ...prev, [invoice.id]: String(outstanding) }))}
-                                  className={`px-2 py-2 rounded-lg text-xs font-medium ${
-                                    theme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                  }`}
-                                  title="Full amount"
-                                >
-                                  100%
-                                </button>
+                                <div className="flex gap-1.5">
+                                  {[25, 50, 75, 100].map(pct => (
+                                    <button
+                                      key={pct}
+                                      onClick={() => setPaymentAmounts(prev => ({ ...prev, [invoice.id]: String(Math.floor(outstanding * pct / 100)) }))}
+                                      className={`flex-1 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
+                                        paymentAmounts[invoice.id] === String(Math.floor(outstanding * pct / 100))
+                                          ? 'bg-emerald-500 text-white shadow-sm'
+                                          : theme === 'dark' ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                      }`}
+                                    >
+                                      {pct}%
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
 
                               {/* Notes Input */}
@@ -801,21 +780,21 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => onSendReminder(invoice, 'friendly')}
-                                  className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-lg transition-colors ${
+                                  className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 p-2 rounded-lg transition-colors ${
                                     theme === 'dark' ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-green-50 text-green-600 hover:bg-green-100'
                                   }`}
                                 >
-                                  <MessageCircle className="w-4 h-4" />
-                                  <span className="text-sm">Friendly Reminder</span>
+                                  <MessageCircle className="w-4 h-4 flex-shrink-0" />
+                                  <span className="text-xs sm:text-sm">Friendly</span>
                                 </button>
                                 <button
                                   onClick={() => onSendReminder(invoice, 'urgent')}
-                                  className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-lg transition-colors ${
+                                  className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 p-2 rounded-lg transition-colors ${
                                     theme === 'dark' ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-50 text-red-600 hover:bg-red-100'
                                   }`}
                                 >
-                                  <Zap className="w-4 h-4" />
-                                  <span className="text-sm">Urgent Reminder</span>
+                                  <Zap className="w-4 h-4 flex-shrink-0" />
+                                  <span className="text-xs sm:text-sm">Urgent</span>
                                 </button>
                               </div>
                             </div>
@@ -831,12 +810,12 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
 
           {/* Pagination */}
           {!isLoading && customerInvoices.length > itemsPerPage && (
-            <div className={`flex items-center justify-between mt-6 pt-4 border-t ${
+            <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-4 border-t ${
               theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
             }`}>
               {/* Page Info */}
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, customerInvoices.length)} of {customerInvoices.length}
+              <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, customerInvoices.length)} of {customerInvoices.length}
               </p>
 
               {/* Pagination Controls */}
@@ -924,14 +903,14 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className={`p-4 border-t ${theme === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+        <div className={`sticky bottom-0 p-2.5 sm:p-4 border-t ${theme === 'dark' ? 'border-slate-800 bg-slate-900/95' : 'border-slate-200 bg-white/95'} backdrop-blur-sm`}>
           <div className="flex items-center justify-between">
-            <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            <p className={`text-[11px] sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
               {customerInvoices.length} invoice(s) • {totals.unpaidCount} pending
             </p>
             <button
               onClick={onClose}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
                 theme === 'dark' 
                   ? 'bg-slate-800 hover:bg-slate-700 text-white' 
                   : 'bg-slate-200 hover:bg-slate-300 text-slate-700'

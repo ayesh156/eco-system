@@ -102,7 +102,7 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
   if (outstandingBalance <= 0) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className={`max-w-lg p-0 overflow-hidden ${
+        <DialogContent className={`w-[95vw] max-w-lg p-0 overflow-hidden rounded-2xl ${
           theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
         }`}>
           <DialogHeader className="sr-only">
@@ -134,7 +134,7 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`max-w-lg p-0 overflow-hidden ${
+      <DialogContent className={`w-[95vw] max-w-lg p-0 overflow-hidden rounded-2xl ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
         <DialogHeader className="sr-only">
@@ -158,54 +158,58 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
         ) : (
           <>
             {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 p-6 text-white">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center font-bold text-xl">
+            <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 p-3 sm:p-5 text-white">
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
+                <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />
+              </div>
+              <div className="relative flex items-center gap-2.5 sm:gap-4">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-white/20 backdrop-blur rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-sm sm:text-xl">
                   {customer.name.charAt(0)}
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold">Record Credit Payment</h2>
-                  <p className="text-sm text-emerald-100">{customer.name}</p>
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-lg font-bold">Record Credit Payment</h2>
+                  <p className="text-xs sm:text-sm text-emerald-100 truncate">{customer.name}</p>
                 </div>
               </div>
             </div>
 
             {/* Outstanding Balance Display */}
-            <div className={`mx-6 mt-6 p-4 rounded-xl ${
+            <div className={`mx-3 sm:mx-5 mt-3 sm:mt-5 p-3 rounded-xl ${
               theme === 'dark' ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-100'
             }`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm font-medium ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
+                  <p className={`text-[11px] sm:text-sm font-medium ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
                     Outstanding Balance
                   </p>
-                  <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
+                  <p className={`text-lg sm:text-2xl font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>
                     {formatCurrency(outstandingBalance)}
                   </p>
                 </div>
-                <Receipt className={`w-10 h-10 ${theme === 'dark' ? 'text-red-500/30' : 'text-red-200'}`} />
+                <Receipt className={`w-7 h-7 sm:w-10 sm:h-10 ${theme === 'dark' ? 'text-red-500/30' : 'text-red-200'}`} />
               </div>
             </div>
 
             {/* Error Alert */}
             {error && (
-              <div className="mx-6 mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
+              <div className="mx-4 sm:mx-6 mt-4 p-3 sm:p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <p className="text-red-500 text-sm">{error}</p>
               </div>
             )}
 
             {/* Form */}
-            <div className="p-6 space-y-5">
+            <div className="p-3 sm:p-5 space-y-3.5 sm:space-y-5">
               {/* Payment Amount */}
-              <div className="space-y-2">
-                <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+              <div className="space-y-1.5">
+                <label className={`block text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                   Payment Amount
                 </label>
-                <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${
+                <div className={`flex items-center gap-2 px-3 py-2.5 sm:py-3 rounded-xl border ${
                   theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
                 } ${!isValidAmount && amount ? 'border-red-500' : ''}`}>
-                  <span className={`font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Rs.</span>
+                  <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Rs.</span>
                   <input
                     type="number"
                     value={amount}
@@ -213,21 +217,21 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
                     placeholder="0"
                     max={outstandingBalance}
                     disabled={isSubmitting}
-                    className={`flex-1 bg-transparent outline-none text-xl font-semibold ${
+                    className={`flex-1 bg-transparent outline-none text-lg sm:text-xl font-semibold min-w-0 ${
                       theme === 'dark' ? 'text-white placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-300'
                     }`}
                   />
                 </div>
                 
                 {/* Quick Amount Buttons */}
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   {[25, 50, 75, 100].map((percent) => (
                     <button
                       key={percent}
                       type="button"
                       onClick={() => setQuickAmount(percent)}
                       disabled={isSubmitting}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      className={`flex-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-sm font-medium transition-all ${
                         parsedAmount === Math.floor(outstandingBalance * (percent / 100))
                           ? 'bg-emerald-500 text-white'
                           : theme === 'dark'
@@ -242,18 +246,18 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
               </div>
 
               {/* Payment Method */}
-              <div className="space-y-2">
-                <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+              <div className="space-y-1.5">
+                <label className={`block text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                   Payment Method
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                   {paymentMethodOptions.map((option) => (
                     <button
                       key={option.value}
                       type="button"
                       onClick={() => setPaymentMethod(option.value)}
                       disabled={isSubmitting}
-                      className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all ${
+                      className={`flex items-center gap-1.5 px-2.5 py-2 sm:px-4 sm:py-3 rounded-xl border transition-all ${
                         paymentMethod === option.value
                           ? `bg-${option.color}-500/10 border-${option.color}-500/50 text-${option.color}-500`
                           : theme === 'dark'
@@ -262,7 +266,7 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
                       } ${paymentMethod === option.value && 'ring-2 ring-emerald-500/20'}`}
                     >
                       {option.icon}
-                      <span className="font-medium">{option.label}</span>
+                      <span className="font-medium text-xs sm:text-sm">{option.label}</span>
                       {paymentMethod === option.value && (
                         <Check className="w-4 h-4 ml-auto" />
                       )}
@@ -272,8 +276,8 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
               </div>
 
               {/* Notes */}
-              <div className="space-y-2">
-                <label className={`block text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+              <div className="space-y-1.5">
+                <label className={`block text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                   Payment Notes (Optional)
                 </label>
                 <input
@@ -282,7 +286,7 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="e.g., Cash received by Kasun"
                   disabled={isSubmitting}
-                  className={`w-full px-4 py-3 rounded-xl border ${
+                  className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border text-sm ${
                     theme === 'dark'
                       ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500'
                       : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400'
@@ -292,10 +296,10 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
 
               {/* Balance Preview */}
               {isValidAmount && (
-                <div className={`p-4 rounded-xl ${
+                <div className={`p-3 sm:p-4 rounded-xl ${
                   theme === 'dark' ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-slate-50 border border-slate-200'
                 }`}>
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
                     <div>
                       <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Current Balance</p>
                       <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
@@ -319,14 +323,14 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
             </div>
 
             {/* Footer */}
-            <div className={`flex items-center justify-between gap-3 p-6 border-t ${
+            <div className={`flex items-center justify-between gap-2 sm:gap-3 p-3 sm:p-5 border-t ${
               theme === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-slate-50'
             }`}>
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className={`px-4 py-2.5 rounded-xl font-medium transition-colors ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors ${
                   theme === 'dark'
                     ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
@@ -338,7 +342,7 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
                 type="button"
                 onClick={handleSubmit}
                 disabled={!isValidAmount || isSubmitting}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all ${
+                className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl font-medium transition-all ${
                   isValidAmount && !isSubmitting
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25'
                     : theme === 'dark'
