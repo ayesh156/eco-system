@@ -21,13 +21,13 @@ interface PrintableGRNProps {
 export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
   ({ grn, supplier, branding }, ref) => {
     // Use branding values with fallbacks
-    const shopName = branding?.name || 'ECOTEC COMPUTER';
+    const shopName = branding?.name || 'ECO SYSTEM COMPUTER';
     const shopSubName = branding?.subName || 'SOLUTIONS';
     const hasCustomLogo = branding?.logo && branding.logo !== logo;
     const shopLogo = branding?.logo || logo;
     const shopAddress = branding?.address || 'No.14, Mulatiyana junction, Mulatiyana, Matara.';
     const shopPhone = branding?.phone || '0711453111';
-    const shopEmail = branding?.email || 'ecoteccomputersolutions@gmail.com';
+    const shopEmail = branding?.email || 'ecosystemcomputersolutions@gmail.com';
 
     const formatCurrency = (amount: number) => {
       return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
@@ -56,7 +56,7 @@ export const PrintableGRN = forwardRef<HTMLDivElement, PrintableGRNProps>(
       <div ref={ref} className="print-grn">
         <style>{`
           /* ═══════════════════════════════════════════════════════════════
-             INK-EFFICIENT B&W PRINT OPTIMIZED - ECOTEC GRN
+             INK-EFFICIENT B&W PRINT OPTIMIZED - ECO SYSTEM GRN
              Designed for black laser/inkjet printers to minimize ink usage
              ═══════════════════════════════════════════════════════════════ */
           

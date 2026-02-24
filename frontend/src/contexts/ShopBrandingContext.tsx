@@ -9,13 +9,15 @@ import { useAuth } from './AuthContext';
 export interface ShopBranding {
   id: string;
   name: string;
-  subName?: string; // e.g., "SOLUTIONS" under "ECOTEC COMPUTER"
+  subName?: string; // e.g., "SOLUTIONS" under "ECO SYSTEM COMPUTER"
   logo?: string; // URL or base64 data
   address?: string;
   phone?: string;
   email?: string;
   website?: string;
   tagline?: string; // e.g., "Computer Solutions"
+  themeMode?: string; // 'dark' | 'light'
+  accentColor?: string; // 'emerald' | 'blue' | 'purple' | 'rose' | 'amber' | 'indigo'
 }
 
 interface ShopBrandingContextType {
@@ -36,14 +38,16 @@ interface ShopBrandingProviderProps {
 // Default branding values
 const DEFAULT_BRANDING: ShopBranding = {
   id: '',
-  name: 'ECOTEC COMPUTER',
+  name: 'ECO SYSTEM COMPUTER',
   subName: 'SOLUTIONS',
   logo: undefined,
   address: 'No.14, Mulatiyana junction, Mulatiyana, Matara.',
   phone: '0711453111',
-  email: 'ecoteccomputersolutions@gmail.com',
+  email: 'ecosystemcomputersolutions@gmail.com',
   website: '',
   tagline: 'Computer Solutions',
+  themeMode: 'dark',
+  accentColor: 'emerald',
 };
 
 // ===================================
@@ -83,6 +87,8 @@ async function fetchShopBranding(shopId: string, token: string): Promise<ShopBra
     email: shop.email || DEFAULT_BRANDING.email,
     website: shop.website || '',
     tagline: shop.tagline || DEFAULT_BRANDING.tagline,
+    themeMode: shop.themeMode || 'dark',
+    accentColor: shop.accentColor || 'emerald',
   };
 }
 
@@ -106,6 +112,8 @@ async function updateShopBranding(
       phone: branding.phone,
       email: branding.email,
       website: branding.website,
+      themeMode: branding.themeMode,
+      accentColor: branding.accentColor,
     }),
   });
 
@@ -127,6 +135,8 @@ async function updateShopBranding(
     email: shop.email || DEFAULT_BRANDING.email,
     website: shop.website || '',
     tagline: shop.tagline || DEFAULT_BRANDING.tagline,
+    themeMode: shop.themeMode || 'dark',
+    accentColor: shop.accentColor || 'emerald',
   };
 }
 

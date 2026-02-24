@@ -158,7 +158,7 @@ export const CustomerBulkPaymentModal: React.FC<CustomerBulkPaymentModalProps> =
         ) : (
           <>
             {/* Header */}
-            <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 p-3 sm:p-5 text-white">
+            <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-teal-500 p-3 sm:p-5 text-white">
               <div className="absolute inset-0 overflow-hidden">
                 <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
                 <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/10 rounded-full blur-xl" />

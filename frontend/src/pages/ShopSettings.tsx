@@ -266,7 +266,7 @@ export const ShopSettings: React.FC = () => {
           <button
             onClick={handleSave}
             disabled={isSaving || isSavingBranding || !hasUnsavedChanges}
-            className={`flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {isSaving || isSavingBranding ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -317,7 +317,7 @@ export const ShopSettings: React.FC = () => {
                 : 'bg-white border-slate-200 shadow-sm'
             }`}
           >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-blue-500/10 rounded-full blur-3xl" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 rounded-full blur-3xl" />
             <div className="relative">
               <div className="flex items-center gap-3 mb-6">
                 <div

@@ -176,7 +176,7 @@ const SectionVisibilityTab: React.FC<SectionVisibilityTabProps> = ({
             <button
               onClick={handleSave}
               disabled={isSaving || !hasChanges}
-              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <>
@@ -656,7 +656,7 @@ export const ShopAdminPanel: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium hover:shadow-emerald-500/25 disabled:opacity-50"
+                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:shadow-emerald-500/25 disabled:opacity-50"
               >
                 {isSaving ? 'Creating...' : 'Create User'}
               </button>
@@ -847,7 +847,7 @@ export const ShopAdminPanel: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium hover:shadow-emerald-500/25 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:shadow-emerald-500/25 disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? 'Saving...' : 'Save Changes'}
@@ -1153,7 +1153,7 @@ export const ShopAdminPanel: React.FC = () => {
           </p>
           <button
             onClick={fetchData}
-            className="mt-4 px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl"
+            className="mt-4 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl"
           >
             Try Again
           </button>
@@ -1197,7 +1197,7 @@ export const ShopAdminPanel: React.FC = () => {
             </button>
             <button
               onClick={() => setIsCreateUserModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
             >
               <UserPlus className="w-5 h-5" />
               Add User

@@ -170,12 +170,12 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
   const newPaymentPercentage = totalAmount > 0 ? ((paidAmount + paymentAmount) / totalAmount) * 100 : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className={`relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${
+      <div className={`relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] flex flex-col rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${
         theme === 'dark' ? 'bg-slate-900' : 'bg-white'
       }`}>
         {/* Success Overlay */}
@@ -191,34 +191,34 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
 
         {/* Header */}
         <div className="relative overflow-hidden flex-shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600" />
-          <div className="relative px-6 py-5">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-600" />
+          <div className="relative px-4 sm:px-6 py-4 sm:py-5">
             <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Record Payment</h2>
-                <p className="text-white/80 text-sm mt-1">{grn.grnNumber} • {grn.supplierName}</p>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-xl font-bold text-white">Record Payment</h2>
+                <p className="text-white/80 text-xs sm:text-sm mt-0.5 sm:mt-1 truncate">{grn.grnNumber} • {grn.supplierName}</p>
               </div>
               <button
                 onClick={onClose}
-                className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/30 transition-colors flex-shrink-0"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
 
             {/* Payment Progress */}
-            <div className="mt-4 p-4 rounded-xl bg-white/10 backdrop-blur">
+            <div className="mt-3 sm:mt-4 p-3 sm:p-4 rounded-xl bg-white/10 backdrop-blur">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-white/80 text-sm">Payment Progress</span>
-                <span className="text-white font-bold">{paymentPercentage.toFixed(0)}%</span>
+                <span className="text-white/80 text-xs sm:text-sm">Payment Progress</span>
+                <span className="text-white font-bold text-sm sm:text-base">{paymentPercentage.toFixed(0)}%</span>
               </div>
-              <div className="h-3 rounded-full overflow-hidden bg-white/20">
+              <div className="h-2.5 sm:h-3 rounded-full overflow-hidden bg-white/20">
                 <div 
                   className="h-full rounded-full bg-white transition-all duration-500"
                   style={{ width: `${paymentPercentage}%` }}
                 />
               </div>
-              <div className="flex justify-between items-center mt-2 text-sm">
+              <div className="flex justify-between items-center mt-2 text-xs sm:text-sm">
                 <span className="text-white/70">Paid: {formatCurrency(paidAmount)}</span>
                 <span className="text-white font-semibold">Remaining: {formatCurrency(remainingAmount)}</span>
               </div>
@@ -266,7 +266,7 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto">
           {activeTab === 'payment' ? (
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
               {/* Amount Input */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -315,12 +315,12 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
                 <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                   Payment Method
                 </label>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 sm:gap-2">
                   {paymentMethods.map(({ id, label, icon: Icon, color, bgColor }) => (
                     <button
                       key={id}
                       onClick={() => setPaymentMethod(id)}
-                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${
+                      className={`flex flex-col items-center gap-0.5 sm:gap-1 p-2 sm:p-3 rounded-xl border transition-all ${
                         paymentMethod === id
                           ? `${bgColor} border-current ${color}`
                           : theme === 'dark'
@@ -328,8 +328,8 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
                             : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}
                     >
-                      <Icon className="w-5 h-5" />
-                      <span className="text-xs font-medium">{label}</span>
+                      <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="text-[10px] sm:text-xs font-medium">{label}</span>
                     </button>
                   ))}
                 </div>
@@ -401,7 +401,7 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
             </div>
           ) : (
             /* Payment History Tab */
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {isLoadingHistory ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className={`w-8 h-8 animate-spin ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} />
@@ -476,11 +476,11 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className={`px-6 py-4 border-t flex gap-3 flex-shrink-0 ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+        <div className={`px-4 sm:px-6 py-3 sm:py-4 border-t flex gap-2 sm:gap-3 flex-shrink-0 ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
           <button
             onClick={onClose}
             disabled={isProcessing || externalProcessing}
-            className={`flex-1 py-3 rounded-xl font-medium transition-colors ${
+            className={`flex-1 py-2.5 sm:py-3 rounded-xl text-sm font-medium transition-colors ${
               theme === 'dark'
                 ? 'bg-slate-700 text-white hover:bg-slate-600'
                 : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
@@ -491,7 +491,7 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
           <button
             onClick={handlePayment}
             disabled={paymentAmount <= 0 || paymentAmount > remainingAmount || isProcessing || externalProcessing || remainingAmount <= 0}
-            className={`flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2.5 sm:py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-1.5 sm:gap-2 ${
               paymentAmount <= 0 || paymentAmount > remainingAmount || isProcessing || remainingAmount <= 0
                 ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                 : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25'
@@ -499,17 +499,17 @@ export const GRNPaymentModal: React.FC<GRNPaymentModalProps> = ({
           >
             {isProcessing || externalProcessing ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                 Processing...
               </>
             ) : remainingAmount <= 0 ? (
               <>
-                <CheckCircle className="w-5 h-5" />
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                 Fully Paid
               </>
             ) : (
               <>
-                <TrendingUp className="w-5 h-5" />
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
                 Record Payment
               </>
             )}

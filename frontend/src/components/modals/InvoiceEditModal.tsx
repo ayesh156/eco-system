@@ -621,7 +621,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
         </DialogHeader>
         
         {/* Gradient Header */}
-        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-4 sm:p-6 text-white">
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-600 p-4 sm:p-6 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
               <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center flex-shrink-0">

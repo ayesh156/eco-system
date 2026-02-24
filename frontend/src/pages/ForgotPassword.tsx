@@ -294,7 +294,7 @@ export const ForgotPassword: React.FC = () => {
             <div
               className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
                 isCompleted
-                  ? 'bg-gradient-to-r from-emerald-500 to-blue-500 text-white'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
                   : isActive
                   ? `border-2 ${theme === 'dark' ? 'border-emerald-400 text-emerald-400' : 'border-emerald-500 text-emerald-600'}`
                   : theme === 'dark'
@@ -308,7 +308,7 @@ export const ForgotPassword: React.FC = () => {
               <div
                 className={`w-12 sm:w-16 h-1 rounded-full transition-all ${
                   index < currentIndex || step === 'success'
-                    ? 'bg-gradient-to-r from-emerald-500 to-blue-500'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
                     : theme === 'dark'
                     ? 'bg-slate-700'
                     : 'bg-slate-200'
@@ -335,7 +335,7 @@ export const ForgotPassword: React.FC = () => {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-emerald-500/5 to-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-emerald-500/5 to-teal-500/5 rounded-full blur-3xl" />
       </div>
 
       <div className={`relative w-full max-w-md p-8 rounded-2xl border shadow-2xl ${
@@ -357,7 +357,7 @@ export const ForgotPassword: React.FC = () => {
 
         {/* Logo & Header */}
         <div className="text-center mb-6">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
             {step === 'success' ? (
               <CheckCircle className="w-8 h-8 text-white" />
             ) : step === 'password' ? (
@@ -429,7 +429,7 @@ export const ForgotPassword: React.FC = () => {
               className={`w-full py-3 px-4 rounded-xl font-medium text-white transition-all flex items-center justify-center gap-2 ${
                 isLoading
                   ? 'bg-slate-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-emerald-500 to-blue-500 hover:shadow-lg hover:shadow-emerald-500/25'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:shadow-lg hover:shadow-emerald-500/25'
               }`}
             >
               {isLoading ? (
@@ -486,7 +486,7 @@ export const ForgotPassword: React.FC = () => {
               className={`w-full py-3 px-4 rounded-xl font-medium text-white transition-all flex items-center justify-center gap-2 ${
                 isLoading || formData.otp.some(d => !d)
                   ? 'bg-slate-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-emerald-500 to-blue-500 hover:shadow-lg hover:shadow-emerald-500/25'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:shadow-lg hover:shadow-emerald-500/25'
               }`}
             >
               {isLoading ? (
@@ -608,7 +608,7 @@ export const ForgotPassword: React.FC = () => {
               className={`w-full py-3 px-4 rounded-xl font-medium text-white transition-all flex items-center justify-center gap-2 ${
                 isLoading
                   ? 'bg-slate-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-emerald-500 to-blue-500 hover:shadow-lg hover:shadow-emerald-500/25'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:shadow-lg hover:shadow-emerald-500/25'
               }`}
             >
               {isLoading ? (
@@ -633,8 +633,8 @@ export const ForgotPassword: React.FC = () => {
           <div className="text-center space-y-6">
             {/* Success Animation */}
             <div className="relative mx-auto w-24 h-24">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full animate-ping opacity-20" />
-              <div className="relative w-24 h-24 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full animate-ping opacity-20" />
+              <div className="relative w-24 h-24 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
                 <CheckCircle className="w-12 h-12 text-white" />
               </div>
             </div>
@@ -647,7 +647,7 @@ export const ForgotPassword: React.FC = () => {
 
             <button
               onClick={() => navigate('/login', { state: { message: 'Password reset successful. Please sign in.' } })}
-              className="w-full py-3 px-4 rounded-xl font-medium text-white bg-gradient-to-r from-emerald-500 to-blue-500 hover:shadow-lg hover:shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-xl font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:shadow-lg hover:shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
             >
               Continue to Sign In
               <ArrowLeft className="w-5 h-5 rotate-180" />

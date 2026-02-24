@@ -474,7 +474,7 @@ export const AccountFormModal: React.FC<AccountFormModalProps> = ({
           </button>
           <button
             onClick={handleSubmit}
-            className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+            className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
           >
             {isEditing ? 'Update Account' : 'Create Account'}
           </button>

@@ -67,6 +67,20 @@ self.addEventListener('fetch', (event) => {
   // Skip chrome-extension and other non-http(s) requests
   if (!url.protocol.startsWith('http')) return;
 
+  // Skip Vite dev-server requests so HMR and source-file serving work
+  // correctly. In dev mode Vite serves raw source files (tsx/ts/jsx)
+  // from paths like /src/, /@vite/, /@fs/, /node_modules/.vite/ etc.
+  if (
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/@vite/') ||
+    url.pathname.startsWith('/@fs/') ||
+    url.pathname.startsWith('/@id/') ||
+    url.pathname.startsWith('/@react-refresh') ||
+    url.pathname.startsWith('/node_modules/.vite/')
+  ) {
+    return; // Let the browser handle it normally
+  }
+
   // Strategy 1: Font files - Cache First (fonts rarely change)
   if (FONT_DOMAINS.some(domain => url.hostname.includes(domain))) {
     event.respondWith(cacheFirst(request, FONT_CACHE, 30 * 24 * 60 * 60 * 1000)); // 30 days

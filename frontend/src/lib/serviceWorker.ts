@@ -11,6 +11,25 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
     return null;
   }
 
+  // Don't register in development — the SW caches Vite source files and
+  // breaks HMR / WebSocket connections.
+  if (import.meta.env.DEV) {
+    console.log('[SW] Skipping registration in development mode');
+    // Unregister any previously registered SW so stale cached files
+    // don't keep being served from the cache.
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const r of registrations) {
+      await r.unregister();
+    }
+    // Also clear caches left over from a previous production SW
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map((name) => caches.delete(name)));
+    if (registrations.length || cacheNames.length) {
+      console.log('[SW] Cleaned up previous SW registrations & caches');
+    }
+    return null;
+  }
+
   try {
     const registration = await navigator.serviceWorker.register(SW_URL, {
       scope: '/',

@@ -20,7 +20,7 @@ export const Help: React.FC = () => {
           Help Center
         </h1>
         <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-          Get help and support for ECOTEC system
+          Get help and support for Eco System system
         </p>
       </div>
 
@@ -76,7 +76,7 @@ export const Help: React.FC = () => {
             Email Support
           </h3>
           <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            support@ecotec.lk
+            support@ecosystem.lk
           </p>
         </div>
       </div>

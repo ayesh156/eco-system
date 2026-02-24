@@ -118,7 +118,7 @@ export const WarrantyClaimViewModal: React.FC<WarrantyClaimViewModalProps> = ({ 
         <div
           className={`relative p-6 pr-16 text-white bg-gradient-to-br ${
             claim.status === 'approved' || claim.status === 'replaced' || claim.status === 'repaired'
-              ? 'from-emerald-600 via-teal-600 to-cyan-600'
+              ? 'from-emerald-600 via-teal-600 to-teal-600'
               : claim.status === 'rejected'
               ? 'from-red-600 via-rose-600 to-pink-600'
               : claim.status === 'under-review'

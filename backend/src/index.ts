@@ -195,7 +195,7 @@ app.get('/', async (_req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ECOTEC API - Online</title>
+  <title>Eco System API - Online</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -419,7 +419,7 @@ app.get('/', async (_req, res) => {
       <span class="logo">🚀</span>
     </div>
     
-    <h1>ECOTEC API</h1>
+    <h1>Eco System API</h1>
     <p class="subtitle">Enterprise Shop Management System</p>
     
     <div class="status-card">

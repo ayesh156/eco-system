@@ -321,7 +321,7 @@ export const CustomerStatementModal: React.FC<CustomerStatementModalProps> = ({
         <div className={`relative overflow-hidden ${
           totals.overdueCount > 0
             ? 'bg-gradient-to-br from-red-600 via-rose-500 to-orange-500'
-            : 'bg-gradient-to-br from-emerald-600 via-teal-500 to-cyan-600'
+            : 'bg-gradient-to-br from-emerald-600 via-teal-500 to-teal-600'
         }`}>
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />

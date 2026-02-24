@@ -1785,8 +1785,8 @@ export const Invoices: React.FC = () => {
                           /* Full Paid - Thank You Design */
                           <div className={`flex flex-col items-center justify-center gap-2 py-4 rounded-xl ${
                             theme === 'dark' 
-                              ? 'bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-cyan-500/10 border border-emerald-500/20' 
-                              : 'bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-200'
+                              ? 'bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-teal-500/10 border border-emerald-500/20' 
+                              : 'bg-gradient-to-br from-emerald-50 via-teal-50 to-teal-50 border border-emerald-200'
                           }`}>
                             <div className="flex items-center gap-2">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${

@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useWhatsAppSettings } from '../contexts/WhatsAppSettingsContext';
 import { useShopBranding } from '../contexts/ShopBrandingContext';
 import type { GoodsReceivedNote, GRNStatus } from '../data/mockData';
 import { GRNFormModal } from '../components/modals/GRNFormModal';
+import { GRNWizardModal } from '../components/modals/GRNWizardModal';
 import { GRNViewModal } from '../components/modals/GRNViewModal';
 import { GRNPaymentModal } from '../components/modals/GRNPaymentModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
@@ -22,9 +22,9 @@ import {
   Search, Plus, Edit, Eye, Calendar, ClipboardCheck,
   CheckCircle, XCircle, Clock, AlertTriangle,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  FileText, Truck, Filter, RefreshCw, List, LayoutGrid,
+  FileText, Filter, RefreshCw, List, LayoutGrid,
   SortAsc, SortDesc, Building2, DollarSign,
-  BarChart3, TrendingUp, Trash2,
+  Trash2,
   CreditCard, Banknote, Wallet, Receipt, BadgePercent,
   MessageCircle, Loader2
 } from 'lucide-react';
@@ -61,7 +61,6 @@ export const GoodsReceived: React.FC = () => {
   const { isViewingShop, viewingShop } = useAuth();
   const { settings: whatsAppSettings } = useWhatsAppSettings();
   const { branding } = useShopBranding();
-  const navigate = useNavigate();
   
   // Get effective shopId for SUPER_ADMIN viewing a shop
   const effectiveShopId = isViewingShop && viewingShop ? viewingShop.id : undefined;
@@ -199,7 +198,10 @@ export const GoodsReceived: React.FC = () => {
     const totalRejected = grns.reduce((sum, g) => sum + g.totalRejectedQuantity, 0);
     const totalOrdered = grns.reduce((sum, g) => sum + g.totalOrderedQuantity, 0);
     const acceptanceRate = totalOrdered > 0 ? ((totalAccepted / totalOrdered) * 100).toFixed(1) : '0';
-    return { totalGRNs, pendingGRNs, completedGRNs, partialGRNs, rejectedGRNs, totalValue, totalAccepted, totalRejected, acceptanceRate };
+    // Paid vs unpaid amounts
+    const totalPaid = grns.reduce((sum, g) => sum + (g.paidAmount || 0), 0);
+    const totalUnpaid = totalValue - totalPaid;
+    return { totalGRNs, pendingGRNs, completedGRNs, partialGRNs, rejectedGRNs, totalValue, totalAccepted, totalRejected, acceptanceRate, totalPaid, totalUnpaid };
   }, [grns]);
 
   // Filter GRNs
@@ -307,9 +309,13 @@ export const GoodsReceived: React.FC = () => {
     setMaxPrice('');
   };
 
+  // Wizard modal state
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+
   // Handlers
   const handleCreateGRN = () => {
-    navigate('/grn/create');
+    setSelectedGRN(null);
+    setIsWizardOpen(true);
   };
 
   const handleEditGRN = async (grn: GoodsReceivedNote) => {
@@ -743,91 +749,101 @@ export const GoodsReceived: React.FC = () => {
 
   // Skeleton Loading Component
   const SkeletonLoader = () => (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header Skeleton */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-            <div className={`h-8 w-48 rounded-lg ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-          </div>
-          <div className={`h-4 w-64 mt-2 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+          <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            Goods Received
+          </h1>
+          <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            Loading GRNs...
+          </p>
         </div>
-        <div className={`h-10 w-32 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+        <div className="flex items-center gap-2">
+          <div className={`w-10 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+          <div className={`w-32 h-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+        </div>
       </div>
 
-      {/* Stats Skeleton */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-              <div className="flex-1">
-                <div className={`h-3 w-16 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-                <div className={`h-6 w-12 mt-2 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+      {/* Stats Skeleton - 2x2 grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className={`p-3 sm:p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              <div className="flex-1 space-y-2">
+                <div className={`h-6 w-16 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`h-3 w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Search & Filters Skeleton */}
-      <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className={`flex-1 h-10 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-          <div className="flex gap-2">
-            <div className={`h-10 w-32 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-            <div className={`h-10 w-32 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-            <div className={`h-10 w-10 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-          </div>
+      {/* Filter Bar Skeleton */}
+      <div className={`p-4 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className={`h-10 flex-1 min-w-[200px] rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+          <div className={`h-10 w-32 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+          <div className={`h-10 w-10 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
         </div>
       </div>
 
       {/* Cards Skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className={`rounded-2xl border p-5 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className={`relative rounded-2xl border p-4 sm:p-5 overflow-hidden ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            {/* Shimmer Effect */}
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
             {/* Card Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-                <div>
-                  <div className={`h-5 w-28 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-                  <div className={`h-3 w-20 mt-2 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className="space-y-2">
+                  <div className={`h-5 w-24 sm:w-28 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                  <div className={`h-3 w-16 sm:w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
                 </div>
               </div>
-              <div className={`h-6 w-20 rounded-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+              <div className={`h-6 w-16 sm:w-20 rounded-full animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
             </div>
+
             {/* Card Body */}
-            <div className="space-y-3">
+            <div className="space-y-3 mb-4">
               <div className="flex justify-between">
-                <div className={`h-4 w-24 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-                <div className={`h-4 w-16 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div className={`h-4 w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`h-4 w-16 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
               </div>
               <div className="flex justify-between">
-                <div className={`h-4 w-20 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-                <div className={`h-4 w-24 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div className={`h-4 w-16 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`h-4 w-24 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
               </div>
               <div className="flex justify-between">
-                <div className={`h-4 w-28 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-                <div className={`h-4 w-20 rounded ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div className={`h-4 w-24 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`h-4 w-20 rounded animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
               </div>
             </div>
+
             {/* Card Footer */}
-            <div className={`flex gap-2 mt-4 pt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-              <div className={`flex-1 h-9 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
-              <div className={`flex-1 h-9 rounded-xl ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+            <div className={`flex gap-2 pt-4 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+              <div className={`h-8 w-24 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              <div className="flex gap-2 ml-auto">
+                <div className={`h-8 w-8 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`h-8 w-8 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`h-8 w-8 rounded-lg animate-pulse ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Loading Indicator */}
-      <div className="flex justify-center py-4">
+      <div className="flex items-center justify-center py-4">
         <div className="flex items-center gap-3">
-          <div className={`w-5 h-5 border-2 border-t-transparent rounded-full animate-spin ${theme === 'dark' ? 'border-emerald-400' : 'border-emerald-500'}`} />
-          <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-            Loading GRNs...
+          <RefreshCw className={`w-5 h-5 animate-spin ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
+          <span className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+            Fetching GRNs from server...
           </span>
         </div>
       </div>
@@ -840,118 +856,124 @@ export const GoodsReceived: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-4 lg:space-y-6 pb-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className={`text-2xl lg:text-3xl font-bold flex items-center gap-3 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-              <ClipboardCheck className="w-5 h-5 text-white" />
-            </div>
-            Goods Received Notes
+          <h1 className={`text-2xl lg:text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            Goods Received
           </h1>
           <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             Track and manage goods received from suppliers
           </p>
         </div>
-        <button 
-          onClick={handleCreateGRN}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:opacity-90 transition-opacity shadow-lg shadow-emerald-500/20"
-        >
-          <Plus className="w-5 h-5" />
-          Create GRN
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => loadData()}
+            className={`p-2.5 rounded-xl transition-colors ${
+              theme === 'dark' 
+                ? 'bg-slate-800 hover:bg-slate-700 text-slate-400' 
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+            }`}
+            title="Refresh GRNs"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={handleCreateGRN}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-5 h-5" />
+            Create GRN
+          </button>
+        </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-              <FileText className="w-5 h-5 text-blue-500" />
+      {/* Stats Cards - 2x2 grid like Invoice page */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        {/* Total GRNs */}
+        <div className={`p-3 sm:p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
             </div>
-            <div>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total GRNs</p>
-              <p className="text-xl font-bold text-blue-500">{stats.totalGRNs}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <Clock className="w-5 h-5 text-amber-500" />
-            </div>
-            <div>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Pending</p>
-              <p className="text-xl font-bold text-amber-500">{stats.pendingGRNs}</p>
+            <div className="min-w-0">
+              <p className={`text-xl sm:text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{stats.totalGRNs}</p>
+              <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Total GRNs</p>
             </div>
           </div>
         </div>
 
-        <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <CheckCircle className="w-5 h-5 text-emerald-500" />
+        {/* Completed Value */}
+        <div className={`p-3 sm:p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500/10 rounded-lg flex items-center justify-center shrink-0">
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
             </div>
-            <div>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Completed</p>
-              <p className="text-xl font-bold text-emerald-500">{stats.completedGRNs}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
-              <TrendingUp className="w-5 h-5 text-teal-500" />
-            </div>
-            <div>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Accept Rate</p>
-              <p className="text-xl font-bold text-teal-500">{stats.acceptanceRate}%</p>
+            <div className="min-w-0">
+              <p className={`text-lg sm:text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                Rs. {stats.totalPaid >= 1000 ? `${(stats.totalPaid / 1000).toFixed(0)}K` : stats.totalPaid.toLocaleString()}
+              </p>
+              <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{stats.completedGRNs} Completed</p>
             </div>
           </div>
         </div>
 
-        <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${theme === 'dark' ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
-              <BarChart3 className="w-5 h-5 text-violet-500" />
+        {/* Pending */}
+        <div className={`p-3 sm:p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-500/10 rounded-lg flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
             </div>
-            <div>
-              <p className={`text-xs font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Value</p>
-              <p className="text-lg font-bold text-violet-500">{formatCurrency(stats.totalValue)}</p>
+            <div className="min-w-0">
+              <p className={`text-lg sm:text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{stats.pendingGRNs + stats.partialGRNs}</p>
+              <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{stats.pendingGRNs} Pending · {stats.partialGRNs} Partial</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Unpaid Amount */}
+        <div className={`p-3 sm:p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-red-500/10 rounded-lg flex items-center justify-center shrink-0">
+              <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+            </div>
+            <div className="min-w-0">
+              <p className={`text-lg sm:text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                Rs. {stats.totalUnpaid >= 1000 ? `${(stats.totalUnpaid / 1000).toFixed(0)}K` : stats.totalUnpaid.toLocaleString()}
+              </p>
+              <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Unpaid Balance</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Search, Filters & View Controls */}
-      <div className={`p-4 rounded-2xl border space-y-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+      <div className={`p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border space-y-3 sm:space-y-4 ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         {/* Top Row - Search and Controls */}
-        <div className="flex flex-col lg:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
           {/* Search */}
-          <div className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border flex-1 ${
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border flex-1 ${
             theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
           }`}>
-            <Search className={`w-5 h-5 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+            <Search className={`w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
             <input
               type="text"
               placeholder="Search GRNs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`bg-transparent border-none outline-none flex-1 min-w-0 text-sm ${
+              className={`bg-transparent border-none outline-none flex-1 min-w-0 text-xs sm:text-sm ${
                 theme === 'dark' ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
               }`}
             />
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-colors ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl transition-colors text-xs sm:text-sm ${
                 showFilters || hasActiveFilters
                   ? 'bg-emerald-500 text-white'
                   : theme === 'dark'
@@ -1028,7 +1050,7 @@ export const GoodsReceived: React.FC = () => {
 
         {/* Expanded Filters */}
         {showFilters && (
-          <div className={`pt-4 border-t grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 ${
+          <div className={`pt-3 sm:pt-4 border-t grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 ${
             theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
           }`}>
             {/* Status Filter */}
@@ -1168,236 +1190,239 @@ export const GoodsReceived: React.FC = () => {
             const paymentPercentage = grn.totalAmount > 0 
               ? (((grn.paidAmount || 0) / grn.totalAmount) * 100).toFixed(0)
               : 0;
+            const isPaid = grn.paymentStatus === 'paid';
+            const balanceDue = grn.totalAmount - (grn.paidAmount || 0);
             
             return (
               <div
                 key={grn.id}
-                className={`rounded-2xl border p-5 transition-all hover:shadow-lg cursor-pointer group ${
+                className={`group rounded-2xl border overflow-hidden transition-all duration-300 cursor-pointer ${
                   theme === 'dark' 
-                    ? 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/50' 
-                    : 'bg-white border-slate-200 hover:border-emerald-500/50 hover:shadow-emerald-500/10'
+                    ? 'bg-slate-800/30 border-slate-700/50 hover:border-slate-600' 
+                    : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
                 }`}
                 onClick={() => handleViewGRN(grn)}
               >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${grnStatusConfig[grn.status].bgColor}`}>
-                      <ClipboardCheck className={`w-5 h-5 ${grnStatusConfig[grn.status].color}`} />
-                    </div>
-                    <div>
-                      <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                {/* Status gradient bar */}
+                <div className={`h-1 ${
+                  grn.status === 'completed' ? 'bg-gradient-to-r from-emerald-500 to-teal-500' 
+                    : grn.status === 'pending' || grn.status === 'inspecting' ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                    : grn.status === 'partial' ? 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                    : 'bg-gradient-to-r from-red-500 to-rose-500'
+                }`} />
+                <div className="p-3 sm:p-4">
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
                         {grn.grnNumber}
                       </p>
-                      <div className="flex items-center gap-1">
-                        <Truck className={`w-3 h-3 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
-                        <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {grn.supplierName}
-                        </p>
+                      <div className={`flex items-center gap-1.5 mt-0.5 text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <Building2 className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{grn.supplierName}</span>
                       </div>
                     </div>
+                    <span className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 flex-shrink-0 border ${grnStatusConfig[grn.status].bgColor} ${grnStatusConfig[grn.status].color} ${grnStatusConfig[grn.status].borderColor}`}>
+                      <StatusIcon className="w-3 h-3" />
+                      {grnStatusConfig[grn.status].label}
+                    </span>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 ${grnStatusConfig[grn.status].bgColor} ${grnStatusConfig[grn.status].color}`}>
-                    <StatusIcon className="w-3.5 h-3.5" />
-                    {grnStatusConfig[grn.status].label}
-                  </span>
-                </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <div className={`p-2.5 rounded-lg text-center ${theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Ordered</p>
-                    <p className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{grn.totalOrderedQuantity}</p>
+                  {/* Dates Grid */}
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-slate-800/80' : 'bg-slate-50'}`}>
+                      <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Order</p>
+                      <p className={`text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        {formatDate(grn.orderDate)}
+                      </p>
+                    </div>
+                    <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-slate-800/80' : 'bg-slate-50'}`}>
+                      <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{grn.receivedDate ? 'Received' : 'Expected'}</p>
+                      <p className={`text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        {formatDate(grn.receivedDate || grn.expectedDeliveryDate || grn.orderDate)}
+                      </p>
+                    </div>
                   </div>
-                  <div className={`p-2.5 rounded-lg text-center ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>Accepted</p>
-                    <p className="font-bold text-emerald-500">{grn.totalAcceptedQuantity}</p>
-                  </div>
-                  <div className={`p-2.5 rounded-lg text-center ${theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Rejected</p>
-                    <p className="font-bold text-red-500">{grn.totalRejectedQuantity}</p>
-                  </div>
-                </div>
 
-                {/* Payment Progress Bar */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Payment Progress</span>
-                    <span className={`font-semibold ${
-                      Number(paymentPercentage) >= 100 ? 'text-emerald-500' :
-                      Number(paymentPercentage) >= 50 ? 'text-amber-500' : 'text-red-500'
-                    }`}>{paymentPercentage}%</span>
-                  </div>
-                  <div className={`h-2 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
-                    <div 
-                      className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${
-                        Number(paymentPercentage) >= 100 ? 'from-emerald-500 to-teal-500' :
-                        Number(paymentPercentage) >= 50 ? 'from-amber-500 to-orange-500' : 'from-red-500 to-rose-500'
-                      }`}
-                      style={{ width: `${Math.min(Number(paymentPercentage), 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Payment & Discount Row */}
-                {(grn.paymentMethod || grn.totalDiscount || grn.discountAmount) && (
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    {/* Payment Method & Status */}
-                    {grn.paymentMethod && (
-                      <div className="flex items-center gap-1.5">
-                        {(() => {
-                          const config = paymentMethodIcons[grn.paymentMethod];
-                          const Icon = config?.icon || CreditCard;
-                          return (
-                            <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${config?.bgColor || 'bg-slate-500/10'}`}>
-                              <Icon className={`w-3.5 h-3.5 ${config?.color || 'text-slate-500'}`} />
-                              <span className={`text-xs font-medium capitalize ${config?.color || 'text-slate-500'}`}>
-                                {grn.paymentMethod}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                        {grn.paymentStatus && (
-                          <span className={`text-xs px-2 py-1 rounded-lg font-medium ${paymentStatusConfig[grn.paymentStatus]?.bgColor || 'bg-slate-500/10'} ${paymentStatusConfig[grn.paymentStatus]?.color || 'text-slate-500'}`}>
-                            {paymentStatusConfig[grn.paymentStatus]?.label || grn.paymentStatus}
+                  {/* Amount Section with Payment Progress */}
+                  <div className={`p-2.5 sm:p-3 rounded-xl mb-3 ${
+                    isPaid
+                      ? theme === 'dark' ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'
+                      : grn.paymentStatus === 'partial'
+                        ? theme === 'dark' ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'
+                        : theme === 'dark' ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>Total</span>
+                      <span className={`text-base sm:text-lg font-bold ${
+                        isPaid ? 'text-emerald-500' : grn.paymentStatus === 'partial' ? 'text-amber-500' : 'text-red-500'
+                      }`}>{formatCurrency(grn.totalAmount)}</span>
+                    </div>
+                    {!isPaid ? (
+                      <>
+                        <div className="flex items-center justify-between text-[10px] sm:text-xs mt-1.5">
+                          <span className={theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}>
+                            ✓ Paid: {formatCurrency(grn.paidAmount || 0)}
                           </span>
-                        )}
-                      </div>
-                    )}
-                    {/* Discount Badge - Always Show */}
-                    {(() => {
-                      const totalDiscount = (grn.totalDiscount || 0) + (grn.discountAmount || 0);
-                      const hasDiscount = totalDiscount > 0;
-                      return (
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${
-                          hasDiscount 
-                            ? (theme === 'dark' ? 'bg-orange-500/10' : 'bg-orange-50')
-                            : (theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-100')
-                        }`}>
-                          <BadgePercent className={`w-3.5 h-3.5 ${
-                            hasDiscount ? 'text-orange-500' : (theme === 'dark' ? 'text-slate-500' : 'text-slate-400')
-                          }`} />
-                          <span className={`text-xs font-medium ${
-                            hasDiscount ? 'text-orange-500' : (theme === 'dark' ? 'text-slate-500' : 'text-slate-400')
-                          }`}>
-                            {hasDiscount ? `-${formatCurrency(totalDiscount)}` : 'Rs. 0'}
+                          <span className={theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}>
+                            ⏳ Due: {formatCurrency(balanceDue)}
                           </span>
                         </div>
+                        <div className={`h-1.5 rounded-full mt-1.5 overflow-hidden ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              grn.paymentStatus === 'partial'
+                                ? 'bg-gradient-to-r from-amber-400 to-orange-400'
+                                : 'bg-gradient-to-r from-red-400 to-rose-400'
+                            }`}
+                            style={{ width: `${Math.min(Number(paymentPercentage), 100)}%` }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between text-[10px] sm:text-xs mt-1.5">
+                          <span className={theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}>
+                            ✓ Paid: {formatCurrency(grn.totalAmount)}
+                          </span>
+                          <span className={theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}>
+                            ⏳ Due: Rs. 0
+                          </span>
+                        </div>
+                        <div className={`h-1.5 rounded-full mt-1.5 overflow-hidden ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                          <div className="h-full w-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Quantity Tags + Payment Info */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium ${
+                      theme === 'dark' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      📦 {grn.totalOrderedQuantity} ordered
+                    </span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium ${
+                      theme === 'dark' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
+                    }`}>
+                      ✅ {grn.totalAcceptedQuantity} accepted
+                    </span>
+                    {grn.totalRejectedQuantity > 0 && (
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium ${
+                        theme === 'dark' ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600'
+                      }`}>
+                        ❌ {grn.totalRejectedQuantity}
+                      </span>
+                    )}
+                    {grn.paymentMethod && (() => {
+                      const config = paymentMethodIcons[grn.paymentMethod];
+                      const Icon = config?.icon || CreditCard;
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium ${config?.bgColor || 'bg-slate-500/10'} ${config?.color || 'text-slate-500'}`}>
+                          <Icon className="w-3 h-3" />
+                          <span className="capitalize">{grn.paymentMethod}</span>
+                        </span>
                       );
                     })()}
+                    {(() => {
+                      const totalDiscount = (grn.totalDiscount || 0) + (grn.discountAmount || 0);
+                      if (totalDiscount > 0) {
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium ${
+                            theme === 'dark' ? 'bg-orange-500/10 text-orange-400' : 'bg-orange-50 text-orange-600'
+                          }`}>
+                            <BadgePercent className="w-3 h-3" />
+                            -{formatCurrency(totalDiscount)}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
-                )}
 
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-700/30">
-                  <div className={`flex items-center gap-1 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                    <Calendar className="w-3.5 h-3.5" />
-                    {formatDate(grn.receivedDate || grn.expectedDeliveryDate || grn.orderDate)}
-                  </div>
-                  <p className={`font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                    {formatCurrency(grn.totalAmount)}
-                  </p>
-                </div>
+                  {/* Actions */}
+                  <div className={`flex flex-col gap-2 pt-3 border-t ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                    {/* Primary Action Row */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleViewGRN(grn); }}
+                        className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                          theme === 'dark' ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                        }`}
+                      >
+                        <Eye className="w-4 h-4" /> View
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleEditGRN(grn); }}
+                        className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                          theme === 'dark' ? 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                        }`}
+                      >
+                        <Edit className="w-4 h-4" /> Edit
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteGRN(grn); }}
+                        className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                          theme === 'dark' ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-50 text-red-600 hover:bg-red-100'
+                        }`}
+                      >
+                        <Trash2 className="w-4 h-4" /> Delete
+                      </button>
+                    </div>
 
-                {/* Quick Actions - Always Visible */}
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewGRN(grn);
-                    }}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      theme === 'dark' 
-                        ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <Eye className="w-4 h-4" />
-                    View
-                  </button>
-                  {/* Pay Button - Show when not fully paid */}
-                  {grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePayGRN(grn);
-                      }}
-                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        theme === 'dark' 
-                          ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400'
-                          : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
-                      }`}
-                    >
-                      <DollarSign className="w-4 h-4" />
-                      Pay
-                    </button>
-                  )}
-                  {/* Send Reminder Button - Show when GRN reminders enabled and not fully paid */}
-                  {whatsAppSettings?.grnReminderEnabled && grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendWhatsAppReminder(grn);
-                      }}
-                      disabled={sendingReminderId === ((grn as FrontendGRN).apiId || grn.id)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors relative ${
-                        sendingReminderId === ((grn as FrontendGRN).apiId || grn.id)
-                          ? 'opacity-70 cursor-wait'
-                          : ''
-                      } ${
-                        theme === 'dark' 
-                          ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
-                          : 'bg-green-100 hover:bg-green-200 text-green-700'
-                      }`}
-                    >
-                      {sendingReminderId === ((grn as FrontendGRN).apiId || grn.id) ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <MessageCircle className="w-4 h-4" />
-                      )}
-                      {sendingReminderId === ((grn as FrontendGRN).apiId || grn.id) ? '...' : '💬'}
-                      {/* Reminder count badge - clickable for history */}
-                      {grn.reminderCount !== undefined && grn.reminderCount > 0 && (
-                        <span 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenReminderHistory(grn);
-                          }}
-                          className="absolute -top-1 -right-1 bg-green-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center cursor-pointer hover:bg-green-700 hover:scale-110 transition-all"
-                          title="View reminder history"
+                    {/* Payment/Reminder Section */}
+                    {!isPaid && balanceDue > 0 ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handlePayGRN(grn); }}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25"
                         >
-                          {grn.reminderCount}
+                          <DollarSign className="w-4 h-4" />
+                          💰 Record Payment
+                        </button>
+                        {whatsAppSettings?.grnReminderEnabled && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); sendWhatsAppReminder(grn); }}
+                            disabled={sendingReminderId === ((grn as FrontendGRN).apiId || grn.id)}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all relative bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-emerald-500/25 ${
+                              sendingReminderId === ((grn as FrontendGRN).apiId || grn.id) ? 'opacity-70 cursor-wait' : 'hover:from-green-600 hover:to-emerald-600'
+                            }`}
+                          >
+                            {sendingReminderId === ((grn as FrontendGRN).apiId || grn.id) ? (
+                              <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+                            ) : (
+                              <><MessageCircle className="w-4 h-4" /> 💬 Remind</>
+                            )}
+                            {grn.reminderCount !== undefined && grn.reminderCount > 0 && (
+                              <span 
+                                onClick={(e) => { e.stopPropagation(); handleOpenReminderHistory(grn); }}
+                                className="absolute -top-2 -right-2 bg-green-700 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg hover:bg-green-800 cursor-pointer hover:scale-110 transition-all"
+                                title="View reminder history"
+                              >
+                                {grn.reminderCount}
+                              </span>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    ) : isPaid ? (
+                      <div className={`flex items-center justify-center gap-2 py-3 rounded-xl ${
+                        theme === 'dark' 
+                          ? 'bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-teal-500/10 border border-emerald-500/20' 
+                          : 'bg-gradient-to-br from-emerald-50 via-teal-50 to-teal-50 border border-emerald-200'
+                      }`}>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                          theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-100'
+                        }`}>
+                          <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        </div>
+                        <span className={`text-sm font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                          Fully Paid 🎉
                         </span>
-                      )}
-                    </button>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditGRN(grn);
-                    }}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      theme === 'dark' 
-                        ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400'
-                        : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700'
-                    }`}
-                  >
-                    <Edit className="w-4 h-4" />
-                    Edit
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteGRN(grn);
-                    }}
-                    className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      theme === 'dark' 
-                        ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
-                        : 'bg-red-100 hover:bg-red-200 text-red-700'
-                    }`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             );
@@ -1407,20 +1432,20 @@ export const GoodsReceived: React.FC = () => {
 
       {/* Table View */}
       {viewMode === 'table' && (
-        <div className={`rounded-2xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
-          <div className="overflow-x-auto">
+        <div className={`rounded-xl sm:rounded-2xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'}`}>
+          <div className="overflow-x-auto -mx-px">
             <table className="w-full">
               <thead className={theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}>
                 <tr>
-                  <th className={`text-left px-4 py-3 text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>GRN Number</th>
-                  <th className={`text-left px-4 py-3 text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Supplier</th>
-                  <th className={`text-left px-4 py-3 text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Order Date</th>
-                  <th className={`text-center px-4 py-3 text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Qty</th>
-                  <th className={`text-center px-4 py-3 text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Payment</th>
-                  <th className={`text-center px-4 py-3 text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Discount</th>
-                  <th className={`text-left px-4 py-3 text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Status</th>
-                  <th className={`text-right px-4 py-3 text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Amount</th>
-                  <th className={`text-center px-4 py-3 text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Actions</th>
+                  <th className={`text-left px-3 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>GRN Number</th>
+                  <th className={`text-left px-3 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Supplier</th>
+                  <th className={`text-left px-3 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap hidden md:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Order Date</th>
+                  <th className={`text-center px-2 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap hidden sm:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Qty</th>
+                  <th className={`text-center px-2 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap hidden lg:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Payment</th>
+                  <th className={`text-center px-2 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap hidden xl:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Discount</th>
+                  <th className={`text-left px-3 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Status</th>
+                  <th className={`text-right px-3 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Amount</th>
+                  <th className={`text-center px-2 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
@@ -1434,26 +1459,26 @@ export const GoodsReceived: React.FC = () => {
                       }`}
                       onClick={() => handleViewGRN(grn)}
                     >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${grnStatusConfig[grn.status].bgColor}`}>
-                            <ClipboardCheck className={`w-4 h-4 ${grnStatusConfig[grn.status].color}`} />
+                      <td className="px-3 sm:px-4 py-2.5 sm:py-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className={`w-7 h-7 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${grnStatusConfig[grn.status].bgColor}`}>
+                            <ClipboardCheck className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${grnStatusConfig[grn.status].color}`} />
                           </div>
-                          <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                          <span className={`text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                             {grn.grnNumber}
                           </span>
                         </div>
                       </td>
-                      <td className={`px-4 py-3 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-slate-400" />
-                          {grn.supplierName}
+                      <td className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 flex-shrink-0" />
+                          <span className="truncate max-w-[100px] sm:max-w-none">{grn.supplierName}</span>
                         </div>
                       </td>
-                      <td className={`px-4 py-3 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <td className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm hidden md:table-cell ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                         {formatDate(grn.orderDate)}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-center hidden sm:table-cell">
                         <div className="flex flex-col items-center gap-0.5">
                           <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                             {grn.totalOrderedQuantity}
@@ -1463,7 +1488,7 @@ export const GoodsReceived: React.FC = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-center hidden lg:table-cell">
                         {grn.paymentMethod ? (
                           <div className="flex flex-col items-center gap-1">
                             {(() => {
@@ -1488,7 +1513,7 @@ export const GoodsReceived: React.FC = () => {
                           <span className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-center hidden xl:table-cell">
                         {(() => {
                           const totalDiscount = (grn.totalDiscount || 0) + (grn.discountAmount || 0);
                           const hasDiscount = totalDiscount > 0;
@@ -1510,28 +1535,28 @@ export const GoodsReceived: React.FC = () => {
                           );
                         })()}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${grnStatusConfig[grn.status].bgColor} ${grnStatusConfig[grn.status].color}`}>
-                          <StatusIcon className="w-3.5 h-3.5" />
+                      <td className="px-3 sm:px-4 py-2.5 sm:py-3">
+                        <span className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-medium ${grnStatusConfig[grn.status].bgColor} ${grnStatusConfig[grn.status].color}`}>
+                          <StatusIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           {grnStatusConfig[grn.status].label}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 text-right font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                      <td className={`px-3 sm:px-4 py-2.5 sm:py-3 text-right text-xs sm:text-sm font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
                         {formatCurrency(grn.totalAmount)}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="px-2 sm:px-4 py-2.5 sm:py-3">
+                        <div className="flex items-center justify-center gap-1 sm:gap-2">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleViewGRN(grn);
                             }}
-                            className={`p-2 rounded-lg transition-colors ${
+                            className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                               theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                             }`}
                             title="View GRN"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
                           {/* Pay Button - Table View */}
                           {grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
@@ -1540,12 +1565,12 @@ export const GoodsReceived: React.FC = () => {
                                 e.stopPropagation();
                                 handlePayGRN(grn);
                               }}
-                              className={`p-2 rounded-lg transition-colors ${
+                              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                                 theme === 'dark' ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-100 text-blue-600'
                               }`}
                               title="Record Payment"
                             >
-                              <DollarSign className="w-4 h-4" />
+                              <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                             </button>
                           )}
                           <button
@@ -1553,12 +1578,12 @@ export const GoodsReceived: React.FC = () => {
                               e.stopPropagation();
                               handleEditGRN(grn);
                             }}
-                            className={`p-2 rounded-lg transition-colors ${
+                            className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                               theme === 'dark' ? 'hover:bg-emerald-500/20 text-emerald-400' : 'hover:bg-emerald-100 text-emerald-600'
                             }`}
                             title="Edit GRN"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
                         </div>
                       </td>
@@ -1573,12 +1598,12 @@ export const GoodsReceived: React.FC = () => {
 
       {/* Empty State */}
       {filteredGRNs.length === 0 && (
-        <div className={`text-center py-16 rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-          <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`}>
-            <ClipboardCheck className={`w-8 h-8 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
+        <div className={`text-center py-10 sm:py-16 rounded-xl sm:rounded-2xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          <div className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-xl sm:rounded-2xl flex items-center justify-center ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`}>
+            <ClipboardCheck className={`w-6 h-6 sm:w-8 sm:h-8 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`} />
           </div>
-          <p className={`font-medium text-lg ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>No GRNs found</p>
-          <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+          <p className={`font-medium text-sm sm:text-lg ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>No GRNs found</p>
+          <p className={`text-xs sm:text-sm mt-1 px-4 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
             {hasActiveFilters ? 'Try adjusting your filters' : 'Create a new GRN to track goods received from suppliers'}
           </p>
           {hasActiveFilters ? (
@@ -1602,20 +1627,20 @@ export const GoodsReceived: React.FC = () => {
       )}
 
       {/* Pagination */}
-      <div className={`mt-4 p-4 rounded-2xl border ${
+      <div className={`mt-3 sm:mt-4 p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border ${
         theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
           {/* Left side - Info and Items Per Page */}
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 justify-center sm:justify-start">
             {/* Result Info */}
-            <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              Showing {filteredGRNs.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} to {Math.min(currentPage * itemsPerPage, filteredGRNs.length)} of {filteredGRNs.length} GRNs
+            <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              {filteredGRNs.length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0}-{Math.min(currentPage * itemsPerPage, filteredGRNs.length)} of {filteredGRNs.length}
             </p>
             
             {/* Items Per Page Selector */}
-            <div className="flex items-center gap-2">
-              <span className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Show:</span>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className={`text-xs sm:text-sm hidden sm:inline ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Show:</span>
               <div className={`flex items-center rounded-full p-0.5 ${
                 theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
               }`}>
@@ -1737,6 +1762,14 @@ export const GoodsReceived: React.FC = () => {
       </div>
 
       {/* Modals */}
+      <GRNWizardModal
+        isOpen={isWizardOpen}
+        suppliers={suppliers}
+        onClose={() => setIsWizardOpen(false)}
+        onSave={handleSaveGRN}
+        isLoading={isLoading}
+      />
+
       <GRNFormModal
         isOpen={isFormModalOpen}
         grn={selectedGRN || undefined}

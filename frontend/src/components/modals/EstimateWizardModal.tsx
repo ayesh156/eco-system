@@ -234,7 +234,7 @@ export const EstimateWizardModal: React.FC<EstimateWizardModalProps> = ({
             <div key={s} className="flex items-center flex-1">
               <div className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all ${
                 step >= s
-                  ? 'bg-gradient-to-r from-emerald-500 to-blue-500 text-white'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
                   : theme === 'dark'
                   ? 'bg-slate-800 text-slate-500'
                   : 'bg-slate-100 text-slate-400'
@@ -246,7 +246,7 @@ export const EstimateWizardModal: React.FC<EstimateWizardModalProps> = ({
               {s < 3 && (
                 <div className={`flex-1 h-1 mx-2 rounded-full ${
                   step > s
-                    ? 'bg-gradient-to-r from-emerald-500 to-blue-500'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
                     : theme === 'dark' ? 'bg-slate-800' : 'bg-slate-200'
                 }`} />
               )}
@@ -444,7 +444,7 @@ export const EstimateWizardModal: React.FC<EstimateWizardModalProps> = ({
                 <button
                   onClick={addItem}
                   disabled={!selectedProduct || quantity <= 0}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4" />
                   Add Item
@@ -744,7 +744,7 @@ export const EstimateWizardModal: React.FC<EstimateWizardModalProps> = ({
             <button
               onClick={() => setStep((step + 1) as Step)}
               disabled={!canProceed()}
-              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
               <ChevronRight className="w-4 h-4" />
@@ -752,7 +752,7 @@ export const EstimateWizardModal: React.FC<EstimateWizardModalProps> = ({
           ) : (
             <button
               onClick={handleSave}
-              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium"
+              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium"
             >
               <Calculator className="w-4 h-4" />
               Save Estimate

@@ -113,7 +113,7 @@ export const GRNReminderHistoryModal: React.FC<GRNReminderHistoryModalProps> = (
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`max-w-2xl max-h-[85vh] overflow-hidden p-0 ${
+      <DialogContent className={`w-[95vw] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden p-0 ${
         theme === 'dark' ? 'bg-slate-900 border-slate-700/50' : 'bg-white border-slate-200'
       }`}>
         <DialogHeader className="sr-only">
@@ -121,15 +121,15 @@ export const GRNReminderHistoryModal: React.FC<GRNReminderHistoryModalProps> = (
         </DialogHeader>
 
         {/* Header */}
-        <div className="relative h-20 bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600">
-          <div className="absolute inset-0 flex items-center px-6">
-            <div className="flex items-center gap-4 flex-1">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-                <History className="w-6 h-6 text-white" />
+        <div className="relative h-16 sm:h-20 bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600">
+          <div className="absolute inset-0 flex items-center px-3 sm:px-6">
+            <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center flex-shrink-0">
+                <History className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">GRN Reminder History</h2>
-                <p className="text-emerald-100 text-sm">
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-xl font-bold text-white truncate">GRN Reminder History</h2>
+                <p className="text-emerald-100 text-xs sm:text-sm truncate">
                   {grnNumber}{supplierName ? ` • ${supplierName}` : ''}
                 </p>
               </div>
@@ -137,15 +137,15 @@ export const GRNReminderHistoryModal: React.FC<GRNReminderHistoryModalProps> = (
             <button
               onClick={loadReminders}
               disabled={isLoading}
-              className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+              className="p-1.5 sm:p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors flex-shrink-0"
             >
-              <RefreshCw className={`w-5 h-5 text-white ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 text-white ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
+        <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(90vh-80px)] sm:max-h-[calc(85vh-80px)]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <RefreshCw className={`w-8 h-8 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'} animate-spin`} />
@@ -181,18 +181,18 @@ export const GRNReminderHistoryModal: React.FC<GRNReminderHistoryModalProps> = (
           ) : (
             <div className="space-y-4">
               {/* Summary */}
-              <div className={`flex items-center gap-4 p-4 rounded-xl ${
+              <div className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl ${
                 theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
               }`}>
-                <div className="flex-1">
-                  <p className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Total Reminders Sent
                   </p>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Last reminder: {formatDate(reminders[0]?.sentAt || '')}
+                  <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Last: {formatDate(reminders[0]?.sentAt || '')}
                   </p>
                 </div>
-                <div className="text-3xl font-bold text-teal-500">
+                <div className="text-2xl sm:text-3xl font-bold text-teal-500">
                   {reminders.length}
                 </div>
               </div>
@@ -214,27 +214,27 @@ export const GRNReminderHistoryModal: React.FC<GRNReminderHistoryModalProps> = (
                           : 'bg-white border-slate-200 hover:shadow-md'
                       }`}
                     >
-                      <div className="p-4">
-                        <div className="flex items-start gap-4">
+                      <div className="p-3 sm:p-4">
+                        <div className="flex items-start gap-2.5 sm:gap-4">
                           {/* Type Icon */}
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${typeInfo.bgColor}`}>
-                            <TypeIcon className={`w-5 h-5 ${typeInfo.color}`} />
+                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${typeInfo.bgColor}`}>
+                            <TypeIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${typeInfo.color}`} />
                           </div>
 
                           {/* Content */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
-                              <span className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                              <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                                 {typeInfo.label}
                               </span>
-                              <span className={`text-xs px-2 py-1 rounded-full ${
+                              <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
                                 theme === 'dark' ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-100 text-teal-700'
                               }`}>
                                 #{reminders.length - globalIndex}
                               </span>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-3 text-sm mb-2">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm mb-2">
                               <span className={`flex items-center gap-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                                 <Clock className="w-3.5 h-3.5" />
                                 {formatDate(reminder.sentAt)}
@@ -269,11 +269,11 @@ export const GRNReminderHistoryModal: React.FC<GRNReminderHistoryModalProps> = (
 
               {/* Pagination */}
               {reminders.length > itemsPerPage && (
-                <div className={`flex items-center justify-between mt-6 pt-4 border-t ${
+                <div className={`flex flex-col sm:flex-row items-center sm:justify-between gap-3 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t ${
                   theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
                 }`}>
                   {/* Page Info */}
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, reminders.length)} of {reminders.length}
                   </p>
 
@@ -364,12 +364,12 @@ export const GRNReminderHistoryModal: React.FC<GRNReminderHistoryModalProps> = (
         </div>
 
         {/* Footer */}
-        <div className={`px-6 py-4 border-t ${
+        <div className={`px-3 sm:px-6 py-3 sm:py-4 border-t ${
           theme === 'dark' ? 'border-slate-700/50 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
         }`}>
           <button
             onClick={onClose}
-            className={`w-full py-3 rounded-xl font-medium transition-all ${
+            className={`w-full py-2.5 sm:py-3 rounded-xl text-sm font-medium transition-all ${
               theme === 'dark'
                 ? 'bg-slate-700 text-white hover:bg-slate-600'
                 : 'bg-slate-200 text-slate-700 hover:bg-slate-300'

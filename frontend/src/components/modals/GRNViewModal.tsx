@@ -557,87 +557,86 @@ Thank you for your service! 🙏`;
     : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className={`w-full max-w-4xl max-h-[95vh] rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm">
+      <div className={`w-full sm:max-w-4xl max-h-[95vh] sm:max-h-[95vh] rounded-t-2xl sm:rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
         theme === 'dark' 
           ? 'bg-slate-900 border-slate-700' 
           : 'bg-white border-slate-200'
       }`}>
         {/* Header - Two Row Layout */}
-        <div className={`px-6 py-4 border-b flex-shrink-0 ${
+        <div className={`px-3 sm:px-6 py-3 sm:py-4 border-b flex-shrink-0 ${
           theme === 'dark' 
             ? 'bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border-slate-700' 
             : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-slate-200'
         }`}>
           {/* Row 1: Title + Action Buttons */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                <ClipboardCheck className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 flex-shrink-0">
+                <ClipboardCheck className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
-              <div>
-                <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              <div className="min-w-0">
+                <h2 className={`text-base sm:text-xl font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                   {grn.grnNumber}
                 </h2>
-                <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                   Goods Received Note
                 </p>
               </div>
             </div>
             
             {/* Action Buttons - Right Side */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               {/* Pay Button - Show when not fully paid with animation highlight */}
               {onPay && grn.paymentStatus !== 'paid' && (grn.paidAmount || 0) < grn.totalAmount && (
                 <button
                   onClick={() => onPay(grn)}
-                  className={`relative flex items-center gap-1.5 px-4 py-2 rounded-xl font-medium shadow-lg transition-all transform hover:scale-105 ${
+                  className={`relative flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl font-medium shadow-lg transition-all transform hover:scale-105 ${
                     theme === 'dark' 
                       ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-amber-500/30' 
                       : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-amber-500/30'
                   }`}
                   title="Record Payment"
                 >
-                  {/* Pulse animation - pointer-events-none to prevent blocking clicks */}
-                  <span className="absolute inset-0 rounded-xl bg-white/20 animate-ping opacity-75 pointer-events-none" />
-                  <DollarSign className="w-4 h-4 relative z-10" />
-                  <span className="text-sm font-semibold relative z-10">Pay Now</span>
+                  <span className="absolute inset-0 rounded-lg sm:rounded-xl bg-white/20 animate-ping opacity-75 pointer-events-none" />
+                  <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 relative z-10" />
+                  <span className="text-xs sm:text-sm font-semibold relative z-10">Pay Now</span>
                 </button>
               )}
               {onEdit && (
                 <button
                   onClick={() => onEdit(grn)}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                     theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                   title="Edit GRN"
                 >
-                  <Edit className="w-5 h-5" />
+                  <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               )}
               <button
                 onClick={handlePrint}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                 theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
               }`}
               title="Print GRN"
             >
-              <Printer className="w-5 h-5" />
+              <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
-            
+
             {/* More Actions - 3-dot menu */}
             <div className="relative" data-grn-actions-menu>
               <button
                 onClick={() => setShowActions(!showActions)}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                   theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                 }`}
                 title="More Actions"
               >
-                <MoreVertical className="w-5 h-5" />
+                <MoreVertical className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
               {showActions && (
-                <div className={`absolute right-0 mt-2 w-56 rounded-xl border shadow-xl z-20 overflow-hidden ${
+                <div className={`absolute right-0 mt-2 w-52 sm:w-56 rounded-xl border shadow-xl z-20 overflow-hidden ${
                   theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
                 }`}>
                   {/* Download PDF */}
@@ -724,25 +723,25 @@ Thank you for your service! 🙏`;
             
             <button
               onClick={onClose}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                 theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
               }`}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             </div>
           </div>
 
           {/* Row 2: Status Badges */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {/* Receipt Status Badge */}
-            <span className={`px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 ${statusInfo.bgColor} ${statusInfo.color} border ${statusInfo.borderColor}`}>
-              <StatusIcon className="w-4 h-4" />
+            <span className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-1.5 ${statusInfo.bgColor} ${statusInfo.color} border ${statusInfo.borderColor}`}>
+              <StatusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
               {statusInfo.label}
             </span>
             
             {/* Payment Status Badge */}
-            <span className={`px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 ${
+            <span className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-1.5 ${
               grn.paymentStatus === 'paid' 
                 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30'
                 : grn.paymentStatus === 'partial'
@@ -760,14 +759,14 @@ Thank you for your service! 🙏`;
             {reminderCount > 0 && (
               <button
                 onClick={() => setShowReminderHistoryModal(true)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-all hover:scale-105 ${
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium flex items-center gap-1 sm:gap-1.5 cursor-pointer transition-all hover:scale-105 ${
                   theme === 'dark'
                     ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20'
                     : 'bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200'
                 }`}
                 title="View reminder history"
               >
-                <Bell className="w-3.5 h-3.5" />
+                <Bell className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 {reminderCount} {reminderCount === 1 ? 'reminder' : 'reminders'}
               </button>
             )}
@@ -775,41 +774,41 @@ Thank you for your service! 🙏`;
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Ordered</p>
-              <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+          {/* Summary Stats - Horizontal scroll on mobile */}
+          <div className="flex gap-2 sm:gap-4 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-5">
+            <div className={`p-2.5 sm:p-4 rounded-xl min-w-[100px] sm:min-w-0 flex-shrink-0 sm:flex-shrink ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+              <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Ordered</p>
+              <p className={`text-lg sm:text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {grn.totalOrderedQuantity}
               </p>
             </div>
-            <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-              <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Received</p>
-              <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            <div className={`p-2.5 sm:p-4 rounded-xl min-w-[100px] sm:min-w-0 flex-shrink-0 sm:flex-shrink ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+              <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Received</p>
+              <p className={`text-lg sm:text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {grn.totalReceivedQuantity}
               </p>
             </div>
-            <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <p className={`text-xs ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>Accepted</p>
-              <p className="text-2xl font-bold text-emerald-500">{grn.totalAcceptedQuantity}</p>
+            <div className={`p-2.5 sm:p-4 rounded-xl min-w-[100px] sm:min-w-0 flex-shrink-0 sm:flex-shrink ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+              <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>Accepted</p>
+              <p className="text-lg sm:text-2xl font-bold text-emerald-500">{grn.totalAcceptedQuantity}</p>
             </div>
-            <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
-              <p className={`text-xs ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Rejected</p>
-              <p className="text-2xl font-bold text-red-500">{grn.totalRejectedQuantity}</p>
+            <div className={`p-2.5 sm:p-4 rounded-xl min-w-[100px] sm:min-w-0 flex-shrink-0 sm:flex-shrink ${theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
+              <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Rejected</p>
+              <p className="text-lg sm:text-2xl font-bold text-red-500">{grn.totalRejectedQuantity}</p>
             </div>
-            <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-              <p className={`text-xs ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Accept Rate</p>
-              <p className="text-2xl font-bold text-blue-500">{acceptanceRate}%</p>
+            <div className={`p-2.5 sm:p-4 rounded-xl min-w-[100px] sm:min-w-0 flex-shrink-0 sm:flex-shrink ${theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+              <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>Accept Rate</p>
+              <p className="text-lg sm:text-2xl font-bold text-blue-500">{acceptanceRate}%</p>
             </div>
           </div>
 
           {/* Supplier & Delivery Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
             {/* Supplier Info */}
-            <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <h3 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                <Building2 className="w-4 h-4" />
+            <div className={`p-3 sm:p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <h3 className={`text-xs sm:text-sm font-semibold mb-2 sm:mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Supplier Information
               </h3>
               <div className="space-y-2">
@@ -830,9 +829,9 @@ Thank you for your service! 🙏`;
             </div>
 
             {/* Delivery Info */}
-            <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <h3 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                <Truck className="w-4 h-4" />
+            <div className={`p-3 sm:p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <h3 className={`text-xs sm:text-sm font-semibold mb-2 sm:mb-3 flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                <Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Delivery Information
               </h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -858,7 +857,7 @@ Thank you for your service! 🙏`;
 
           {/* Payment & Discount Summary */}
           {(grn.paymentMethod || grn.totalDiscount || grn.discountAmount) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
               {/* Payment Info */}
               {grn.paymentMethod && (
                 <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -959,15 +958,68 @@ Thank you for your service! 🙏`;
             </div>
           )}
 
-          {/* Items Table */}
+          {/* Items */}
           <div className={`rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-            <div className={`px-4 py-3 border-b ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-              <h3 className={`font-semibold flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            <div className={`px-3 sm:px-4 py-2.5 sm:py-3 border-b ${theme === 'dark' ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <h3 className={`text-sm font-semibold flex items-center gap-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 <Package className="w-4 h-4" />
                 Items ({grn.items.length})
               </h3>
             </div>
-            <div className="overflow-x-auto">
+
+            {/* Mobile Card View */}
+            <div className="sm:hidden divide-y ${theme === 'dark' ? 'divide-slate-700/50' : 'divide-slate-200'}">
+              {grn.items.map((item) => (
+                <div key={item.id} className={`p-3 space-y-2 ${theme === 'dark' ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className={`text-sm font-medium truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{item.productName}</p>
+                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>{item.category}</p>
+                      {item.batchNumber && (
+                        <p className={`text-[10px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>Batch: {item.batchNumber}</p>
+                      )}
+                    </div>
+                    <span className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${itemStatusConfig[item.status].bgColor} ${itemStatusConfig[item.status].color}`}>
+                      {itemStatusConfig[item.status].label}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 text-center">
+                    <div className={`py-1 rounded-lg text-xs ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+                      <span className={`block text-[9px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Ord</span>
+                      <span className={`font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{item.orderedQuantity}</span>
+                    </div>
+                    <div className={`py-1 rounded-lg text-xs ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+                      <span className={`block text-[9px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Rcv</span>
+                      <span className={`font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{item.receivedQuantity}</span>
+                    </div>
+                    <div className={`py-1 rounded-lg text-xs ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                      <span className={`block text-[9px] ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>Acc</span>
+                      <span className="font-medium text-emerald-500">{item.acceptedQuantity}</span>
+                    </div>
+                    <div className={`py-1 rounded-lg text-xs ${theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
+                      <span className={`block text-[9px] ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Rej</span>
+                      <span className="font-medium text-red-500">{item.rejectedQuantity}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <div>
+                      {item.originalUnitPrice && item.originalUnitPrice !== item.unitPrice ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className={`line-through ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Rs.{item.originalUnitPrice.toLocaleString()}</span>
+                          <span className={`font-medium ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>Rs.{item.unitPrice.toLocaleString()}</span>
+                        </span>
+                      ) : (
+                        <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>@ Rs.{item.unitPrice.toLocaleString()}</span>
+                      )}
+                    </div>
+                    <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rs.{item.totalAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className={theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50'}>
@@ -1045,22 +1097,22 @@ Thank you for your service! 🙏`;
 
           {/* Notes & Quality Info */}
           {(grn.notes || grn.inspectedBy) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
               {grn.notes && (
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                  <h3 className={`text-sm font-semibold mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
-                    <FileText className="w-4 h-4" />
+                <div className={`p-3 sm:p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  <h3 className={`text-xs sm:text-sm font-semibold mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     Notes
                   </h3>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     {grn.notes}
                   </p>
                 </div>
               )}
               {grn.inspectedBy && (
-                <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-blue-50 border-blue-200'}`}>
-                  <h3 className={`text-sm font-semibold mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}`}>
-                    <ShieldCheck className="w-4 h-4" />
+                <div className={`p-3 sm:p-4 rounded-xl border ${theme === 'dark' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-blue-50 border-blue-200'}`}>
+                  <h3 className={`text-xs sm:text-sm font-semibold mb-2 flex items-center gap-2 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-700'}`}>
+                    <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     Quality Inspection
                   </h3>
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -1080,12 +1132,49 @@ Thank you for your service! 🙏`;
         </div>
 
         {/* Footer - Total & Balance */}
-        <div className={`px-6 py-4 border-t ${
+        <div className={`px-3 sm:px-6 py-3 sm:py-4 border-t ${
           theme === 'dark' 
             ? 'bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border-slate-700' 
             : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-slate-200'
         }`}>
-          <div className="flex items-center justify-between">
+          {/* Mobile Footer Layout */}
+          <div className="sm:hidden space-y-2">
+            <div className={`text-[10px] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+              Created: {formatDate(grn.createdAt)}
+            </div>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              {grn.discountAmount > 0 && (
+                <div className="text-xs">
+                  <span className={theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}>Disc: </span>
+                  <span className={`font-medium ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>-Rs.{grn.discountAmount.toLocaleString()}</span>
+                </div>
+              )}
+              <div className="text-xs">
+                <span className={theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}>Total: </span>
+                <span className={`font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Rs.{grn.totalAmount.toLocaleString()}</span>
+              </div>
+              {(grn.paidAmount || 0) > 0 && (
+                <div className="text-xs">
+                  <span className={theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}>Paid: </span>
+                  <span className={`font-semibold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>Rs.{(grn.paidAmount || 0).toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+            {balanceDue > 0 && (
+              <div className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-sm ${theme === 'dark' ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'}`}>
+                <span className={`font-medium ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Balance Due</span>
+                <span className={`font-bold ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Rs.{balanceDue.toLocaleString()}</span>
+              </div>
+            )}
+            {balanceDue === 0 && grn.totalAmount > 0 && (
+              <div className={`text-center px-3 py-1.5 rounded-xl text-xs font-bold ${theme === 'dark' ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' : 'bg-emerald-50 border border-emerald-200 text-emerald-600'}`}>
+                ✓ FULLY PAID
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Footer Layout */}
+          <div className="hidden sm:flex items-center justify-between">
             <div className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
               Created: {formatDate(grn.createdAt)}
               {grn.updatedAt !== grn.createdAt && ` • Updated: ${formatDate(grn.updatedAt)}`}
@@ -1143,12 +1232,12 @@ Thank you for your service! 🙏`;
 
       {/* Print Preview Modal */}
       {showPrintPreview && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm">
           <div className={`w-full max-w-5xl max-h-[95vh] rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
             theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
           }`}>
             {/* Print Preview Header */}
-            <div className={`px-6 py-4 border-b flex items-center justify-between ${
+            <div className={`px-3 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between ${
               theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
             }`}>
               <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>

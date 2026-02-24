@@ -114,7 +114,7 @@ export const DataExport: React.FC = () => {
     try {
       const data = getDataForExport(key);
       const csvContent = generateCSV(data, config);
-      downloadCSV(csvContent, `ecotec_${config.tableName}.csv`);
+      downloadCSV(csvContent, `eco_system_${config.tableName}.csv`);
       setExportStatus(prev => [...prev.filter(s => s.table !== key), { table: key, success: true }]);
     } catch (error) {
       console.error(`Error exporting ${key}:`, error);
@@ -132,7 +132,7 @@ export const DataExport: React.FC = () => {
       });
       
       const combinedCSV = generateCombinedCSV(datasets);
-      downloadCSV(combinedCSV, 'ecotec_all_data.csv');
+      downloadCSV(combinedCSV, 'eco_system_all_data.csv');
       
       // Mark all as successful
       selectedTables.forEach(key => {
@@ -146,7 +146,7 @@ export const DataExport: React.FC = () => {
   // Download schema SQL file for a single table
   const handleDownloadSchemaSQL = (key: string, config: CSVExportConfig) => {
     try {
-      let schemaContent = `-- ECOTEC Computer Shop - ${config.displayName} Schema\n`;
+      let schemaContent = `-- Eco System Computer Shop - ${config.displayName} Schema\n`;
       schemaContent += `-- Generated on: ${new Date().toISOString()}\n`;
       schemaContent += `-- Table: ${config.tableName}\n\n`;
       schemaContent += `SET NAMES utf8mb4;\n\n`;
@@ -154,7 +154,7 @@ export const DataExport: React.FC = () => {
       schemaContent += generateMySQLSchema(config);
       schemaContent += '\n';
       
-      downloadSQL(schemaContent, `ecotec_${config.tableName}_schema.sql`);
+      downloadSQL(schemaContent, `eco_system_${config.tableName}_schema.sql`);
     } catch (error) {
       console.error(`Error downloading schema for ${key}:`, error);
     }
@@ -165,7 +165,7 @@ export const DataExport: React.FC = () => {
     try {
       const data = getDataForExport(key);
       const sqlContent = generateCompleteTableSQL(data, config);
-      downloadSQL(sqlContent, `ecotec_${config.tableName}_complete.sql`);
+      downloadSQL(sqlContent, `eco_system_${config.tableName}_complete.sql`);
       setExportStatus(prev => [...prev.filter(s => s.table !== key), { table: key, success: true }]);
     } catch (error) {
       console.error(`Error exporting ${key}:`, error);
@@ -174,7 +174,7 @@ export const DataExport: React.FC = () => {
   };
 
   const handleExportSchema = () => {
-    let schemaContent = `-- ECOTEC Computer Shop Database Schema\n`;
+    let schemaContent = `-- Eco System Computer Shop Database Schema\n`;
     schemaContent += `-- Generated on: ${new Date().toISOString()}\n`;
     schemaContent += `-- This schema is designed for MySQL 8.0+\n\n`;
     schemaContent += `SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS = 0;\n\n`;
@@ -190,12 +190,12 @@ export const DataExport: React.FC = () => {
     });
 
     schemaContent += `SET FOREIGN_KEY_CHECKS = 1;\n`;
-    downloadSQL(schemaContent, 'ecotec_schema.sql');
+    downloadSQL(schemaContent, 'eco_system_schema.sql');
   };
 
   // Download complete SQL with all selected tables (CREATE TABLE + INSERT statements)
   const handleExportCompleteSQL = () => {
-    let sqlContent = `-- ECOTEC Computer Shop - Complete Database Export\n`;
+    let sqlContent = `-- Eco System Computer Shop - Complete Database Export\n`;
     sqlContent += `-- Generated on: ${new Date().toISOString()}\n`;
     sqlContent += `-- This file contains CREATE TABLE and INSERT statements\n`;
     sqlContent += `-- Tables included: ${selectedTables.size}\n\n`;
@@ -213,7 +213,7 @@ export const DataExport: React.FC = () => {
 
     sqlContent += `SET FOREIGN_KEY_CHECKS = 1;\n`;
     sqlContent += `\n-- Import completed successfully!\n`;
-    downloadSQL(sqlContent, 'ecotec_complete_import.sql');
+    downloadSQL(sqlContent, 'eco_system_complete_import.sql');
     
     // Mark all as successful
     selectedTables.forEach(key => {
@@ -305,8 +305,8 @@ export const DataExport: React.FC = () => {
       {selectedTables.size > 0 && (
         <div className={`rounded-2xl border p-4 ${
           theme === 'dark' 
-            ? 'bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border-emerald-500/30' 
-            : 'bg-gradient-to-br from-emerald-50 to-blue-50 border-emerald-200'
+            ? 'bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/30' 
+            : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200'
         }`}>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
@@ -342,7 +342,7 @@ export const DataExport: React.FC = () => {
               </button>
               <button
                 onClick={handleExportAllCSV}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
               >
                 <Download className="w-4 h-4" />
                 Export All as CSV
@@ -366,8 +366,8 @@ export const DataExport: React.FC = () => {
               className={`relative overflow-hidden rounded-2xl border transition-all ${
                 isSelected
                   ? theme === 'dark'
-                    ? 'bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border-emerald-500/50'
-                    : 'bg-gradient-to-br from-emerald-50 to-blue-50 border-emerald-300'
+                    ? 'bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/50'
+                    : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300'
                   : theme === 'dark'
                     ? 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600/50'
                     : 'bg-white border-slate-200 hover:border-slate-300'
@@ -549,7 +549,7 @@ export const DataExport: React.FC = () => {
           ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50' 
           : 'bg-white border-slate-200 shadow-sm'
       }`}>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-blue-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 rounded-full blur-3xl" />
         <div className="relative">
           <h2 className={`text-xl font-bold mb-4 flex items-center gap-2 ${
             theme === 'dark' ? 'text-white' : 'text-slate-900'
@@ -570,11 +570,11 @@ export const DataExport: React.FC = () => {
               <pre className={`text-sm overflow-x-auto p-3 rounded-lg ${
                 theme === 'dark' ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-700 border'
               }`}>
-{`CREATE DATABASE IF NOT EXISTS ecotec_db
+{`CREATE DATABASE IF NOT EXISTS eco_system_db
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
-USE ecotec_db;`}
+USE eco_system_db;`}
               </pre>
             </div>
 
@@ -590,7 +590,7 @@ USE ecotec_db;`}
                 theme === 'dark' ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-700 border'
               }`}>
 {`-- In MySQL command line or workbench
-SOURCE ecotec_schema.sql;`}
+SOURCE eco_system_schema.sql;`}
               </pre>
             </div>
 
@@ -618,10 +618,10 @@ SOURCE ecotec_schema.sql;`}
               <pre className={`text-sm overflow-x-auto p-3 rounded-lg ${
                 theme === 'dark' ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-700 border'
               }`}>
-{`mysql --local-infile=1 -u root -p ecotec_db
+{`mysql --local-infile=1 -u root -p eco_system_db
 
 -- Then run:
-SOURCE ecotec_import.sql;`}
+SOURCE eco_system_import.sql;`}
               </pre>
             </div>
 

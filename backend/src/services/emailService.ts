@@ -808,7 +808,7 @@ const generateOTPEmailHTML = (data: OTPEmailData): string => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Password Reset OTP - ECOTEC</title>
+  <title>Password Reset OTP - Eco System</title>
   <style>
     @media (prefers-color-scheme: light) {
       body { background-color: #f8fafc !important; }
@@ -852,7 +852,7 @@ const generateOTPEmailHTML = (data: OTPEmailData): string => {
                 E
               </div>
               <h1 style="margin: 16px 0 0 0; color: #1e293b; font-size: 24px; font-weight: 600;" class="text-heading">
-                ECOTEC System
+                Eco System
               </h1>
             </td>
           </tr>
@@ -920,7 +920,7 @@ const generateOTPEmailHTML = (data: OTPEmailData): string => {
                       </p>
                       <ul style="margin: 0; padding: 0 0 0 20px; color: #64748b; font-size: 13px; line-height: 1.8;" class="text-body">
                         <li>Never share this code with anyone</li>
-                        <li>ECOTEC will never ask for your password</li>
+                        <li>Eco System will never ask for your password</li>
                         <li>If you didn't request this, ignore this email</li>
                       </ul>
                     </div>
@@ -935,7 +935,7 @@ const generateOTPEmailHTML = (data: OTPEmailData): string => {
           <tr>
             <td style="padding: 32px 20px; text-align: center;">
               <p style="margin: 0 0 8px 0; color: #94a3b8; font-size: 13px;" class="footer-text">
-                © ${currentYear} ECOTEC System. All rights reserved.
+                © ${currentYear} Eco System. All rights reserved.
               </p>
               <p style="margin: 0; color: #cbd5e1; font-size: 12px;" class="footer-link-text">
                 This is an automated email. Please do not reply.
@@ -955,7 +955,7 @@ const generateOTPEmailHTML = (data: OTPEmailData): string => {
 const generateOTPEmailText = (data: OTPEmailData): string => {
   const { otp, userName } = data;
   return `
-ECOTEC System - Password Reset
+Eco System - Password Reset
 
 ${userName ? `Hi ${userName},` : 'Hello,'}
 
@@ -967,10 +967,10 @@ This code will expire in 10 minutes.
 
 Security Tips:
 - Never share this code with anyone
-- ECOTEC will never ask for your password
+- Eco System will never ask for your password
 - If you didn't request this, please ignore this email
 
-© ${new Date().getFullYear()} ECOTEC System. All rights reserved.
+© ${new Date().getFullYear()} Eco System. All rights reserved.
   `.trim();
 };
 
@@ -1000,7 +1000,7 @@ export const sendPasswordResetOTP = async (data: OTPEmailData): Promise<SendOTPR
       return { success: false, error: 'Email service not configured. Set RESEND_API_KEY or SMTP credentials.' };
     }
 
-    const fromName = process.env.SMTP_FROM_NAME || 'ECOTEC System';
+    const fromName = process.env.SMTP_FROM_NAME || 'Eco System';
     const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noreply@system.com';
 
     console.log(`📤 Attempting to send OTP email to: ${data.email}`);
@@ -1008,7 +1008,7 @@ export const sendPasswordResetOTP = async (data: OTPEmailData): Promise<SendOTPR
     const mailOptions = {
       from: `"${fromName}" <${fromEmail}>`,
       to: data.email,
-      subject: '🔐 Password Reset Code - ECOTEC System',
+      subject: '🔐 Password Reset Code - Eco System',
       text: generateOTPEmailText(data),
       html: generateOTPEmailHTML(data),
     };

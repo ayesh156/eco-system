@@ -63,7 +63,7 @@ export const AIChat: React.FC = () => {
         role: 'assistant',
         content: `Ayubowan! 🙏 Welcome to Eco System AI Assistant!
 
-I'm here to help you with anything related to the ECOTEC System:
+I'm here to help you with anything related to the Eco System:
 
 📦 **Inventory Management** - Products, brands, categories, stock tracking
 👥 **Customer Management** - Customer details, purchase history, credit tracking
@@ -509,7 +509,7 @@ How can I help you today? 😊`,
               Eco System AI Assistant
             </h1>
             <p className={`mt-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-              Your intelligent assistant for the ECOTEC System
+              Your intelligent assistant for the Eco System
             </p>
           </div>
         </div>
@@ -534,7 +534,7 @@ How can I help you today? 😊`,
           </p>
           <button
             onClick={() => navigate('/settings')}
-            className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-blue-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+            className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
           >
             Go to Settings
           </button>
@@ -727,7 +727,7 @@ How can I help you today? 😊`,
             </button>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center shadow-lg">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
                   <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-slate-900" />
@@ -736,7 +736,7 @@ How can I help you today? 😊`,
                 <h1 className={`text-base sm:text-lg font-bold ${
                   theme === 'dark' ? 'text-white' : 'text-slate-900'
                 }`}>
-                  ECOTEC AI
+                  Eco System AI
                 </h1>
                 <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                   En • සිං • Singlish
@@ -863,7 +863,7 @@ How can I help you today? 😊`,
                 onClick={() => setResponseLanguage('auto')}
                 className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all ${
                   responseLanguage === 'auto'
-                    ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-sm'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm'
                     : theme === 'dark' 
                       ? 'text-slate-400 hover:text-white' 
                       : 'text-slate-500 hover:text-slate-900'
@@ -919,9 +919,9 @@ How can I help you today? 😊`,
               className="relative group w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 rounded-xl overflow-hidden"
             >
               {/* Radiant glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 via-cyan-500 to-blue-600 rounded-xl opacity-80 group-hover:opacity-100 transition-opacity" />
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 via-cyan-500 to-blue-600 rounded-xl blur-md opacity-50 group-hover:opacity-75 group-hover:blur-lg transition-all" />
-              <div className="absolute inset-[2px] bg-gradient-to-br from-emerald-500 to-blue-600 rounded-[10px]" />
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 via-teal-500 to-teal-600 rounded-xl opacity-80 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 via-teal-500 to-teal-600 rounded-xl blur-md opacity-50 group-hover:opacity-75 group-hover:blur-lg transition-all" />
+              <div className="absolute inset-[2px] bg-gradient-to-br from-emerald-500 to-teal-600 rounded-[10px]" />
               <Send className="relative w-4 h-4 sm:w-5 sm:h-5 text-white transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </button>
           </div>

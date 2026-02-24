@@ -49,12 +49,12 @@ interface PrintableQuotationProps {
 export const PrintableQuotation = forwardRef<HTMLDivElement, PrintableQuotationProps>(
   ({ quotation, branding }, ref) => {
     // Use branding values with fallbacks
-    const shopName = branding?.name || 'ECOTEC';
+    const shopName = branding?.name || 'Eco System';
     const shopSubName = branding?.subName || '';
     const hasCustomLogo = branding?.logo && branding.logo !== logo;
     const shopLogo = branding?.logo || logo;
     const shopPhone = branding?.phone || '011-2345678 | 077-1234567';
-    const shopEmail = branding?.email || 'info@ecotec.lk';
+    const shopEmail = branding?.email || 'info@ecosystem.lk';
 
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString('en-GB', {
@@ -72,7 +72,7 @@ export const PrintableQuotation = forwardRef<HTMLDivElement, PrintableQuotationP
       <div ref={ref} className="print-quotation">
         <style>{`
           /* ═══════════════════════════════════════════════════════════════
-             INK-EFFICIENT B&W PRINT OPTIMIZED - ECOTEC QUOTATION
+             INK-EFFICIENT B&W PRINT OPTIMIZED - ECO SYSTEM QUOTATION
              Designed for black laser/inkjet printers to minimize ink usage
              ═══════════════════════════════════════════════════════════════ */
           
@@ -720,9 +720,9 @@ export const PrintableQuotation = forwardRef<HTMLDivElement, PrintableQuotationP
 
         {/* Footer */}
         <div className="quotation-footer">
-          <div className="footer-message">Thank you for your interest in ECOTEC!</div>
+          <div className="footer-message">Thank you for your interest in Eco System!</div>
           <div className="footer-contact">
-            No. 123, Galle Road, Colombo 03 | www.ecotec.lk
+            No. 123, Galle Road, Colombo 03 | www.ecosystem.lk
           </div>
           <div className="footer-disclaimer">
             This quotation is valid for the period mentioned above. Prices and availability are subject to change. 

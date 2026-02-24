@@ -259,7 +259,7 @@ export const InvoiceWizardModal: React.FC<InvoiceWizardModalProps> = ({
           <DialogDescription>Create a new invoice in 3 easy steps</DialogDescription>
         </DialogHeader>
         {/* Gradient Header */}
-        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-6 text-white" aria-hidden="true">
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-600 p-6 text-white" aria-hidden="true">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
               <FileText className="w-7 h-7" />

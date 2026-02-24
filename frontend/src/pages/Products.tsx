@@ -1977,7 +1977,7 @@ export const Products: React.FC = () => {
           theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
         }`}>
           <div className={`w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
-            theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-blue-500/20' : 'bg-gradient-to-br from-emerald-50 to-blue-50'
+            theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20' : 'bg-gradient-to-br from-emerald-50 to-teal-50'
           }`}>
             <Package className={`w-10 h-10 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`} />
           </div>

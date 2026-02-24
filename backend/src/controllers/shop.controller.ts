@@ -221,6 +221,8 @@ export const updateShop = async (req: Request, res: Response, next: NextFunction
       taxRate,
       hiddenSections,
       adminHiddenSections,
+      themeMode,
+      accentColor,
     } = req.body;
 
     // Check if shop exists
@@ -249,6 +251,8 @@ export const updateShop = async (req: Request, res: Response, next: NextFunction
         taxId: taxId ?? undefined,
         currency: currency ?? undefined,
         taxRate: taxRate ?? undefined,
+        themeMode: themeMode ?? undefined,
+        accentColor: accentColor ?? undefined,
     };
 
     // Add hidden sections if provided and valid

@@ -1,3 +1,15 @@
+// Helper: generate a Tailwind color scale backed by CSS custom properties.
+// Each shade resolves to rgb(var(--{name}-{shade}) / <alpha-value>) so that
+// opacity modifiers like bg-emerald-500/20 keep working.
+function cssVarColor(name) {
+  const shades = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  const scale = {};
+  for (const s of shades) {
+    scale[s] = `rgb(var(--${name}-${s}) / <alpha-value>)`;
+  }
+  return scale;
+}
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
@@ -15,6 +27,10 @@ export default {
     },
     extend: {
       colors: {
+        // Dynamic accent colours — CSS vars are updated at runtime by ThemeContext
+        emerald: cssVarColor('accent'),
+        teal: cssVarColor('accent2'),
+
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

@@ -17,7 +17,7 @@ datasource db {
 model Shop {
   id            String    @id @default(cuid())
   name          String    
-  slug          String    @unique  // URL-friendly name e.g., "ecotech"
+  slug          String    @unique  // URL-friendly name e.g., "eco-system"
   subName       String?             // Secondary name e.g., "SOLUTIONS"
   tagline       String?             // Tagline e.g., "Computer Solutions"
   description   String?
@@ -57,6 +57,10 @@ model Shop {
   // e.g., ["/services", "/quotations", "/estimates", "/cash-management"]
   hiddenSections            String[]  @default([])
   adminHiddenSections       String[]  @default([])
+  
+  // Appearance Settings
+  themeMode       String?   @default("dark")     // 'dark' | 'light'
+  accentColor     String?   @default("emerald")  // 'emerald' | 'blue' | 'purple' | 'rose' | 'amber' | 'indigo'
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

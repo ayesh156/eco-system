@@ -543,7 +543,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
         {/* Gradient Header */}
         <div className={`p-4 sm:p-6 text-white ${isEditing 
           ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500' 
-          : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500'
+          : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-teal-500'
         }`} aria-hidden="true">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
@@ -603,8 +603,8 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
                   {/* Center icon with glow */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full blur-xl opacity-60 animate-pulse" />
-                      <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-full flex items-center justify-center shadow-2xl">
+                      <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full blur-xl opacity-60 animate-pulse" />
+                      <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500 via-teal-500 to-teal-500 rounded-full flex items-center justify-center shadow-2xl">
                         <Building2 className="w-8 h-8 text-white animate-pulse" />
                       </div>
                     </div>
@@ -615,7 +615,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
                 <div className="w-48 mb-4">
                   <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-full transition-all duration-200 ease-out"
+                      className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-teal-500 rounded-full transition-all duration-200 ease-out"
                       style={{ width: `${fillProgress}%` }}
                     />
                   </div>
@@ -638,7 +638,7 @@ export const BrandFormModal: React.FC<BrandFormModalProps> = ({
                   {[...Array(6)].map((_, i) => (
                     <div
                       key={i}
-                      className="absolute w-2 h-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full opacity-40"
+                      className="absolute w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full opacity-40"
                       style={{
                         left: `${15 + i * 15}%`,
                         bottom: '-10px',

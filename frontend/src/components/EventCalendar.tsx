@@ -607,7 +607,7 @@ export const EventCalendar: React.FC<EventCalendarProps> = () => {
             </button>
             <button
               onClick={handleCreateEvent}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95"
             >
               <Plus className="w-4 h-4" />
               New Event
@@ -790,8 +790,8 @@ export const EventCalendar: React.FC<EventCalendarProps> = () => {
                       day.isCurrentMonth
                         ? isSelected
                           ? theme === 'dark'
-                            ? 'bg-gradient-to-br from-emerald-500/20 to-blue-500/10 border-emerald-500/50 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/10'
-                            : 'bg-gradient-to-br from-emerald-50 to-blue-50 border-emerald-400 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/10'
+                            ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border-emerald-500/50 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/10'
+                            : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-400 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/10'
                           : day.isToday
                             ? theme === 'dark'
                               ? 'bg-gradient-to-br from-blue-500/20 to-indigo-500/10 border-blue-500/50 shadow-md shadow-blue-500/10'
@@ -865,8 +865,8 @@ export const EventCalendar: React.FC<EventCalendarProps> = () => {
                   className={`group relative p-4 rounded-xl border transition-all duration-200 overflow-hidden ${
                     isCurrentMonth
                       ? theme === 'dark'
-                        ? 'bg-gradient-to-br from-emerald-500/20 to-blue-500/10 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
-                        : 'bg-gradient-to-br from-emerald-50 to-blue-50 border-emerald-400 shadow-lg shadow-emerald-500/10'
+                        ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
+                        : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-400 shadow-lg shadow-emerald-500/10'
                       : theme === 'dark'
                         ? 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-700/40 hover:border-slate-600 hover:shadow-md'
                         : 'bg-white border-slate-200 hover:bg-slate-50 hover:shadow-md'
@@ -948,7 +948,7 @@ export const EventCalendar: React.FC<EventCalendarProps> = () => {
                   setIsEditing(true);
                   setIsEventModalOpen(true);
                 }}
-                className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl text-sm font-medium transition-all hover:scale-105"
+                className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-sm font-medium transition-all hover:scale-105"
               >
                 <Plus className="w-4 h-4" />
                 Add
@@ -1155,7 +1155,7 @@ export const EventCalendar: React.FC<EventCalendarProps> = () => {
                   {/* Date badge */}
                   <div className={`flex-shrink-0 text-center px-3 py-2 rounded-xl ${
                     isToday
-                      ? 'bg-gradient-to-br from-emerald-500 to-blue-500 text-white'
+                      ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white'
                       : isTomorrow
                         ? theme === 'dark' ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-50 text-amber-600'
                         : theme === 'dark' ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-600'
@@ -2033,7 +2033,7 @@ const EventFormModal: React.FC<EventFormModalProps> = ({
                 <button
                   onClick={handleSubmit}
                   disabled={!title.trim()}
-                  className="px-4 py-2 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-blue-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="px-4 py-2 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {event ? 'Save Changes' : 'Create Event'}
                 </button>
@@ -2041,7 +2041,7 @@ const EventFormModal: React.FC<EventFormModalProps> = ({
             ) : (
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-blue-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+                className="px-4 py-2 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
               >
                 Close
               </button>

@@ -619,7 +619,7 @@ How can I help you today? 😊`,
       >
         <div className="relative">
           {/* Multi-layer animated glow effect - Creative attention grabber */}
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 rounded-full blur-xl opacity-40 group-hover:opacity-100 animate-pulse transition-opacity duration-500" />
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-teal-500 to-teal-500 rounded-full blur-xl opacity-40 group-hover:opacity-100 animate-pulse transition-opacity duration-500" />
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full blur-lg opacity-30 group-hover:opacity-60 animate-spin-slow transition-opacity duration-500" 
                style={{ animationDuration: '8s' }} />
           <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 rounded-full blur-2xl opacity-0 group-hover:opacity-50 group-hover:animate-spin transition-all duration-700" 
@@ -632,7 +632,7 @@ How can I help you today? 😊`,
                style={{ animationDuration: '6s' }} />
           
           {/* Button with 3D tilt animation */}
-          <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-emerald-500 via-teal-500 to-blue-600 group-hover:from-pink-500 group-hover:via-purple-500 group-hover:to-blue-500 rounded-full shadow-2xl hover:shadow-pink-500/70 transition-all duration-700 hover:scale-110 animate-float group-hover:animate-bounce"
+          <div className="relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-emerald-500 via-teal-500 to-teal-600 group-hover:from-pink-500 group-hover:via-purple-500 group-hover:to-teal-500 rounded-full shadow-2xl hover:shadow-pink-500/70 transition-all duration-700 hover:scale-110 animate-float group-hover:animate-bounce"
                style={{
                  transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
                  animation: 'float 3s ease-in-out infinite, pulse-glow 2s ease-in-out infinite'
@@ -728,7 +728,7 @@ How can I help you today? 😊`,
       }`}>
         {/* Compact Header */}
         <div className="relative overflow-hidden flex-shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-blue-600" />
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-600" />
           
           <div className="relative flex items-center justify-between px-3 py-2">
             <div className="flex items-center gap-2">
@@ -855,7 +855,7 @@ How can I help you today? 😊`,
                   <button
                     onClick={handleSaveApiKey}
                     disabled={!apiKeyInput.trim()}
-                    className="w-full px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-600 text-white rounded-xl font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
                   >
                     Connect AI
                   </button>
@@ -968,7 +968,7 @@ How can I help you today? 😊`,
                         onClick={() => setResponseLanguage('auto')}
                         className={`px-1.5 py-0.5 rounded text-[9px] font-medium transition-all ${
                           responseLanguage === 'auto'
-                            ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white'
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
                             : theme === 'dark' 
                               ? 'text-slate-400 hover:text-white' 
                               : 'text-slate-500 hover:text-slate-900'
@@ -1024,9 +1024,9 @@ How can I help you today? 😊`,
                       className="relative group w-9 h-9 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 rounded-xl overflow-hidden"
                     >
                       {/* Radiant glow effect */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 via-cyan-500 to-blue-600 rounded-xl opacity-80 group-hover:opacity-100 transition-opacity" />
-                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 via-cyan-500 to-blue-600 rounded-xl blur-md opacity-40 group-hover:opacity-60 transition-all" />
-                      <div className="absolute inset-[2px] bg-gradient-to-br from-emerald-500 to-blue-600 rounded-[9px]" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 via-teal-500 to-teal-600 rounded-xl opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 via-teal-500 to-teal-600 rounded-xl blur-md opacity-40 group-hover:opacity-60 transition-all" />
+                      <div className="absolute inset-[2px] bg-gradient-to-br from-emerald-500 to-teal-600 rounded-[9px]" />
                       <Send className="relative w-3.5 h-3.5 text-white transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                     </button>
                   </div>
@@ -1043,7 +1043,7 @@ How can I help you today? 😊`,
             className="w-full px-3 py-2 flex items-center gap-2 hover:bg-white/5 transition-colors cursor-pointer"
           >
             <div className="relative">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500/20 to-blue-500/20 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
                 <Bot className={`w-3.5 h-3.5 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`} />
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-slate-900 animate-pulse" />

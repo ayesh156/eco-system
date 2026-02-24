@@ -5,10 +5,22 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    // Fix WebSocket HMR connection issues
+    // https://vite.dev/config/server-options.html#server-hmr
+    hmr: {
+      // Use the same host/port as the dev server so the browser can
+      // reach the WebSocket endpoint without cross-origin or proxy issues.
+      host: 'localhost',
+      port: 5173,
+      protocol: 'ws',
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    dedupe: ['react', 'react-dom'],
   },
   build: {
     // Enable source maps for production debugging (optional, remove if not needed)

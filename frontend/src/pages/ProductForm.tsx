@@ -1356,7 +1356,7 @@ export const ProductForm: React.FC = () => {
                           <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-emerald-500 border-r-blue-500 animate-spin" />
                           {/* Inner pulsing circle */}
                           <div className={`absolute inset-2 rounded-full flex items-center justify-center ${
-                            theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-blue-500/20' : 'bg-gradient-to-br from-emerald-50 to-blue-50'
+                            theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20' : 'bg-gradient-to-br from-emerald-50 to-teal-50'
                           }`}>
                             <Brain className="w-6 h-6 text-emerald-500 animate-pulse" />
                           </div>
@@ -1367,7 +1367,7 @@ export const ProductForm: React.FC = () => {
                         
                         {/* Analysis text with typing effect */}
                         <div className="text-center space-y-2">
-                          <p className={`text-sm font-semibold bg-gradient-to-r from-emerald-500 to-blue-500 bg-clip-text text-transparent`}>
+                          <p className={`text-sm font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent`}>
                             AI Analyzing Product Image...
                           </p>
                           <div className="flex items-center justify-center gap-1">
@@ -1440,7 +1440,7 @@ export const ProductForm: React.FC = () => {
                     {/* AI Feature Highlight */}
                     {geminiService.hasApiKey() && aiAutoFillEnabled && !isEditing && (
                       <div className={`mx-auto max-w-xs p-2 rounded-lg ${
-                        theme === 'dark' ? 'bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/20' : 'bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200'
+                        theme === 'dark' ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20' : 'bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200'
                       }`}>
                         <div className="flex items-center justify-center gap-2">
                           <Brain className="w-4 h-4 text-emerald-500" />
@@ -1469,8 +1469,8 @@ export const ProductForm: React.FC = () => {
             {aiAutoFillSuccess && (
               <div className={`flex items-center gap-3 p-3 rounded-xl border animate-pulse ${
                 theme === 'dark' 
-                  ? 'bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border-emerald-500/30' 
-                  : 'bg-gradient-to-r from-emerald-50 to-blue-50 border-emerald-200'
+                  ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-500/30' 
+                  : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200'
               }`}>
                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/20">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />

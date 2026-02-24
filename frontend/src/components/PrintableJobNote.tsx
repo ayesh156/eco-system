@@ -22,11 +22,11 @@ interface PrintableJobNoteProps {
 export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps>(
   ({ jobNote, branding }, ref) => {
     // Use branding values with fallbacks
-    const shopName = branding?.name || 'ECOTEC';
+    const shopName = branding?.name || 'Eco System';
     const hasCustomLogo = branding?.logo && branding.logo !== defaultLogo;
     const shopLogo = branding?.logo || defaultLogo;
     const shopPhone = branding?.phone || '011-2345678';
-    const shopEmail = branding?.email || 'info@ecotec.lk';
+    const shopEmail = branding?.email || 'info@ecosystem.lk';
 
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString('en-GB', {
@@ -81,7 +81,7 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
       <div ref={ref} className="print-job-note">
         <style>{`
           /* ═══════════════════════════════════════════════════════════════
-             INK-EFFICIENT B&W PRINT OPTIMIZED - ECOTEC JOB NOTE
+             INK-EFFICIENT B&W PRINT OPTIMIZED - ECO SYSTEM JOB NOTE
              Designed for black laser/inkjet printers to minimize ink usage
              ═══════════════════════════════════════════════════════════════ */
           
@@ -772,8 +772,8 @@ export const PrintableJobNote = forwardRef<HTMLDivElement, PrintableJobNoteProps
         {/* Footer */}
         <div className="job-footer">
           <p>No. 123, Main Street, Colombo 05, Sri Lanka</p>
-          <p>www.ecotec.lk | support@ecotec.lk</p>
-          <p className="thanks">Thank you for choosing ECOTEC!</p>
+          <p>www.ecosystem.lk | support@ecosystem.lk</p>
+          <p className="thanks">Thank you for choosing Eco System!</p>
         </div>
       </div>
     );

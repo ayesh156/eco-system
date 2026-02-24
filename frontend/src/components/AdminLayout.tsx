@@ -39,7 +39,7 @@ interface AdminLayoutProps {
 }
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
-  const { theme, toggleTheme, aiAutoFillEnabled, toggleAiAutoFill } = useTheme();
+  const { theme, toggleTheme, aiAutoFillEnabled, toggleAiAutoFill, setAccentColor } = useTheme();
   const { user, logout, isViewingShop, viewingShop, exitViewingShop } = useAuth();
   const { branding } = useShopBranding();
   const { isSectionHidden, isSuperAdminHidden, isAdminHidden, hiddenSections, adminHiddenSections, isLoading: sectionsLoading } = useShopSections();
@@ -85,6 +85,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   // Handle exit viewing shop
   const handleExitViewingShop = () => {
+    // Restore SUPER_ADMIN's own accent colour before exiting
+    const savedAdminAccent = localStorage.getItem('superAdminAccentColor');
+    if (savedAdminAccent) {
+      setAccentColor(savedAdminAccent as any);
+    }
     exitViewingShop();
     navigate('/admin');
   };
@@ -535,7 +540,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 {branding.logo ? (
                   <img src={branding.logo} alt="Shop Logo" className="w-10 h-10 object-contain" />
                 ) : (
-                  <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center">
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                     <Building className="w-6 h-6 text-white" />
                   </div>
                 )}
@@ -610,8 +615,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 ${
                         parentActive
                           ? theme === 'dark'
-                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10 cursor-pointer'
-                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10 cursor-pointer'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10 cursor-pointer'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10 cursor-pointer'
                           : theme === 'dark'
                             ? 'text-slate-400 hover:text-white hover:bg-slate-800/50 cursor-pointer'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer'
@@ -620,7 +625,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     >
                       {/* Active indicator bar */}
                       {parentActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-full" />
                       )}
 
                       <Icon className={`w-5 h-5 flex-shrink-0 transition-transform ${
@@ -712,8 +717,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       to={item.path}
                       className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 ${exactActive
                           ? theme === 'dark'
-                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10'
-                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10'
                           : theme === 'dark'
                             ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -722,7 +727,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     >
                       {/* Active indicator bar */}
                       {exactActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-full" />
                       )}
 
                       <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${exactActive ? 'text-emerald-500' : ''
@@ -797,8 +802,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                             {subItem.badge && (
                               <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full min-w-[20px] text-center ${
                                 theme === 'dark'
-                                  ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 text-emerald-400 border border-emerald-500/30'
-                                  : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-600 border border-emerald-200'
+                                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-600 border border-emerald-200'
                               }`}>
                                 {subItem.badge}
                               </span>
@@ -859,8 +864,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 ${
                         parentActive
                           ? theme === 'dark'
-                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10 cursor-pointer'
-                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10 cursor-pointer'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10 cursor-pointer'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10 cursor-pointer'
                           : theme === 'dark'
                             ? 'text-slate-400 hover:text-white hover:bg-slate-800/50 cursor-pointer'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer'
@@ -868,7 +873,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       title={sidebarCollapsed ? item.label : undefined}
                     >
                       {parentActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-full" />
                       )}
 
                       <Icon className={`w-5 h-5 flex-shrink-0 transition-transform ${
@@ -939,8 +944,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       to={item.path}
                       className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 ${exactActive
                           ? theme === 'dark'
-                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10'
-                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-400 shadow-lg shadow-emerald-500/10'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-600 shadow-lg shadow-emerald-500/10'
                           : theme === 'dark'
                             ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -948,7 +953,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       title={sidebarCollapsed ? item.label : undefined}
                     >
                       {exactActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-full" />
                       )}
                       <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${exactActive ? 'text-emerald-500' : ''}`} />
                       {!sidebarCollapsed && (
@@ -1001,8 +1006,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                             {subItem.badge && (
                               <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full min-w-[20px] text-center ${
                                 theme === 'dark'
-                                  ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 text-emerald-400 border border-emerald-500/30'
-                                  : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-600 border border-emerald-200'
+                                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-600 border border-emerald-200'
                               }`}>
                                 {subItem.badge}
                               </span>
@@ -1095,7 +1100,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 {branding.logo ? (
                   <img src={branding.logo} alt="Shop Logo" className="w-10 h-10 object-contain" />
                 ) : (
-                  <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                     <Building className="w-6 h-6 text-white" />
                   </div>
                 )}
@@ -1145,15 +1150,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       onClick={() => toggleMenu(item.path)}
                       className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all cursor-pointer ${parentActive
                           ? theme === 'dark'
-                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400'
-                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-400'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-600'
                           : theme === 'dark'
                             ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                         }`}
                     >
                       {parentActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-full" />
                       )}
                       <Icon className={`w-5 h-5 ${parentActive ? 'text-emerald-500' : ''}`} />
                       <span className="flex-1">
@@ -1198,8 +1203,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                               {subItem.badge && (
                                 <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full min-w-[20px] text-center ${
                                   theme === 'dark'
-                                    ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 text-emerald-400 border border-emerald-500/30'
-                                    : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-600 border border-emerald-200'
+                                    ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-600 border border-emerald-200'
                                 }`}>
                                   {subItem.badge}
                                 </span>
@@ -1216,15 +1221,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     onClick={() => setMobileSidebarOpen(false)}
                     className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all ${exactActive
                         ? theme === 'dark'
-                          ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400'
-                          : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600'
+                          ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-400'
+                          : 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-600'
                         : theme === 'dark'
                           ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                       }`}
                   >
                     {exactActive && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-full" />
                     )}
                     <Icon className={`w-5 h-5 ${exactActive ? 'text-emerald-500' : ''}`} />
                     <span className="flex-1">{item.label}</span>
@@ -1259,15 +1264,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       onClick={() => toggleMenu(item.path)}
                       className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all cursor-pointer ${parentActive
                           ? theme === 'dark'
-                            ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400'
-                            : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600'
+                            ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-400'
+                            : 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-600'
                           : theme === 'dark'
                             ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                         }`}
                     >
                       {parentActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-full" />
                       )}
                       <Icon className={`w-5 h-5 ${parentActive ? 'text-emerald-500' : ''}`} />
                       <span className="flex-1">{item.label}</span>
@@ -1302,8 +1307,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                               {subItem.badge && (
                                 <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full min-w-[20px] text-center ${
                                   theme === 'dark'
-                                    ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 text-emerald-400 border border-emerald-500/30'
-                                    : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-600 border border-emerald-200'
+                                    ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-600 border border-emerald-200'
                                 }`}>
                                   {subItem.badge}
                                 </span>
@@ -1320,15 +1325,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                     onClick={() => setMobileSidebarOpen(false)}
                     className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all ${exactActive
                         ? theme === 'dark'
-                          ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/10 text-emerald-400'
-                          : 'bg-gradient-to-r from-emerald-500/10 to-blue-500/5 text-emerald-600'
+                          ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-400'
+                          : 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-600'
                         : theme === 'dark'
                           ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                       }`}
                   >
                     {exactActive && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-r-full" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-r-full" />
                     )}
                     <Icon className={`w-5 h-5 ${exactActive ? 'text-emerald-500' : ''}`} />
                     <span>{item.label}</span>
@@ -1463,7 +1468,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             {/* Right side */}
             <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3">
               {/* Pro Badge - hidden on tablet for space */}
-              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 rounded-full border border-emerald-500/20">
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-full border border-emerald-500/20">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="text-xs font-medium text-emerald-400">Pro</span>
               </div>
@@ -1475,7 +1480,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 }`}>
                 <Bell className="w-5 h-5" />
                 {notificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                     {notificationCount}
                   </span>
                 )}
@@ -1499,8 +1504,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 title={aiAutoFillEnabled ? 'AI Auto-Fill: ON' : 'AI Auto-Fill: OFF'}
                 className={`relative p-2.5 rounded-xl border transition-all group ${aiAutoFillEnabled
                     ? theme === 'dark'
-                      ? 'bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border-emerald-500/30 hover:from-emerald-500/30 hover:to-blue-500/30'
-                      : 'bg-gradient-to-r from-emerald-50 to-blue-50 border-emerald-200 hover:from-emerald-100 hover:to-blue-100'
+                      ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border-emerald-500/30 hover:from-emerald-500/30 hover:to-teal-500/30'
+                      : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 hover:from-emerald-100 hover:to-teal-100'
                     : theme === 'dark'
                       ? 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-700/50'
                       : 'bg-white border-slate-200 hover:bg-slate-50'
@@ -1537,7 +1542,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       : 'bg-white border-slate-200 hover:bg-slate-50'
                     }`}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
                     <User className="w-4 h-4 text-white" />
                   </div>
                   <div className="hidden md:block text-left min-w-0">

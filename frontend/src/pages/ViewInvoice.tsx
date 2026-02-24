@@ -1048,10 +1048,10 @@ Thank you for your business! 🙏`;
   );
 
   return (
-    <div className={`min-h-screen p-2 sm:p-4 lg:p-6 pb-20 sm:pb-4 lg:pb-6 ${theme === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}>
+    <div className={`min-h-screen p-1.5 sm:p-3 md:p-4 lg:p-6 pb-24 sm:pb-4 lg:pb-6 ${theme === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}>
       {/* Header */}
-      <div className="max-w-6xl mx-auto mb-3 sm:mb-4 lg:mb-6">
-        <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+      <div className="max-w-6xl mx-auto mb-2 sm:mb-3 md:mb-4 lg:mb-6">
+        <div className="flex items-center justify-between gap-1 sm:gap-2">
           {/* Left: Back button */}
           <button
             onClick={() => navigate('/invoices')}
@@ -1065,9 +1065,9 @@ Thank you for your business! 🙏`;
           </button>
 
           {/* Center: Invoice info */}
-          <div className="flex-1 min-w-0 mx-1.5 sm:mx-2 md:mx-4">
-            <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2">
-              <h1 className={`text-sm sm:text-lg md:text-xl lg:text-2xl font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+          <div className="flex-1 min-w-0 mx-1 sm:mx-2 md:mx-4">
+            <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 flex-wrap">
+              <h1 className={`text-[13px] sm:text-lg md:text-xl lg:text-2xl font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {invoice.id}
               </h1>
               <button
@@ -1087,7 +1087,7 @@ Thank you for your business! 🙏`;
                 </div>
               </div>
             </div>
-            <p className={`text-[9px] sm:text-[10px] md:text-xs lg:text-sm truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-[9px] sm:text-[10px] md:text-xs lg:text-sm truncate mt-0.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
               {(() => {
                 const date = new Date(invoice.date);
                 const timeStr = date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1241,31 +1241,31 @@ Thank you for your business! 🙏`;
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 xl:gap-6">
         {/* Main Invoice Preview */}
-        <div className="md:col-span-2 min-w-0">
+        <div className="lg:col-span-2 min-w-0">
           <div className={`rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl ${
             theme === 'dark' ? 'shadow-black/50' : 'shadow-slate-300/50'
           }`}>
             {/* Invoice Header */}
-            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-3 sm:p-5 md:p-6 lg:p-8 text-white">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2.5 sm:gap-4">
+            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-2.5 sm:p-4 md:p-6 lg:p-8 text-white">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-4">
                 <div>
                   <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 mb-0.5 sm:mb-2">
-                    <Monitor className="w-4 h-4 sm:w-6 sm:h-6 md:w-8 md:h-8" />
-                    <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold tracking-tight">ECOTEC</h2>
+                    <Monitor className="w-3.5 h-3.5 sm:w-5 sm:h-5 md:w-8 md:h-8" />
+                    <h2 className="text-base sm:text-xl md:text-2xl lg:text-3xl font-bold tracking-tight">ECOTEC</h2>
                   </div>
-                  <p className="text-emerald-200 text-[10px] sm:text-xs md:text-sm mt-0.5 sm:mt-1 tracking-widest">COMPUTER SOLUTIONS</p>
-                  <div className="mt-1.5 sm:mt-3 md:mt-4 text-emerald-100 text-[10px] sm:text-xs md:text-sm space-y-0.5">
+                  <p className="text-emerald-200 text-[9px] sm:text-xs md:text-sm mt-0.5 sm:mt-1 tracking-widest">COMPUTER SOLUTIONS</p>
+                  <div className="mt-1 sm:mt-3 md:mt-4 text-emerald-100 text-[9px] sm:text-xs md:text-sm space-y-0.5">
                     <p className="flex items-center gap-1 sm:gap-1.5 md:gap-2"><MapPin className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 flex-shrink-0" /> Main Street, Colombo 03</p>
                     <p className="flex items-center gap-1 sm:gap-1.5 md:gap-2"><Phone className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 flex-shrink-0" /> 011-2345678 • 077-1234567</p>
-                    <p className="flex items-center gap-1 sm:gap-1.5 md:gap-2"><Mail className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 flex-shrink-0" /> info@ecotec.lk</p>
+                    <p className="flex items-center gap-1 sm:gap-1.5 md:gap-2 hidden sm:flex"><Mail className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 flex-shrink-0" /> info@ecotec.lk</p>
                   </div>
                 </div>
                 <div className="flex flex-col items-end text-right">
-                  <p className="text-base sm:text-2xl md:text-3xl lg:text-4xl font-bold tracking-wider">INVOICE</p>
-                  <p className="text-emerald-200 text-xs sm:text-base md:text-lg mt-1 sm:mt-2">{invoice.id}</p>
-                  <div className={`inline-flex items-center gap-1 sm:gap-1.5 md:gap-2 mt-1 sm:mt-3 px-2 sm:px-3 md:px-4 py-0.5 sm:py-1 md:py-2 rounded-full text-[10px] sm:text-xs md:text-sm ${
+                  <p className="text-sm sm:text-2xl md:text-3xl lg:text-4xl font-bold tracking-wider">INVOICE</p>
+                  <p className="text-emerald-200 text-[11px] sm:text-base md:text-lg mt-0.5 sm:mt-2">{invoice.id}</p>
+                  <div className={`inline-flex items-center gap-1 sm:gap-1.5 md:gap-2 mt-1 sm:mt-3 px-1.5 sm:px-3 md:px-4 py-0.5 sm:py-1 md:py-2 rounded-full text-[9px] sm:text-xs md:text-sm ${
                     invoice.status === 'fullpaid' ? 'bg-emerald-500' :
                     invoice.status === 'halfpay' ? 'bg-amber-500' : 'bg-red-500'
                   }`}>
@@ -1279,7 +1279,7 @@ Thank you for your business! 🙏`;
             {/* Invoice Body */}
             <div className={`p-3 sm:p-5 md:p-6 lg:p-8 ${theme === 'dark' ? 'bg-slate-900' : 'bg-white'}`}>
               {/* Customer & Date Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4 md:gap-6 mb-3 sm:mb-5 md:mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-6 mb-2.5 sm:mb-4 md:mb-6">
                 <div className={`p-2.5 sm:p-4 md:p-5 rounded-lg sm:rounded-xl border-l-4 border-emerald-500 ${
                   theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
                 }`}>
@@ -1332,7 +1332,7 @@ Thank you for your business! 🙏`;
               </div>
               
               {/* Payment Method & Sales Channel */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:gap-6 mb-3 sm:mb-6 md:mb-8">
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-3 md:gap-6 mb-2.5 sm:mb-5 md:mb-8">
                 <div className={`p-2 sm:p-3 md:p-4 rounded-lg sm:rounded-xl flex items-center gap-2 sm:gap-2.5 md:gap-3 ${
                   theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'
                 }`}>
@@ -1407,8 +1407,8 @@ Thank you for your business! 🙏`;
                   theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
                 }`}>
                   {/* Mobile Card Layout */}
-                  <div className="md:hidden">
-                    <div className={`py-2.5 px-3 text-xs font-bold uppercase tracking-wider ${
+                  <div className="lg:hidden">
+                    <div className={`py-2 px-2.5 sm:px-3 text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
                       theme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
                     }`}>
                       Items ({invoice.items.length})
@@ -1418,15 +1418,15 @@ Thank you for your business! 🙏`;
                         const product = getProductDetails(item.productId);
                         const warrantyStatus = getWarrantyStatus(item.warrantyDueDate);
                         return (
-                          <div key={item.productId + index} className={`p-3 ${index % 2 === 1 ? (theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50/50') : ''}`}>
-                            <div className="flex items-start gap-2.5">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          <div key={item.productId + index} className={`p-2 sm:p-3 ${index % 2 === 1 ? (theme === 'dark' ? 'bg-slate-800/30' : 'bg-slate-50/50') : ''}`}>
+                            <div className="flex items-start gap-2">
+                              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
                                 theme === 'dark' ? 'bg-emerald-500/20' : 'bg-emerald-100'
                               }`}>
-                                <Package className="w-4 h-4 text-emerald-500" />
+                                <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                <p className={`text-[12px] sm:text-sm font-semibold leading-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                                   {item.productName}
                                   {product?.warranty && (
                                     <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded ${theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
@@ -1480,7 +1480,7 @@ Thank you for your business! 🙏`;
                   </div>
 
                   {/* Desktop Table Layout */}
-                  <table className="w-full hidden md:table">
+                  <table className="w-full hidden lg:table">
                     <thead>
                       <tr className={theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}>
                         <th className={`py-3 sm:py-4 px-3 sm:px-4 text-left text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
@@ -1645,7 +1645,7 @@ Thank you for your business! 🙏`;
         </div>
 
         {/* Right Sidebar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 lg:gap-5 xl:gap-6">
           {/* Quick Stats */}
           <div className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border ${
             theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-white border-slate-200 shadow-sm'
@@ -1829,8 +1829,8 @@ Thank you for your business! 🙏`;
             {invoice.status === 'fullpaid' && (
               <div className={`flex items-center justify-center gap-2 py-3 rounded-xl ${
                 theme === 'dark' 
-                  ? 'bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-cyan-500/10 border border-emerald-500/20' 
-                  : 'bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-200'
+                  ? 'bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-teal-500/10 border border-emerald-500/20' 
+                  : 'bg-gradient-to-br from-emerald-50 via-teal-50 to-teal-50 border border-emerald-200'
               }`}>
                 <CheckCircle className="w-5 h-5 text-emerald-500" />
                 <span className={`font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
@@ -2060,36 +2060,36 @@ Thank you for your business! 🙏`;
         shopId={effectiveShopId}
       />
 
-      {/* Mobile Floating Action Bar - Samsung S20 optimized */}
+      {/* Mobile Floating Action Bar - Samsung S20 (360px) optimized */}
       {isMobile && (
-        <div className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl safe-area-bottom ${
+        <div className={`fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl ${
           theme === 'dark'
             ? 'bg-slate-900/95 border-slate-700/80'
             : 'bg-white/95 border-slate-200'
         }`}>
-          <div className="flex items-center justify-around px-2 py-2">
+          <div className="flex items-center justify-around px-1.5 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
             {/* Record Payment - Primary Action */}
             {invoice.status !== 'fullpaid' && (
               <button
                 onClick={() => setShowPaymentModal(true)}
-                className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all active:scale-95"
+                className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all active:scale-95"
               >
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                  <Wallet className="w-5 h-5 text-white" />
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <Wallet className="w-4 h-4 text-white" />
                 </div>
-                <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Pay</span>
+                <span className={`text-[9px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Pay</span>
               </button>
             )}
 
             {/* Print */}
             <button
               onClick={handlePrint}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all active:scale-95"
+              className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all active:scale-95"
             >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-slate-100 border border-slate-200'}`}>
-                <Printer className={`w-5 h-5 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`} />
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-slate-100 border border-slate-200'}`}>
+                <Printer className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`} />
               </div>
-              <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Print</span>
+              <span className={`text-[9px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Print</span>
             </button>
 
             {/* Edit */}
@@ -2098,23 +2098,34 @@ Thank you for your business! 🙏`;
                 setSelectedInvoice(invoice);
                 setShowEditModal(true);
               }}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all active:scale-95"
+              className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all active:scale-95"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                <Edit3 className="w-5 h-5 text-white" />
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <Edit3 className="w-4 h-4 text-white" />
               </div>
-              <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Edit</span>
+              <span className={`text-[9px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Edit</span>
+            </button>
+
+            {/* Download */}
+            <button
+              onClick={handleDownloadPDF}
+              className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all active:scale-95"
+            >
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-slate-100 border border-slate-200'}`}>
+                <Download className={`w-4 h-4 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-500'}`} />
+              </div>
+              <span className={`text-[9px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>PDF</span>
             </button>
 
             {/* More */}
             <button
               onClick={() => setShowActions(true)}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all active:scale-95"
+              className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all active:scale-95"
             >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-slate-100 border border-slate-200'}`}>
-                <MoreVertical className={`w-5 h-5 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`} />
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${theme === 'dark' ? 'bg-slate-800 border border-slate-700' : 'bg-slate-100 border border-slate-200'}`}>
+                <MoreVertical className={`w-4 h-4 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`} />
               </div>
-              <span className={`text-[10px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>More</span>
+              <span className={`text-[9px] font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>More</span>
             </button>
           </div>
         </div>

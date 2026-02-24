@@ -256,7 +256,7 @@ export const ShopBrandingTab: React.FC = () => {
             : 'bg-white border-slate-200 shadow-sm'
         }`}
       >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 rounded-full blur-3xl" />
         <div className="relative">
           <div className="flex items-center gap-3 mb-6">
             <div
@@ -711,35 +711,36 @@ export const ShopBrandingTab: React.FC = () => {
         </div>
 
         {/* Header Only Preview */}
-        <div className="p-6">
-          <div className="rounded-xl border p-6 bg-white border-slate-300">
-            <div className="flex justify-between items-center border-b-2 border-black pb-4">
+        <div className="p-3 sm:p-4 md:p-6">
+          <div className="rounded-xl border p-3 sm:p-4 md:p-6 bg-white border-slate-300">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 border-b-2 border-black pb-3 sm:pb-4">
               {/* Left - Company Section */}
-              <div className="flex items-center gap-3">
-                {/* Logo - No border/border-radius */}
-                <div className="flex items-center justify-center bg-white flex-shrink-0" style={{ width: 'auto', maxWidth: '120px', maxHeight: '80px' }}>
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Logo */}
+                <div className="flex items-center justify-center bg-white flex-shrink-0" style={{ width: 'auto', maxWidth: '80px', maxHeight: '56px' }}>
                   {logoPreview ? (
                     <img
                       src={logoPreview}
                       alt="Logo"
-                      style={{ width: 'auto', height: 'auto', maxWidth: '120px', maxHeight: '80px', objectFit: 'contain' }}
+                      className="sm:max-w-[120px] sm:max-h-[80px]"
+                      style={{ width: 'auto', height: 'auto', maxWidth: '80px', maxHeight: '56px', objectFit: 'contain' }}
                     />
                   ) : (
-                    <Building2 className="w-10 h-10 text-gray-400" />
+                    <Building2 className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
                   )}
                 </div>
 
                 {/* Company Info */}
-                <div>
-                  <h1 className="text-lg font-bold text-black leading-tight">
+                <div className="min-w-0">
+                  <h1 className="text-sm sm:text-base md:text-lg font-bold text-black leading-tight truncate">
                     {formData.name || 'SHOP NAME'}
                   </h1>
                   {formData.subName && (
-                    <div className="text-xs font-semibold text-black">
+                    <div className="text-[10px] sm:text-xs font-semibold text-black truncate">
                       {formData.subName}
                     </div>
                   )}
-                  <div className="text-xs text-black mt-1 leading-relaxed">
+                  <div className="text-[10px] sm:text-xs text-black mt-0.5 sm:mt-1 leading-relaxed line-clamp-2 sm:line-clamp-none">
                     {formData.address
                       ?.split(',')
                       .map((line, i) => (
@@ -753,11 +754,11 @@ export const ShopBrandingTab: React.FC = () => {
               </div>
 
               {/* Right - Contact Box */}
-              <div className="text-right flex flex-col justify-center">
-                <h3 className="text-xs font-semibold text-black underline mb-1">
+              <div className="text-left sm:text-right flex flex-col justify-center border-t sm:border-t-0 border-gray-200 pt-2 sm:pt-0 flex-shrink-0">
+                <h3 className="text-[10px] sm:text-xs font-semibold text-black underline mb-0.5 sm:mb-1">
                   Contact information
                 </h3>
-                <div className="text-xs text-black leading-relaxed">
+                <div className="text-[10px] sm:text-xs text-black leading-relaxed">
                   {formData.email || 'email@example.com'}
                   <br />
                   {formData.phone || '0XX-XXXXXXX'}
@@ -767,8 +768,8 @@ export const ShopBrandingTab: React.FC = () => {
             
             {/* Creative Tagline Banner */}
             {formData.tagline && (
-              <div className="mt-3 text-center">
-                <span className="inline-block px-4 py-1.5 text-xs font-medium text-gray-600 italic tracking-wide border-t border-b border-gray-300">
+              <div className="mt-2 sm:mt-3 text-center">
+                <span className="inline-block px-2 sm:px-4 py-1 sm:py-1.5 text-[10px] sm:text-xs font-medium text-gray-600 italic tracking-wide border-t border-b border-gray-300">
                   ✨ {formData.tagline} ✨
                 </span>
               </div>

@@ -49,12 +49,12 @@ interface PrintableEstimateProps {
 export const PrintableEstimate = forwardRef<HTMLDivElement, PrintableEstimateProps>(
   ({ estimate, branding }, ref) => {
     // Use branding values with fallbacks
-    const shopName = branding?.name || 'ECOTEC';
+    const shopName = branding?.name || 'Eco System';
     const shopSubName = branding?.subName || '';
     const hasCustomLogo = branding?.logo && branding.logo !== logo;
     const shopLogo = branding?.logo || logo;
     const shopPhone = branding?.phone || '011-2345678 | 077-1234567';
-    const shopEmail = branding?.email || 'info@ecotec.lk';
+    const shopEmail = branding?.email || 'info@ecosystem.lk';
 
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString('en-GB', {
@@ -72,7 +72,7 @@ export const PrintableEstimate = forwardRef<HTMLDivElement, PrintableEstimatePro
       <div ref={ref} className="print-estimate">
         <style>{`
           /* ═══════════════════════════════════════════════════════════════
-             INK-EFFICIENT B&W PRINT OPTIMIZED - ECOTEC ESTIMATE
+             INK-EFFICIENT B&W PRINT OPTIMIZED - ECO SYSTEM ESTIMATE
              Designed for black laser/inkjet printers to minimize ink usage
              ═══════════════════════════════════════════════════════════════ */
           
@@ -720,9 +720,9 @@ export const PrintableEstimate = forwardRef<HTMLDivElement, PrintableEstimatePro
 
         {/* Footer */}
         <div className="estimate-footer">
-          <div className="footer-message">Thank you for considering ECOTEC!</div>
+          <div className="footer-message">Thank you for considering Eco System!</div>
           <div className="footer-contact">
-            No. 123, Galle Road, Colombo 03 | www.ecotec.lk
+            No. 123, Galle Road, Colombo 03 | www.ecosystem.lk
           </div>
           <div className="footer-disclaimer">
             This is a price estimate only. Final prices may vary based on availability and market conditions. 

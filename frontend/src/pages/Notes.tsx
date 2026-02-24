@@ -451,7 +451,7 @@ export const Notes: React.FC = () => {
       >
         {/* Pin indicator */}
         {note.isPinned && (
-          <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500 flex items-center justify-center shadow-lg">
+          <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg">
             <Pin className="w-3 h-3 text-white" />
           </div>
         )}
@@ -687,7 +687,7 @@ export const Notes: React.FC = () => {
             setModalMode('edit');
             setIsNoteModalOpen(true);
           }}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95"
         >
           <Plus className="w-5 h-5" />
           New Note
@@ -1438,7 +1438,7 @@ export const Notes: React.FC = () => {
                 setModalMode('edit');
                 setIsNoteModalOpen(true);
               }}
-              className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+              className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
             >
               Create Note
             </button>
@@ -1818,7 +1818,7 @@ const NoteFormModal: React.FC<NoteFormModalProps> = ({ isOpen, onClose, onSave, 
               <button
                 onClick={handleSubmit}
                 disabled={!title.trim()}
-                className="px-5 py-2.5 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-blue-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="px-5 py-2.5 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {note ? 'Save Changes' : 'Create Note'}
               </button>
@@ -1826,7 +1826,7 @@ const NoteFormModal: React.FC<NoteFormModalProps> = ({ isOpen, onClose, onSave, 
           ) : (
             <button
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-blue-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+              className="px-5 py-2.5 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
             >
               Close
             </button>

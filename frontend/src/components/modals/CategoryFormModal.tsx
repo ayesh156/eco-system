@@ -493,7 +493,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         {/* Gradient Header */}
         <div className={`p-4 sm:p-6 text-white ${isEditing 
           ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500' 
-          : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500'
+          : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-teal-500'
         }`} aria-hidden="true">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">

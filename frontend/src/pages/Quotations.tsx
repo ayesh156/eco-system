@@ -214,7 +214,7 @@ export const Quotations: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/quotations/create')} className="relative group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/30 hover:scale-[1.02] transition-all overflow-hidden">
+          <button onClick={() => navigate('/quotations/create')} className="relative group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/30 hover:scale-[1.02] transition-all overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-teal-500 to-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <Plus className="w-5 h-5 relative z-10" />
             <span className="relative z-10">Create Quotation</span>

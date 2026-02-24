@@ -230,7 +230,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
       }`}>
         {/* Success Overlay - Beautiful Animation */}
         {showSuccess && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 animate-in fade-in zoom-in duration-300">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-500 via-teal-500 to-teal-500 animate-in fade-in zoom-in duration-300">
             <div className="relative">
               <div className="absolute inset-0 animate-ping">
                 <div className="w-24 h-24 rounded-full bg-white/20" />
@@ -799,7 +799,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                   {/* Total Paid Summary */}
                   <div className={`mt-3 sm:mt-4 p-4 sm:p-5 rounded-xl sm:rounded-2xl ${
                     theme === 'dark' 
-                      ? 'bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 border border-emerald-500/30' 
+                      ? 'bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-teal-500/20 border border-emerald-500/30' 
                       : 'bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200'
                   }`}>
                     <div className="flex items-center justify-between gap-3">
@@ -838,7 +838,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
               disabled={paymentAmount <= 0 || isProcessing}
               className={`w-full flex items-center justify-center gap-2 sm:gap-3 py-3.5 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all ${
                 paymentAmount > 0 && !isProcessing
-                  ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02] active:scale-[0.98]'
+                  ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02] active:scale-[0.98]'
                   : theme === 'dark' ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
               }`}
             >

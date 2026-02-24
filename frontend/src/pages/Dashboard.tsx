@@ -159,7 +159,7 @@ export const Dashboard: React.FC = () => {
                 onClick={() => setSelectedPeriod(period)}
                 className={`px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all ${
                   selectedPeriod === period
-                    ? 'bg-gradient-to-r from-emerald-500 to-blue-500 text-white shadow-lg'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
                     : theme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -193,7 +193,7 @@ export const Dashboard: React.FC = () => {
             ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50' 
             : 'bg-white border-slate-200 shadow-sm'
         }`}>
-          <div className="absolute top-0 right-0 w-20 sm:w-32 h-20 sm:h-32 bg-gradient-to-br from-emerald-500/20 to-blue-500/10 rounded-full blur-3xl" />
+          <div className="absolute top-0 right-0 w-20 sm:w-32 h-20 sm:h-32 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 rounded-full blur-3xl" />
           <div className="relative">
             <div className="flex items-center justify-between">
               <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
@@ -322,7 +322,7 @@ export const Dashboard: React.FC = () => {
               <div key={data.day} className="flex-1 flex flex-col items-center gap-1 sm:gap-2">
                 <div className="w-full relative flex flex-col items-center">
                   <div 
-                    className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-emerald-500 to-blue-500 transition-all duration-500 hover:from-emerald-400 hover:to-blue-400"
+                    className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-emerald-500 to-teal-500 transition-all duration-500 hover:from-emerald-400 hover:to-teal-400"
                     style={{ height: `${(data.value / maxRevenue) * 160}px` }}
                   />
                 </div>

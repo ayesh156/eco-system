@@ -89,7 +89,7 @@ export const SectionGuard: React.FC<SectionGuardProps> = ({ path, children }) =>
 
             <Link
               to="/"
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
             >
               <Home className="w-4 h-4" />
               Dashboard

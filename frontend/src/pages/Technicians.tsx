@@ -245,7 +245,7 @@ export const Technicians: React.FC = () => {
         </div>
         <button 
           onClick={handleAddNew}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
         >
           <Plus className="w-5 h-5" />
           Add Technician
@@ -490,7 +490,7 @@ export const Technicians: React.FC = () => {
                 }`}
               >
                 {/* Glassmorphism blur effect */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-blue-500/5 rounded-full blur-3xl" />
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 rounded-full blur-3xl" />
                 
                 <div className="relative">
                   {/* Header */}
@@ -731,7 +731,7 @@ export const Technicians: React.FC = () => {
           {!hasActiveFilters && (
             <button
               onClick={handleAddNew}
-              className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium"
+              className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium"
             >
               Add Technician
             </button>

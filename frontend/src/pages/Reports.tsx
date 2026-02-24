@@ -895,7 +895,7 @@ export const Reports: React.FC = () => {
                 disabled={page === '...'}
                 className={`min-w-[36px] h-9 px-3 rounded-lg text-sm font-medium transition-all ${
                   page === currentPage
-                    ? 'bg-gradient-to-r from-emerald-500 to-blue-500 text-white shadow-lg'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg'
                     : page === '...'
                       ? theme === 'dark' ? 'text-slate-500 cursor-default' : 'text-slate-400 cursor-default'
                       : theme === 'dark' 
@@ -1433,7 +1433,7 @@ export const Reports: React.FC = () => {
                   onClick={() => setSelectedPeriod(period)}
                   className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-300 ${
                     selectedPeriod === period
-                      ? 'bg-gradient-to-r from-emerald-500 to-blue-500 text-white shadow-lg shadow-emerald-500/25'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/25'
                       : theme === 'dark' 
                         ? 'text-slate-400 hover:text-white hover:bg-slate-700/50' 
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -1535,7 +1535,7 @@ export const Reports: React.FC = () => {
                         onClick={() => handleDateSelect(day)}
                         className={`aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-all ${
                           isSelected
-                            ? 'bg-gradient-to-br from-emerald-500 to-blue-500 text-white shadow-lg'
+                            ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg'
                             : isToday
                               ? theme === 'dark'
                                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
@@ -1594,7 +1594,7 @@ export const Reports: React.FC = () => {
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-300 ${
                 isExporting
                   ? 'opacity-50 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40'
               } text-white font-medium`}
             >
               {isExporting ? (
@@ -1820,7 +1820,7 @@ export const Reports: React.FC = () => {
                     {formatCompactCurrency(data.value)}
                   </div>
                   <div 
-                    className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-emerald-500 to-blue-500 transition-all duration-500 hover:from-emerald-400 hover:to-blue-400 cursor-pointer"
+                    className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-emerald-500 to-teal-500 transition-all duration-500 hover:from-emerald-400 hover:to-teal-400 cursor-pointer"
                     style={{ 
                       height: `${Math.max((data.value / maxChartValue) * 160, 4)}px`,
                       opacity: data.value > 0 ? 1 : 0.3

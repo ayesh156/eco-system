@@ -493,7 +493,7 @@ export const WarrantyClaimFormModal: React.FC<WarrantyClaimFormModalProps> = ({
           className={`p-6 text-white ${
             isEditing
               ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500'
-              : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500'
+              : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-teal-500'
           }`}
           aria-hidden="true"
         >

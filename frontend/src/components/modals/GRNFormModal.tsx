@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useDataCache } from '../../contexts/DataCacheContext';
 import type { GoodsReceivedNote, GRNItem, Supplier, GRNStatus } from '../../data/mockData';
-import { mockProducts } from '../../data/mockData';
 import { SearchableSelect } from '../ui/searchable-select';
 import {
   X,
@@ -317,9 +317,11 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
   onSave,
   isLoading = false,
   isLoadingSuppliers = false,
-  isLoadingProducts = false,
+  isLoadingProducts: externalIsLoadingProducts = false,
 }) => {
   const { theme } = useTheme();
+  const { products, loadProducts, productsLoading: internalLoadingProducts } = useDataCache();
+  const isLoadingProducts = externalIsLoadingProducts || internalLoadingProducts;
   const isEditing = !!grn;
 
   // Form state
@@ -384,11 +386,18 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
     }))
   , []);
 
-  // Product options for select
+  // Load products on mount
+  useEffect(() => {
+    if (!products || products.length === 0) {
+      loadProducts();
+    }
+  }, []);
+
+  // Product options for select - use API products
   const productOptions = useMemo(() => [
     { value: '', label: 'Select Product' },
-    ...mockProducts.map(p => ({ value: p.id, label: `${p.name} - Rs.${p.price.toLocaleString()}` }))
-  ], []);
+    ...(products || []).map(p => ({ value: p.id, label: `${p.name} - Rs.${p.price.toLocaleString()}` }))
+  ], [products]);
 
   // Handle supplier change
   const handleSupplierChange = (supplierId: string) => {
@@ -428,7 +437,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
 
     // If product changed, update related fields
     if (field === 'productId') {
-      const product = mockProducts.find(p => p.id === value);
+      const product = (products || []).find(p => p.id === value);
       if (product) {
         updated[index].productName = product.name;
         updated[index].category = product.category;
@@ -548,43 +557,43 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className={`w-full max-w-5xl max-h-[95vh] rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm">
+      <div className={`w-full sm:max-w-5xl max-h-[95vh] rounded-t-2xl sm:rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
         theme === 'dark' 
           ? 'bg-slate-900 border-slate-700' 
           : 'bg-white border-slate-200'
       }`}>
         {/* Header */}
-        <div className={`px-6 py-4 border-b flex items-center justify-between flex-shrink-0 ${
+        <div className={`px-3 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between flex-shrink-0 ${
           theme === 'dark' 
             ? 'bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border-slate-700' 
             : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-slate-200'
         }`}>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-              <ClipboardCheck className="w-6 h-6 text-white" />
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 flex-shrink-0">
+              <ClipboardCheck className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
             </div>
-            <div>
-              <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+            <div className="min-w-0">
+              <h2 className={`text-base sm:text-xl font-bold truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 {isEditing ? 'Edit GRN' : 'Create New GRN'}
               </h2>
-              <p className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+              <p className={`text-xs sm:text-sm truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                 {formData.grnNumber || 'Goods Received Note'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-1.5 sm:p-2 rounded-lg transition-colors flex-shrink-0 ${
               theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
             }`}
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className={`px-6 py-2 border-b flex gap-2 ${
+        <div className={`px-3 sm:px-6 py-1.5 sm:py-2 border-b flex gap-1.5 sm:gap-2 ${
           theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
         }`}>
           {[
@@ -594,7 +603,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                 activeTab === tab.id
                   ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
                   : theme === 'dark'
@@ -602,18 +611,18 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                     : 'text-slate-600 hover:bg-slate-200'
               }`}
             >
-              <tab.icon className="w-4 h-4" />
+              <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               {tab.label}
             </button>
           ))}
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
           {activeTab === 'details' && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Supplier & Dates Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 {/* Supplier Selection */}
                 <div className="relative">
                   <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -662,7 +671,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
               </div>
 
               {/* Dates Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                     <Calendar className="w-4 h-4 inline mr-2" />
@@ -702,7 +711,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
               </div>
 
               {/* Delivery Info Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                     <User className="w-4 h-4 inline mr-2" />
@@ -778,17 +787,17 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
           )}
 
           {activeTab === 'items' && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {/* Add Item Button */}
               <div className="flex justify-between items-center">
-                <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                <h3 className={`text-sm sm:text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                   Products / Items
                 </h3>
                 <button
                   onClick={addItem}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg shadow-emerald-500/25"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs sm:text-sm font-medium hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg shadow-emerald-500/25"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   Add Product
                 </button>
               </div>
@@ -813,18 +822,18 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                   <p className="text-sm mt-1">Click "Add Product" to start adding items</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {items.map((item, index) => (
                     <div
                       key={item.id}
-                      className={`p-4 rounded-xl border ${
+                      className={`p-3 sm:p-4 rounded-xl border ${
                         theme === 'dark' ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'
                       }`}
                     >
                       {/* Row 1: Product and Quantities */}
-                      <div className="grid grid-cols-12 gap-4 mb-4">
+                      <div className="grid grid-cols-12 gap-2 sm:gap-4 mb-3 sm:mb-4">
                         {/* Product Selection */}
-                        <div className="col-span-12 md:col-span-5">
+                        <div className="col-span-12 sm:col-span-5">
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             Product
                           </label>
@@ -851,7 +860,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                         </div>
 
                         {/* Ordered Qty */}
-                        <div className="col-span-4 md:col-span-2">
+                        <div className="col-span-4 sm:col-span-2">
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             Ordered
                           </label>
@@ -868,7 +877,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                         </div>
 
                         {/* Received Qty */}
-                        <div className="col-span-4 md:col-span-2">
+                        <div className="col-span-4 sm:col-span-2">
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             Received
                           </label>
@@ -885,7 +894,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                         </div>
 
                         {/* Accepted Qty */}
-                        <div className="col-span-4 md:col-span-2">
+                        <div className="col-span-4 sm:col-span-2">
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             Accepted
                           </label>
@@ -902,7 +911,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                         </div>
 
                         {/* Remove Button */}
-                        <div className="col-span-12 md:col-span-1 flex items-end justify-end">
+                        <div className="col-span-12 sm:col-span-1 flex items-end justify-end">
                           <button
                             onClick={() => removeItem(index)}
                             className={`p-2 rounded-lg transition-colors ${
@@ -917,11 +926,11 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                       </div>
 
                       {/* Row 2: Pricing and Discount */}
-                      <div className={`grid grid-cols-12 gap-4 pt-4 border-t ${
+                      <div className={`grid grid-cols-12 gap-2 sm:gap-4 pt-3 sm:pt-4 border-t ${
                         theme === 'dark' ? 'border-slate-700' : 'border-slate-200'
                       }`}>
                         {/* Original Price */}
-                        <div className="col-span-6 md:col-span-2">
+                        <div className="col-span-6 sm:col-span-2">
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             <DollarSign className="w-3 h-3 inline mr-1" />
                             Original Price
@@ -939,7 +948,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                         </div>
 
                         {/* Discount Type */}
-                        <div className="col-span-6 md:col-span-2">
+                        <div className="col-span-6 sm:col-span-2">
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             <Tag className="w-3 h-3 inline mr-1" />
                             Discount Type
@@ -977,7 +986,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                         </div>
 
                         {/* Discount Value */}
-                        <div className="col-span-6 md:col-span-2">
+                        <div className="col-span-6 sm:col-span-2">
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             Discount {item.discountType === 'percentage' ? '(%)' : '(Rs.)'}
                           </label>
@@ -994,7 +1003,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                         </div>
 
                         {/* Final Unit Price (Read-only) */}
-                        <div className="col-span-6 md:col-span-2">
+                        <div className="col-span-6 sm:col-span-2">
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
                             Final Price
                           </label>
@@ -1008,7 +1017,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                         </div>
 
                         {/* Total Amount */}
-                        <div className="col-span-6 md:col-span-2">
+                        <div className="col-span-6 sm:col-span-2">
                           <label className={`block text-xs font-medium mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                             Total
                           </label>
@@ -1022,7 +1031,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
                         </div>
 
                         {/* Discount Savings Badge */}
-                        <div className="col-span-6 md:col-span-2 flex items-end">
+                        <div className="col-span-6 sm:col-span-2 flex items-end">
                           {(item.discountValue || 0) > 0 && (
                             <div className={`w-full px-3 py-2 rounded-lg text-center text-xs font-medium ${
                               theme === 'dark'
@@ -1041,40 +1050,40 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
 
               {/* Totals Summary */}
               {items.length > 0 && (
-                <div className={`p-4 rounded-xl border ${
+                <div className={`p-3 sm:p-4 rounded-xl border ${
                   theme === 'dark' 
                     ? 'bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border-emerald-500/30' 
                     : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200'
                 }`}>
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-4 text-center">
                     <div>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Total Ordered</p>
-                      <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{totals.orderedQuantity}</p>
+                      <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Ordered</p>
+                      <p className={`text-base sm:text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{totals.orderedQuantity}</p>
                     </div>
                     <div>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Total Received</p>
-                      <p className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{totals.receivedQuantity}</p>
+                      <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Received</p>
+                      <p className={`text-base sm:text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{totals.receivedQuantity}</p>
                     </div>
                     <div>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Accepted</p>
-                      <p className="text-xl font-bold text-emerald-500">{totals.acceptedQuantity}</p>
+                      <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Accepted</p>
+                      <p className="text-base sm:text-xl font-bold text-emerald-500">{totals.acceptedQuantity}</p>
                     </div>
                     <div>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Rejected</p>
-                      <p className="text-xl font-bold text-red-500">{totals.rejectedQuantity}</p>
+                      <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Rejected</p>
+                      <p className="text-base sm:text-xl font-bold text-red-500">{totals.rejectedQuantity}</p>
                     </div>
                     <div>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
-                        <Tag className="w-3 h-3 inline mr-1" />
-                        Total Discount
+                      <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                        <Tag className="w-3 h-3 inline mr-0.5" />
+                        Discount
                       </p>
-                      <p className="text-xl font-bold text-amber-500">
+                      <p className="text-base sm:text-xl font-bold text-amber-500">
                         Rs.{totals.totalDiscount.toLocaleString()}
                       </p>
                     </div>
                     <div>
-                      <p className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Total Value</p>
-                      <p className={`text-xl font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                      <p className={`text-[10px] sm:text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Total Value</p>
+                      <p className={`text-base sm:text-xl font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
                         Rs.{totals.totalAmount.toLocaleString()}
                       </p>
                     </div>
@@ -1086,26 +1095,26 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className={`px-6 py-4 border-t flex justify-between items-center ${
+        <div className={`px-3 sm:px-6 py-3 sm:py-4 border-t flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 ${
           theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
         }`}>
-          <div className={`flex items-center gap-4 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+          <div className={`flex items-center gap-3 sm:gap-4 text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             {totals.totalDiscount > 0 && (
               <span>
-                <Tag className="w-4 h-4 inline mr-1 text-amber-500" />
-                Discount: <span className="font-bold text-amber-500">Rs. {totals.totalDiscount.toLocaleString()}</span>
+                <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1 text-amber-500" />
+                Disc: <span className="font-bold text-amber-500">Rs. {totals.totalDiscount.toLocaleString()}</span>
               </span>
             )}
             <span>
-              <DollarSign className="w-4 h-4 inline mr-1" />
-              Total: <span className="font-bold text-lg text-emerald-500">Rs. {totals.totalAmount.toLocaleString()}</span>
+              <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
+              Total: <span className="font-bold text-base sm:text-lg text-emerald-500">Rs. {totals.totalAmount.toLocaleString()}</span>
             </span>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
             <button
               onClick={onClose}
               disabled={isLoading}
-              className={`px-6 py-2.5 rounded-xl font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 theme === 'dark'
                   ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50'
                   : 'bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-50'
@@ -1116,7 +1125,7 @@ export const GRNFormModal: React.FC<GRNFormModalProps> = ({
             <button
               onClick={handleSave}
               disabled={!formData.supplierId || isLoading}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/25"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/25"
             >
               {isLoading ? (
                 <>

@@ -1880,4 +1880,120 @@ This project is deployed on **Render.com** using `render.yaml` blueprint:
 3. Environment variables are configured in Render dashboard
 4. SPA routing handled by Render's rewrite rules (`/* → /index.html`)
 5. All API routes are in `backend/src/routes/*.ts` - no separate serverless handlers needed
+
+---
+
+## 🎨 MANDATORY: Dynamic Accent Colour System (CSS Variables)
+
+**CRITICAL:** This project uses a **dynamic accent colour system** powered by CSS custom properties. When the user selects an accent colour in Settings → Appearance, **every** component in the app updates instantly.
+
+### How It Works
+
+Tailwind's `emerald-*` and `teal-*` colour scales are overridden in `tailwind.config.js` to resolve from CSS custom properties:
+
+```
+emerald-500  →  rgb(var(--accent-500) / <alpha-value>)
+teal-500     →  rgb(var(--accent2-500) / <alpha-value>)
+```
+
+`ThemeContext.tsx` sets `--accent-*` and `--accent2-*` CSS variables on `:root` when the accent changes. Default values are defined in `index.css`.
+
+### Rules for New Components
+
+1. **Use `emerald-*` for primary accent colours** — buttons, links, active states, badges, icons, focus rings, borders.
+2. **Use `teal-*` for gradient secondary endpoints** — always pair `from-emerald-*` with `to-teal-*` (never `to-blue-*` or `to-cyan-*`).
+3. **Never hardcode specific colour hex values** for accent elements — always use Tailwind `emerald-*` / `teal-*` classes so they respond to the CSS variable system.
+4. **Opacity modifiers work normally** — `bg-emerald-500/20`, `border-emerald-500/50` etc. all work because the CSS variables use the `/ <alpha-value>` syntax.
+5. **Non-accent colours are fine as-is** — `red-*`, `amber-*`, `blue-*` (for info/links NOT related to accent), `green-*` (for success) etc. remain static.
+6. **For colour picker previews** (like the Settings accent picker), use **inline `style={{ background: ... }}`** with fixed hex values so the swatch circles always show the actual colour option, not the dynamic accent.
+
+### Gradient Pattern
+
+```tsx
+// ✅ CORRECT: emerald → teal (both are dynamic)
+className="bg-gradient-to-r from-emerald-500 to-teal-500"
+
+// ❌ WRONG: using blue/cyan as gradient endpoint with emerald
+className="bg-gradient-to-r from-emerald-500 to-blue-500"
+className="bg-gradient-to-r from-emerald-500 to-cyan-500"
+```
+
+### Available Accent Colours
+
+| Key | Primary | Secondary (gradient endpoint) |
+|-----|---------|-------------------------------|
+| `emerald` | Emerald → | Teal |
+| `blue` | Blue → | Cyan |
+| `purple` | Purple → | Pink |
+| `rose` | Rose → | Pink |
+| `amber` | Amber → | Orange |
+| `indigo` | Indigo → | Violet |
+
+---
+
+## 📱 MANDATORY: Mobile & Tablet Responsive Design
+
+**CRITICAL:** Every new page, modal, and component MUST be fully responsive for **mobile (320px+)**, **tablet (768px+)**, and **desktop (1024px+)** from the start. Do NOT create desktop-only components and "fix responsive later".
+
+### Responsive Checklist for Every New Component
+
+- [ ] Test at 320px width (small phones)
+- [ ] Test at 375px width (iPhone)
+- [ ] Test at 768px width (tablet portrait)
+- [ ] Test at 1024px width (tablet landscape / small desktop)
+- [ ] Test at 1280px+ (desktop)
+- [ ] Touch targets are at least 44×44px on mobile
+- [ ] Text is readable without zooming
+- [ ] No horizontal overflow/scrolling
+- [ ] Tables use horizontal scroll wrapper on mobile or switch to card layout
+- [ ] Modals are full-screen on mobile, centered on desktop
+
+### Key Responsive Patterns
+
+```tsx
+// Grid layouts — always start from 1 column
+className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+
+// Flex direction — stack on mobile, row on desktop
+className="flex flex-col lg:flex-row gap-4"
+
+// Text scaling
+className="text-sm sm:text-base lg:text-lg"
+
+// Spacing scaling
+className="p-3 sm:p-4 lg:p-6"
+
+// Hide/show elements
+className="hidden lg:flex"  // Desktop only
+className="flex lg:hidden"  // Mobile only
+
+// Modal sizing
+className="w-full max-w-[95vw] sm:max-w-lg lg:max-w-2xl"
+```
+
+---
+
+## ✅ MANDATORY: Build Before Commit
+
+**CRITICAL:** Before committing ANY changes, you MUST run the frontend build to catch errors:
+
+```bash
+cd frontend
+npm run build
+```
+
+### Pre-Commit Checklist
+
+1. **Run `npm run build`** in the `frontend/` directory — must complete with **zero errors**
+2. **Check for TypeScript errors** — `tsc -b` is run as part of the build
+3. **Fix any build errors** before committing
+4. **Large chunk warnings** are acceptable (not blockers) but worth optimizing later
+5. **If backend changes were made**, also verify backend compiles: `cd backend && npx tsc --noEmit`
+
+### Common Build Issues to Watch For
+
+- Missing imports after moving/renaming files
+- Unused variables (TypeScript strict mode)
+- Type mismatches after interface changes
+- Missing dependencies after adding new packages
 ````

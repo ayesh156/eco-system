@@ -815,13 +815,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         <div className="relative w-12 h-12 mx-auto">
                           <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-emerald-500 border-r-blue-500 animate-spin" />
                           <div className={`absolute inset-2 rounded-full flex items-center justify-center ${
-                            theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-blue-500/20' : 'bg-gradient-to-br from-emerald-50 to-blue-50'
+                            theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20' : 'bg-gradient-to-br from-emerald-50 to-teal-50'
                           }`}>
                             <Brain className="w-5 h-5 text-emerald-500 animate-pulse" />
                           </div>
                           <Sparkles className="absolute -top-1 -right-1 w-3 h-3 text-amber-400 animate-ping" />
                         </div>
-                        <p className={`text-xs font-medium bg-gradient-to-r from-emerald-500 to-blue-500 bg-clip-text text-transparent`}>
+                        <p className={`text-xs font-medium bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent`}>
                           AI Analyzing Image...
                         </p>
                       </div>

@@ -292,7 +292,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
         {/* Creative Gradient Header + Step Progress */}
         <div className={`relative overflow-hidden ${isEditing 
-          ? 'bg-gradient-to-br from-emerald-600 via-teal-500 to-cyan-600' 
+          ? 'bg-gradient-to-br from-emerald-600 via-teal-500 to-teal-600' 
           : 'bg-gradient-to-br from-violet-600 via-purple-500 to-indigo-600'
         }`}>
           <div className="absolute inset-0 overflow-hidden">

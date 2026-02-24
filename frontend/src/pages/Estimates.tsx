@@ -194,7 +194,7 @@ export const Estimates: React.FC = () => {
       `📦 Items: ${estimate.items.length}\n` +
       `💰 *Total: ${formatCurrency(estimate.total)}*\n\n` +
       `For full details, please visit our shop or contact us.\n\n` +
-      `Thank you!\n*ECOTEC Computer Shop*\n📞 011-2345678`;
+      `Thank you!\n*Eco System Computer Shop*\n📞 011-2345678`;
     const phone = '94783233760';
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };

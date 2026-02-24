@@ -747,7 +747,7 @@ export const AdminDashboard: React.FC = () => {
                 {/* Create User Button */}
                 <button
                   onClick={() => setIsCreateUserModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
                 >
                   <UserPlus className="w-5 h-5" />
                   <span className="hidden sm:inline">Create User</span>
@@ -1284,7 +1284,7 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop, theme, onView, onViewDashboar
         disabled={!shop.isActive}
         className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
           shop.isActive
-            ? 'bg-gradient-to-r from-emerald-500 to-blue-500 text-white shadow-lg hover:shadow-emerald-500/25'
+            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg hover:shadow-emerald-500/25'
             : theme === 'dark'
               ? 'bg-slate-700/30 text-slate-500 cursor-not-allowed'
               : 'bg-slate-100 text-slate-400 cursor-not-allowed'
@@ -1964,7 +1964,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
             >
               {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Save Changes
@@ -2223,7 +2223,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
           theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
         }`}>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-r from-emerald-500 to-blue-500 shadow-lg shadow-emerald-500/25">
+            <div className="p-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/25">
               <UserPlus className="w-5 h-5 text-white" />
             </div>
             <h2 className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
@@ -2359,7 +2359,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-blue-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg hover:shadow-emerald-500/25 transition-all"
             >
               {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
               Create User
