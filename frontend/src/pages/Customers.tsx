@@ -2145,7 +2145,7 @@ export const Customers: React.FC = () => {
               >
                 {/* Newly Saved Badge */}
                 {isHighlighted && (
-                  <div className="bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs font-medium px-3 py-1.5 flex items-center justify-center gap-1.5">
+                  <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-medium px-3 py-1.5 flex items-center justify-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     Successfully Saved!
                   </div>

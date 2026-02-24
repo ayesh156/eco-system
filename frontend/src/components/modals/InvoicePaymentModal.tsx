@@ -204,7 +204,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   const getPaymentMethodColors = (method: string) => {
     switch (method) {
       case 'cash':
-        return { bg: 'from-emerald-500/20 to-green-500/20', border: 'border-emerald-500/30', icon: 'bg-gradient-to-br from-emerald-500 to-green-600', text: 'text-emerald-400' };
+        return { bg: 'from-emerald-500/20 to-teal-500/20', border: 'border-emerald-500/30', icon: 'bg-gradient-to-br from-emerald-500 to-teal-600', text: 'text-emerald-400' };
       case 'card':
         return { bg: 'from-blue-500/20 to-cyan-500/20', border: 'border-blue-500/30', icon: 'bg-gradient-to-br from-blue-500 to-cyan-600', text: 'text-blue-400' };
       case 'bank':

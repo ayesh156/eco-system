@@ -880,7 +880,7 @@ export const QuotationForm: React.FC = () => {
               ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50'
               : 'bg-white border-slate-200 shadow-sm'
           }`}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-green-500/5 rounded-full blur-3xl" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 rounded-full blur-3xl" />
             <div className="relative">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -1311,7 +1311,7 @@ export const QuotationForm: React.FC = () => {
               ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50'
               : 'bg-white border-slate-200 shadow-sm'
           }`}>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-green-500/10 rounded-full blur-3xl" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 rounded-full blur-3xl" />
             <div className="relative">
               <div className="flex items-center gap-3 mb-6">
                 <div className={`p-2.5 rounded-xl ${

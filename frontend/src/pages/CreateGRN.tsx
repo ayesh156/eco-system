@@ -1131,7 +1131,7 @@ export const CreateGRN: React.FC = () => {
                         <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                           Buying Price
                         </p>
-                        <p className={`font-bold ${theme === 'dark' ? 'text-amber-400' : 'text-amber-600'}`}>
+                        <p className={`font-bold ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>
                           Rs.{buyingPrice.toLocaleString()}
                         </p>
                         {isInCart && (
@@ -1149,7 +1149,7 @@ export const CreateGRN: React.FC = () => {
           {step === 3 && (
             <div className="flex-1 flex flex-col p-4 overflow-hidden">
               <div className="flex items-center gap-2 mb-4">
-                <Wallet className="w-5 h-5 text-purple-500" />
+                <Wallet className="w-5 h-5 text-emerald-500" />
                 <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                   Payment & Finalization
                 </span>
@@ -1188,7 +1188,7 @@ export const CreateGRN: React.FC = () => {
                   theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-50'
                 }`}>
                   <div className="flex items-center gap-2 mb-3">
-                    <Tag className="w-4 h-4 text-orange-500" />
+                    <Tag className="w-4 h-4 text-emerald-500" />
                     <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                       Overall Discount
                     </span>
@@ -1241,7 +1241,7 @@ export const CreateGRN: React.FC = () => {
                     </div>
                   </div>
                   {totals.overallDiscount > 0 && (
-                    <p className="text-xs text-orange-500 mt-2">
+                    <p className="text-xs text-emerald-500 mt-2">
                       You save Rs.{totals.overallDiscount.toLocaleString()}
                     </p>
                   )}
@@ -1252,7 +1252,7 @@ export const CreateGRN: React.FC = () => {
                   theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-50'
                 }`}>
                   <div className="flex items-center gap-2 mb-3">
-                    <CreditCard className="w-4 h-4 text-blue-500" />
+                    <CreditCard className="w-4 h-4 text-emerald-500" />
                     <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                       Payment Method
                     </span>
@@ -1288,7 +1288,7 @@ export const CreateGRN: React.FC = () => {
                   theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-50'
                 }`}>
                   <div className="flex items-center gap-2 mb-3">
-                    <Wallet className="w-4 h-4 text-purple-500" />
+                    <Wallet className="w-4 h-4 text-emerald-500" />
                     <span className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                       Payment Status
                     </span>
@@ -1360,14 +1360,14 @@ export const CreateGRN: React.FC = () => {
                     </div>
                     {totals.itemDiscountTotal > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-orange-500">Item Discounts</span>
-                        <span className="text-orange-500">-Rs.{totals.itemDiscountTotal.toLocaleString()}</span>
+                        <span className="text-emerald-500">Item Discounts</span>
+                        <span className="text-emerald-500">-Rs.{totals.itemDiscountTotal.toLocaleString()}</span>
                       </div>
                     )}
                     {totals.overallDiscount > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-orange-500">Overall Discount</span>
-                        <span className="text-orange-500">-Rs.{totals.overallDiscount.toLocaleString()}</span>
+                        <span className="text-emerald-500">Overall Discount</span>
+                        <span className="text-emerald-500">-Rs.{totals.overallDiscount.toLocaleString()}</span>
                       </div>
                     )}
                     <div className={`flex justify-between items-center pt-2 border-t ${
@@ -1418,7 +1418,7 @@ export const CreateGRN: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-amber-500" />
+                <Receipt className="w-5 h-5 text-emerald-500" />
                 <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                   GRN Summary
                 </span>
@@ -1669,8 +1669,8 @@ export const CreateGRN: React.FC = () => {
                 </div>
                 {(totals.itemDiscountTotal > 0 || totals.overallDiscount > 0) && (
                   <div className="flex justify-between text-xs mt-1">
-                    <span className="text-orange-500">Discounts Applied</span>
-                    <span className="text-orange-500">-Rs.{(totals.itemDiscountTotal + totals.overallDiscount).toLocaleString()}</span>
+                    <span className="text-emerald-500">Discounts Applied</span>
+                    <span className="text-emerald-500">-Rs.{(totals.itemDiscountTotal + totals.overallDiscount).toLocaleString()}</span>
                   </div>
                 )}
               </div>

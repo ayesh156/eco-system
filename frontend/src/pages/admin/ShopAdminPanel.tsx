@@ -478,7 +478,7 @@ export const ShopAdminPanel: React.FC = () => {
   // Status badge
   const getStatusBadge = (isActive: boolean) => {
     return isActive ? (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-500/10 to-green-500/10 text-emerald-400 border border-emerald-500/20">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-400 border border-emerald-500/20">
         <CheckCircle className="w-3 h-3" />
         Active
       </span>
@@ -1242,7 +1242,7 @@ export const ShopAdminPanel: React.FC = () => {
             ? 'bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-700/50'
             : 'bg-white border-slate-200 shadow-sm'
         }`}>
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-green-500/10 rounded-full blur-2xl" />
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 rounded-full blur-2xl" />
           <div className="relative">
             <div className={`p-2.5 w-fit rounded-xl mb-3 ${theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
               <CheckCircle className="w-5 h-5 text-emerald-500" />

@@ -282,7 +282,7 @@ export const AdminDashboard: React.FC = () => {
       case 'SUPER_ADMIN':
         return 'from-purple-500/10 to-pink-500/10 text-purple-400 border-purple-500/30';
       case 'ADMIN':
-        return 'from-emerald-500/10 to-green-500/10 text-emerald-400 border-emerald-500/30';
+        return 'from-emerald-500/10 to-teal-500/10 text-emerald-400 border-emerald-500/30';
       case 'MANAGER':
         return 'from-blue-500/10 to-cyan-500/10 text-blue-400 border-blue-500/30';
       default:
@@ -363,7 +363,7 @@ export const AdminDashboard: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Stats Cards */}
           {[
-            { label: 'Total Shops', value: stats.totalShops, icon: Building2, color: 'from-emerald-500 to-green-500', shadow: 'shadow-emerald-500/20' },
+            { label: 'Total Shops', value: stats.totalShops, icon: Building2, color: 'from-emerald-500 to-teal-500', shadow: 'shadow-emerald-500/20' },
             { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'from-blue-500 to-cyan-500', shadow: 'shadow-blue-500/20' },
             { label: 'Active Shops', value: stats.activeShops, icon: CheckCircle, color: 'from-green-500 to-emerald-500', shadow: 'shadow-green-500/20' },
             { label: 'Inactive Shops', value: stats.inactiveShops, icon: XCircle, color: 'from-red-500 to-rose-500', shadow: 'shadow-red-500/20' },
@@ -1005,7 +1005,7 @@ export const AdminDashboard: React.FC = () => {
                   shop: 'Ecotec Mobile', 
                   time: '2 minutes ago',
                   icon: UserPlus,
-                  color: 'from-emerald-500 to-green-500'
+                  color: 'from-emerald-500 to-teal-500'
                 },
                 { 
                   type: 'shop_updated', 

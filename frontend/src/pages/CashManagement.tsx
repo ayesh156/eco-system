@@ -73,8 +73,8 @@ const getAccountColor = (type: CashAccountType, theme: string) => {
         : 'from-amber-50 to-orange-50 border-amber-200';
     case 'cash_in_hand': 
       return theme === 'dark' 
-        ? 'from-emerald-500/20 to-green-500/10 border-emerald-500/30' 
-        : 'from-emerald-50 to-green-50 border-emerald-200';
+        ? 'from-emerald-500/20 to-teal-500/10 border-emerald-500/30' 
+        : 'from-emerald-50 to-teal-50 border-emerald-200';
     case 'business': 
       return theme === 'dark' 
         ? 'from-blue-500/20 to-indigo-500/10 border-blue-500/30' 
@@ -1967,7 +1967,7 @@ export const CashManagement: React.FC = () => {
             {/* Net Cash Flow */}
             <div className={`relative overflow-hidden p-5 rounded-2xl border ${
               financialSummary.netCashFlow >= 0
-                ? theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/10 to-green-500/5 border-emerald-500/20' : 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200'
+                ? theme === 'dark' ? 'bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border-emerald-500/20' : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200'
                 : theme === 'dark' ? 'bg-gradient-to-br from-red-500/10 to-rose-500/5 border-red-500/20' : 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200'
             }`}>
               <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/20 to-transparent rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />

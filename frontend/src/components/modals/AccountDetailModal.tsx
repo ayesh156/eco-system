@@ -85,7 +85,7 @@ const getAccountGradient = (type: CashAccountType, theme: string): string => {
   const isDark = theme === 'dark';
   switch (type) {
     case 'drawer': return isDark ? 'from-amber-500/20 to-orange-500/10' : 'from-amber-100 to-orange-50';
-    case 'cash_in_hand': return isDark ? 'from-emerald-500/20 to-green-500/10' : 'from-emerald-100 to-green-50';
+    case 'cash_in_hand': return isDark ? 'from-emerald-500/20 to-teal-500/10' : 'from-emerald-100 to-teal-50';
     case 'business': return isDark ? 'from-blue-500/20 to-indigo-500/10' : 'from-blue-100 to-indigo-50';
     case 'bank': return isDark ? 'from-indigo-500/20 to-purple-500/10' : 'from-indigo-100 to-purple-50';
     case 'mobile_wallet': return isDark ? 'from-purple-500/20 to-pink-500/10' : 'from-purple-100 to-pink-50';

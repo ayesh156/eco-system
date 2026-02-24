@@ -119,8 +119,13 @@ export const Settings: React.FC = () => {
   // GRN template changes tracking
   const [grnTemplatesHasChanges, setGrnTemplatesHasChanges] = useState(false);
 
-  // Theme/Accent saving state
-  const [isSavingTheme, setIsSavingTheme] = useState(false);
+  // Theme/Accent/Tax unsaved changes tracking (only saved on Save button click)
+  const [themeHasChanges, setThemeHasChanges] = useState(false);
+  const [accentHasChanges, setAccentHasChanges] = useState(false);
+  const [taxHasChanges, setTaxHasChanges] = useState(false);
+  // Keep a ref of what pending values to save
+  const [pendingTheme, setPendingTheme] = useState<string | null>(null);
+  const [pendingAccent, setPendingAccent] = useState<string | null>(null);
 
   // Ensure SUPER_ADMIN's accent is persisted on first visit
   useEffect(() => {
@@ -150,63 +155,51 @@ export const Settings: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branding?.themeMode, branding?.accentColor, isSuperAdmin]);
 
-  // Save theme settings to database
+  // Save theme/accent settings to database (called from handleSave)
   const saveThemeToDatabase = async (newTheme?: string, newAccent?: string) => {
     const shopId = isViewingShop && viewingShop ? viewingShop.id : user?.shop?.id;
     const token = getAccessToken();
     if (!shopId || !token) return;
 
-    setIsSavingTheme(true);
-    try {
-      const payload: any = {};
-      if (newTheme !== undefined) payload.themeMode = newTheme;
-      if (newAccent !== undefined) payload.accentColor = newAccent;
+    const payload: any = {};
+    if (newTheme !== undefined) payload.themeMode = newTheme;
+    if (newAccent !== undefined) payload.accentColor = newAccent;
 
-      const response = await fetch(`${API_URL}/shops/${shopId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+    const response = await fetch(`${API_URL}/shops/${shopId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-      if (response.ok) {
-        // Update branding context too
-        updateBranding(payload);
-        toast.success('Theme settings saved');
-      } else {
-        toast.error('Failed to save theme settings');
-      }
-    } catch {
-      toast.error('Failed to save theme settings');
-    } finally {
-      setIsSavingTheme(false);
+    if (response.ok) {
+      updateBranding(payload);
+    } else {
+      throw new Error('Failed to save theme settings');
     }
   };
 
-  // Handle theme toggle with DB save
+  // Handle theme toggle — apply locally, defer DB save to Save button
   const handleThemeToggle = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     toggleTheme();
-    saveThemeToDatabase(newTheme, undefined);
+    setPendingTheme(newTheme);
+    setThemeHasChanges(true);
   };
 
-  // Handle accent color change with DB save
+  // Handle accent color change — apply locally, defer DB save to Save button
   const handleAccentChange = (color: string) => {
-    if (isSuperAdmin && isViewingShop) {
-      // SUPER_ADMIN viewing a shop: save to the SHOP's DB only,
-      // don't change the admin's own accent preference
-      saveThemeToDatabase(undefined, color);
-    } else {
-      // Apply the accent globally
+    if (!(isSuperAdmin && isViewingShop)) {
+      // Apply the accent preview immediately (visual only)
       setAccentColor(color as any);
       if (isSuperAdmin) {
-        // Persist SUPER_ADMIN's personal accent separately so it survives shop visits
         localStorage.setItem('superAdminAccentColor', color);
       }
-      saveThemeToDatabase(undefined, color);
     }
+    setPendingAccent(color);
+    setAccentHasChanges(true);
   };
 
   // Update form when effective shop changes (e.g., SUPER_ADMIN switches shops)
@@ -395,7 +388,7 @@ export const Settings: React.FC = () => {
   // Status badge
   const getStatusBadge = (isActive: boolean) => {
     return isActive ? (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-500/10 to-green-500/10 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'} border border-emerald-500/20`}>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-500/10 to-teal-500/10 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'} border border-emerald-500/20`}>
         <CheckCircle className="w-3 h-3" />
         Active
       </span>
@@ -1150,6 +1143,22 @@ export const Settings: React.FC = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Save theme/accent changes to database
+      if (themeHasChanges || accentHasChanges) {
+        await saveThemeToDatabase(
+          themeHasChanges && pendingTheme ? pendingTheme : undefined,
+          accentHasChanges && pendingAccent ? pendingAccent : undefined
+        );
+        setThemeHasChanges(false);
+        setAccentHasChanges(false);
+        setPendingTheme(null);
+        setPendingAccent(null);
+      }
+      // Save tax settings changes
+      if (taxHasChanges) {
+        await saveTaxSettings();
+        setTaxHasChanges(false);
+      }
       // Save sections changes if any (supports both SuperAdmin and Shop ADMIN)
       if (sectionsHasChanges) {
         if (isSuperAdmin) {
@@ -1177,8 +1186,6 @@ export const Settings: React.FC = () => {
         await saveSettings();
         setGrnTemplatesHasChanges(false);
       }
-      // Simulate API call for other settings
-      await new Promise(resolve => setTimeout(resolve, 500));
       setSaveSuccess(true);
       toast.success('Settings saved successfully!');
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -1474,7 +1481,6 @@ export const Settings: React.FC = () => {
                   {/* Modern Toggle Switch */}
                   <button
                     onClick={handleThemeToggle}
-                    disabled={isSavingTheme}
                     className={`relative w-16 h-8 sm:w-20 sm:h-10 rounded-full transition-all duration-500 flex-shrink-0 ${
                       theme === 'dark' 
                         ? 'bg-gradient-to-r from-indigo-600 to-purple-600' 
@@ -1518,15 +1524,9 @@ export const Settings: React.FC = () => {
                       <h3 className={`text-sm sm:text-base font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                         Accent Color
                       </h3>
-                      {isSavingTheme && (
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-[10px] text-emerald-500 font-medium">Saving...</span>
-                        </div>
-                      )}
                     </div>
                     <p className={`text-xs sm:text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Choose your primary accent color — auto-saved to your shop
+                      Choose your primary accent color
                     </p>
                   </div>
                 </div>
@@ -1546,7 +1546,6 @@ export const Settings: React.FC = () => {
                       <button
                         key={color.key}
                         onClick={() => handleAccentChange(color.key)}
-                        disabled={isSavingTheme}
                         className={`group relative flex flex-col items-center gap-2 p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 ${
                           isSelected
                             ? theme === 'dark'
@@ -1700,7 +1699,7 @@ export const Settings: React.FC = () => {
               }`}>
                 <div className="p-4 sm:p-6">
                   <div className="flex items-center gap-2.5 sm:gap-3 mb-4 sm:mb-6">
-                    <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
+                    <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
                       <Settings2 className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-500" />
                     </div>
                     <div className="min-w-0">
@@ -1719,7 +1718,7 @@ export const Settings: React.FC = () => {
                       <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
                         <div className={`w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center transition-all duration-500 flex-shrink-0 ${
                           taxSettings.enabled
-                            ? 'bg-gradient-to-br from-emerald-500/20 to-green-500/20' 
+                            ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/20' 
                             : 'bg-gradient-to-br from-slate-500/20 to-slate-600/20'
                         }`}>
                           <CheckCircle2 className={`w-5 h-5 sm:w-7 sm:h-7 transition-colors ${
@@ -1740,11 +1739,11 @@ export const Settings: React.FC = () => {
                       <button
                         onClick={() => {
                           updateTaxSettings({ enabled: !taxSettings.enabled });
-                          saveTaxSettings();
+                          setTaxHasChanges(true);
                         }}
                         className={`relative w-16 h-8 sm:w-20 sm:h-10 rounded-full transition-all duration-500 flex-shrink-0 ${
                           taxSettings.enabled
-                            ? 'bg-gradient-to-r from-emerald-600 to-green-600' 
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600' 
                             : 'bg-gradient-to-r from-slate-400 to-slate-500'
                         }`}
                         style={{
@@ -1780,7 +1779,7 @@ export const Settings: React.FC = () => {
                           onClick={() => {
                             const val = Math.max(0, taxSettings.defaultPercentage - 0.5);
                             updateTaxSettings({ defaultPercentage: val });
-                            saveTaxSettings();
+                            setTaxHasChanges(true);
                           }}
                           disabled={!taxSettings.enabled || taxSettings.defaultPercentage <= 0}
                           className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl font-bold transition-all active:scale-90 ${
@@ -1829,7 +1828,7 @@ export const Settings: React.FC = () => {
                           onClick={() => {
                             const val = Math.min(30, taxSettings.defaultPercentage + 0.5);
                             updateTaxSettings({ defaultPercentage: val });
-                            saveTaxSettings();
+                            setTaxHasChanges(true);
                           }}
                           disabled={!taxSettings.enabled || taxSettings.defaultPercentage >= 30}
                           className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl font-bold transition-all active:scale-90 ${
@@ -1851,7 +1850,7 @@ export const Settings: React.FC = () => {
                             key={percentage}
                             onClick={() => {
                               updateTaxSettings({ defaultPercentage: percentage });
-                              saveTaxSettings();
+                              setTaxHasChanges(true);
                             }}
                             disabled={!taxSettings.enabled}
                             className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 ${
@@ -2205,7 +2204,7 @@ export const Settings: React.FC = () => {
                       <div className="bg-[#0B141A] rounded-2xl overflow-hidden shadow-2xl">
                         {/* WhatsApp Header */}
                         <div className="bg-[#202C33] px-4 py-3 flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
                             JD
                           </div>
                           <div className="flex-1">
@@ -2277,7 +2276,7 @@ export const Settings: React.FC = () => {
                 ? 'bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-slate-700/50 backdrop-blur-xl' 
                 : 'bg-white border-slate-200 shadow-xl shadow-slate-200/50'
             }`}>
-              <div className="relative h-16 sm:h-24 bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600">
+              <div className="relative h-16 sm:h-24 bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600">
                 <div className="absolute inset-0 flex items-center px-3 sm:px-6">
                   <div className="flex items-center gap-2.5 sm:gap-4 flex-1 min-w-0">
                     <div className="w-9 h-9 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0">

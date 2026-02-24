@@ -121,7 +121,7 @@ export const GRNReminderHistoryModal: React.FC<GRNReminderHistoryModalProps> = (
         </DialogHeader>
 
         {/* Header */}
-        <div className="relative h-16 sm:h-20 bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600">
+        <div className="relative h-16 sm:h-20 bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600">
           <div className="absolute inset-0 flex items-center px-3 sm:px-6">
             <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
               <div className="w-9 h-9 sm:w-12 sm:h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center flex-shrink-0">

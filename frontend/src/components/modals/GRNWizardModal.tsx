@@ -476,20 +476,20 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
             onKeyDown={(e) => handlePriceKeyDown(e, item.id)}
             className={`w-28 px-2 py-1 border rounded-lg text-sm ${
               theme === 'dark'
-                ? 'border-orange-500 bg-slate-700 text-white'
-                : 'border-orange-500 bg-white text-slate-900'
+                ? 'border-emerald-500 bg-slate-700 text-white'
+                : 'border-emerald-500 bg-white text-slate-900'
             }`}
           />
         ) : (
           <button
             onClick={() => handlePriceEdit(item.id, item.unitPrice)}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-orange-500/10 transition-colors touch-manipulation text-xs"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-emerald-500/10 transition-colors touch-manipulation text-xs"
             title="Tap to edit price"
           >
             {item.originalUnitPrice && item.originalUnitPrice !== item.unitPrice ? (
               <>
                 <span className="line-through text-red-400">Rs. {item.originalUnitPrice.toLocaleString()}</span>
-                <span className="text-orange-400 font-medium">Rs. {item.unitPrice.toLocaleString()}</span>
+                <span className="text-emerald-400 font-medium">Rs. {item.unitPrice.toLocaleString()}</span>
               </>
             ) : (
               <span className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Rs. {item.unitPrice.toLocaleString()}</span>
@@ -523,7 +523,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
               }`}
               autoFocus
             />
-            <button onClick={() => applyDiscount(item.id)} className="px-2 py-1 text-xs bg-orange-500 text-white rounded-lg touch-manipulation">
+            <button onClick={() => applyDiscount(item.id)} className="px-2 py-1 text-xs bg-emerald-500 text-white rounded-lg touch-manipulation">
               OK
             </button>
             <button onClick={() => setEditingDiscountId(null)} className={`px-1 py-1 text-xs rounded-lg touch-manipulation ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -535,8 +535,8 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
             onClick={() => handleDiscountClick(item.id, item)}
             className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors touch-manipulation ${
               item.discountValue && item.discountValue > 0
-                ? 'bg-orange-500/10 text-orange-400'
-                : theme === 'dark' ? 'text-slate-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-500'
+                ? 'bg-emerald-500/10 text-emerald-400'
+                : theme === 'dark' ? 'text-slate-500 hover:text-emerald-400' : 'text-slate-400 hover:text-emerald-500'
             }`}
           >
             <Tag className="w-3 h-3" />
@@ -547,7 +547,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
           </button>
         )}
 
-        <span className="text-orange-400 font-bold text-sm whitespace-nowrap">
+        <span className="text-emerald-400 font-bold text-sm whitespace-nowrap">
           Rs. {Math.round(item.totalAmount).toLocaleString()}
         </span>
       </div>
@@ -565,7 +565,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
         </DialogHeader>
 
         {/* ═══════════════ Gradient Header ═══════════════ */}
-        <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-500 px-3 py-2.5 sm:px-6 sm:py-4 text-white shrink-0" aria-hidden="true">
+        <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 px-3 py-2.5 sm:px-6 sm:py-4 text-white shrink-0" aria-hidden="true">
           <div className="flex items-center gap-2 sm:gap-4">
             {/* Mobile: Back arrow */}
             <button
@@ -580,7 +580,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="text-base sm:text-2xl font-bold truncate">{isEditing ? 'Edit' : 'Create'} GRN</h2>
-              <p className="text-orange-100 text-[11px] sm:text-sm truncate">
+              <p className="text-emerald-100 text-[11px] sm:text-sm truncate">
                 <span className="sm:hidden">Step {step}/4 — {stepLabels[step - 1]}</span>
                 <span className="hidden sm:inline">Goods Received Note — {isEditing ? 'Update details' : '4 easy steps'}</span>
               </p>
@@ -612,9 +612,9 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                     }}
                     className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-sm transition-all shadow-sm cursor-pointer touch-manipulation ${
                       s < step
-                        ? 'bg-orange-500 text-white hover:bg-orange-600'
+                        ? 'bg-emerald-500 text-white hover:bg-emerald-600'
                         : s === step
-                        ? 'bg-orange-600 text-white ring-4 ring-orange-500/30'
+                        ? 'bg-emerald-600 text-white ring-4 ring-emerald-500/30'
                         : theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'
                     }`}
                   >
@@ -628,7 +628,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                 </div>
                 {s < 4 && (
                   <div className={`flex-1 h-1 mx-1.5 sm:mx-3 rounded-full transition-colors ${
-                    s < step ? 'bg-orange-500' : (theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200')
+                    s < step ? 'bg-emerald-500' : (theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200')
                   }`} />
                 )}
               </React.Fragment>
@@ -645,8 +645,8 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
               <div className="space-y-4">
                 {/* Section header */}
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center shrink-0">
-                    <Building2 className="w-5 h-5 text-orange-400" />
+                  <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center shrink-0">
+                    <Building2 className="w-5 h-5 text-emerald-400" />
                   </div>
                   <div className="min-w-0">
                     <h3 className={`text-base sm:text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Select a Supplier</h3>
@@ -667,7 +667,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                       placeholder="Search by name, company, phone..."
                       value={supplierSearch}
                       onChange={(e) => setSupplierSearch(e.target.value)}
-                      className={`w-full pl-10 pr-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                         theme === 'dark'
                           ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                           : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400'
@@ -677,10 +677,10 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
 
                   {/* Selected supplier banner */}
                   {currentSupplier && (
-                    <div className="p-3 rounded-xl border-2 border-orange-500 bg-orange-500/10">
+                    <div className="p-3 rounded-xl border-2 border-emerald-500 bg-emerald-500/10">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${
-                          theme === 'dark' ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600'
+                          theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
                         }`}>
                           {currentSupplier.company.charAt(0)}
                         </div>
@@ -692,7 +692,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                             {currentSupplier.name} • {currentSupplier.phone}
                           </p>
                         </div>
-                        <CheckCircle className="w-5 h-5 text-orange-500 shrink-0" />
+                        <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
                       </div>
                     </div>
                   )}
@@ -711,14 +711,14 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                           onClick={() => setSelectedSupplierId(supplier.id)}
                           className={`w-full p-3 border-2 rounded-xl text-left transition-all touch-manipulation ${
                             selectedSupplierId === supplier.id
-                              ? 'border-orange-500 bg-orange-500/10'
-                              : theme === 'dark' ? 'border-slate-700 hover:border-orange-500/50 bg-slate-800/50' : 'border-slate-200 hover:border-orange-400/50 bg-white'
+                              ? 'border-emerald-500 bg-emerald-500/10'
+                              : theme === 'dark' ? 'border-slate-700 hover:border-emerald-500/50 bg-slate-800/50' : 'border-slate-200 hover:border-emerald-400/50 bg-white'
                           }`}
                         >
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${
                               selectedSupplierId === supplier.id
-                                ? 'bg-orange-500/20 text-orange-400'
+                                ? 'bg-emerald-500/20 text-emerald-400'
                                 : theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-600'
                             }`}>
                               {supplier.company.charAt(0)}
@@ -732,7 +732,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                               </p>
                             </div>
                             {selectedSupplierId === supplier.id && (
-                              <CheckCircle className="w-5 h-5 text-orange-500 shrink-0" />
+                              <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
                             )}
                           </div>
                           <div className="flex items-center gap-1 mt-1.5 ml-[52px]">
@@ -768,7 +768,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                           placeholder="Search suppliers..."
                           value={supplierSearch}
                           onChange={(e) => setSupplierSearch(e.target.value)}
-                          className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                          className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             theme === 'dark'
                               ? 'border-slate-600 bg-slate-800 text-white placeholder-slate-500'
                               : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'
@@ -790,14 +790,14 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                             onClick={() => setSelectedSupplierId(supplier.id)}
                             className={`w-full p-3 border-2 rounded-xl text-left transition-all ${
                               selectedSupplierId === supplier.id
-                                ? 'border-orange-500 bg-orange-500/10'
-                                : theme === 'dark' ? 'border-slate-700 hover:border-orange-500/50 bg-slate-800/50' : 'border-slate-200 hover:border-orange-500/50 bg-white'
+                                ? 'border-emerald-500 bg-emerald-500/10'
+                                : theme === 'dark' ? 'border-slate-700 hover:border-emerald-500/50 bg-slate-800/50' : 'border-slate-200 hover:border-emerald-500/50 bg-white'
                             }`}
                           >
                             <div className="flex items-center gap-3">
                               <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${
                                 selectedSupplierId === supplier.id
-                                  ? 'bg-orange-500/20 text-orange-400'
+                                  ? 'bg-emerald-500/20 text-emerald-400'
                                   : theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-600'
                               }`}>
                                 {supplier.company.charAt(0)}
@@ -811,7 +811,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                                 </p>
                               </div>
                               {selectedSupplierId === supplier.id && (
-                                <CheckCircle className="w-5 h-5 text-orange-500 shrink-0" />
+                                <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
                               )}
                             </div>
                             <div className="flex items-center gap-1 mt-1.5 ml-[52px]">
@@ -833,8 +833,8 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                     onMouseDown={handleMouseDown}
                     className={`w-2 cursor-col-resize flex items-center justify-center transition-colors ${
                       isResizing
-                        ? 'bg-orange-500'
-                        : theme === 'dark' ? 'bg-slate-700 hover:bg-orange-500/50' : 'bg-slate-200 hover:bg-orange-500/50'
+                        ? 'bg-emerald-500'
+                        : theme === 'dark' ? 'bg-slate-700 hover:bg-emerald-500/50' : 'bg-slate-200 hover:bg-emerald-500/50'
                     }`}
                   >
                     <GripVertical className={`w-3 h-3 ${isResizing ? 'text-white' : 'text-slate-400'}`} />
@@ -857,10 +857,10 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
 
                     <div className="flex-1 overflow-y-auto p-3">
                       {currentSupplier ? (
-                        <div className="p-4 rounded-xl border-2 border-orange-500 bg-orange-500/10">
+                        <div className="p-4 rounded-xl border-2 border-emerald-500 bg-emerald-500/10">
                           <div className="flex items-center gap-3 mb-3">
                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold ${
-                              theme === 'dark' ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600'
+                              theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
                             }`}>
                               {currentSupplier.company.charAt(0)}
                             </div>
@@ -908,7 +908,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                       {/* Cart Preview */}
                       <div className={`mt-4 p-4 rounded-xl ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                         <div className="flex items-center gap-2 mb-3">
-                          <Package className="w-4 h-4 text-orange-500" />
+                          <Package className="w-4 h-4 text-emerald-500" />
                           <span className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                             Cart ({items.length} items)
                           </span>
@@ -931,7 +931,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                             )}
                             <div className={`flex justify-between text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                               <span>Total:</span>
-                              <span className="text-orange-500">Rs. {Math.round(totals.total).toLocaleString()}</span>
+                              <span className="text-emerald-500">Rs. {Math.round(totals.total).toLocaleString()}</span>
                             </div>
                           </div>
                         )}
@@ -947,8 +947,8 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
               <div className="space-y-4">
                 {/* Section header */}
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center shrink-0">
-                    <Package className="w-5 h-5 text-amber-400" />
+                  <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center shrink-0">
+                    <Package className="w-5 h-5 text-emerald-400" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className={`text-base sm:text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Add GRN Items</h3>
@@ -959,9 +959,9 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                   </div>
                   {/* Cart count badge - mobile */}
                   {items.length > 0 && (
-                    <div className="flex lg:hidden items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500/15 border border-orange-500/30">
-                      <ShoppingCart className="w-3.5 h-3.5 text-orange-400" />
-                      <span className="text-xs font-bold text-orange-400">{items.length}</span>
+                    <div className="flex lg:hidden items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                      <ShoppingCart className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-xs font-bold text-emerald-400">{items.length}</span>
                     </div>
                   )}
                 </div>
@@ -981,7 +981,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                             placeholder="Search products..."
                             value={productSearch}
                             onChange={(e) => { setProductSearch(e.target.value); setSelectedProductId(''); }}
-                            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                            className={`w-full pl-10 pr-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                               theme === 'dark'
                                 ? 'border-slate-600 bg-slate-800 text-white placeholder-slate-500'
                                 : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'
@@ -992,7 +992,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
 
                       {productsLoading ? (
                         <div className="flex items-center justify-center py-12">
-                          <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                          <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
                           <span className={`ml-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Loading products...</span>
                         </div>
                       ) : (
@@ -1012,13 +1012,13 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                                   theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'
                                 } ${
                                   selectedProductId === p.id
-                                    ? 'bg-orange-500/10'
+                                    ? 'bg-emerald-500/10'
                                     : theme === 'dark' ? 'hover:bg-slate-700/50 active:bg-slate-700/60' : 'hover:bg-slate-100 active:bg-slate-200'
                                 }`}
                               >
                                 <div className="flex justify-between items-center gap-2">
                                   <div className="min-w-0 flex-1">
-                                    <p className={`font-medium text-sm truncate ${selectedProductId === p.id ? 'text-orange-400' : (theme === 'dark' ? 'text-white' : 'text-slate-900')}`}>
+                                    <p className={`font-medium text-sm truncate ${selectedProductId === p.id ? 'text-emerald-400' : (theme === 'dark' ? 'text-white' : 'text-slate-900')}`}>
                                       {p.name}
                                     </p>
                                     <p className={`text-xs truncate ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
@@ -1052,7 +1052,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                                 min="1"
                                 value={orderedQty}
                                 onChange={(e) => setOrderedQty(parseInt(e.target.value) || 1)}
-                                className={`w-14 px-2 py-2 text-sm text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                                className={`w-14 px-2 py-2 text-sm text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                                   theme === 'dark' ? 'border-slate-600 bg-slate-800 text-white' : 'border-slate-300 bg-white text-slate-900'
                                 }`}
                               />
@@ -1068,7 +1068,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                             <button
                               onClick={addItem}
                               disabled={!selectedProductId || orderedQty <= 0}
-                              className="flex-1 px-3 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 transition-all touch-manipulation"
+                              className="flex-1 px-3 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 transition-all touch-manipulation"
                             >
                               <Plus className="w-4 h-4" />
                               Add to GRN
@@ -1092,7 +1092,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                             GRN Items ({items.length})
                           </h4>
                         </div>
-                        <span className="text-orange-500 font-bold text-sm">Rs. {Math.round(totals.total).toLocaleString()}</span>
+                        <span className="text-emerald-500 font-bold text-sm">Rs. {Math.round(totals.total).toLocaleString()}</span>
                       </div>
 
                       <div className="max-h-[40vh] overflow-y-auto overscroll-contain p-2 space-y-2">
@@ -1109,7 +1109,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                           )}
                           <div className={`flex justify-between text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                             <span>Total ({totals.orderedQty} items)</span>
-                            <span className="text-orange-400">Rs. {Math.round(totals.total).toLocaleString()}</span>
+                            <span className="text-emerald-400">Rs. {Math.round(totals.total).toLocaleString()}</span>
                           </div>
                         </div>
                       )}
@@ -1140,7 +1140,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                           placeholder="Search products..."
                           value={productSearch}
                           onChange={(e) => { setProductSearch(e.target.value); setSelectedProductId(''); }}
-                          className={`w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                          className={`w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                             theme === 'dark'
                               ? 'border-slate-600 bg-slate-800 text-white placeholder-slate-500'
                               : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400'
@@ -1151,7 +1151,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
 
                     {productsLoading ? (
                       <div className="flex-1 flex items-center justify-center">
-                        <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
                         <span className={`ml-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Loading...</span>
                       </div>
                     ) : (
@@ -1170,13 +1170,13 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                                 theme === 'dark' ? 'border-slate-700/50' : 'border-slate-100'
                               } ${
                                 selectedProductId === p.id
-                                  ? 'bg-orange-500/10'
+                                  ? 'bg-emerald-500/10'
                                   : theme === 'dark' ? 'hover:bg-slate-700/50' : 'hover:bg-slate-100'
                               }`}
                             >
                               <div className="flex justify-between items-start gap-2">
                                 <div className="min-w-0 flex-1">
-                                  <p className={`font-medium text-sm truncate ${selectedProductId === p.id ? 'text-orange-400' : (theme === 'dark' ? 'text-white' : 'text-slate-900')}`}>
+                                  <p className={`font-medium text-sm truncate ${selectedProductId === p.id ? 'text-emerald-400' : (theme === 'dark' ? 'text-white' : 'text-slate-900')}`}>
                                     {p.name}
                                   </p>
                                   <p className={`text-xs truncate ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -1201,7 +1201,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                             min="1"
                             value={orderedQty}
                             onChange={(e) => setOrderedQty(parseInt(e.target.value) || 1)}
-                            className={`w-20 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                            className={`w-20 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                               theme === 'dark'
                                 ? 'border-slate-600 bg-slate-800 text-white'
                                 : 'border-slate-300 bg-white text-slate-900'
@@ -1210,7 +1210,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                           <button
                             onClick={addItem}
                             disabled={!selectedProductId || orderedQty <= 0}
-                            className="flex-1 px-3 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition-all"
+                            className="flex-1 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition-all"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             Add
@@ -1225,8 +1225,8 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                     onMouseDown={handleMouseDown}
                     className={`w-2 cursor-col-resize flex items-center justify-center transition-colors ${
                       isResizing
-                        ? 'bg-orange-500'
-                        : theme === 'dark' ? 'bg-slate-700 hover:bg-orange-500/50' : 'bg-slate-200 hover:bg-orange-500/50'
+                        ? 'bg-emerald-500'
+                        : theme === 'dark' ? 'bg-slate-700 hover:bg-emerald-500/50' : 'bg-slate-200 hover:bg-emerald-500/50'
                     }`}
                   >
                     <GripVertical className={`w-3 h-3 ${isResizing ? 'text-white' : 'text-slate-400'}`} />
@@ -1246,7 +1246,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                           GRN Items ({items.length})
                         </h4>
                       </div>
-                      <span className="text-orange-500 font-bold text-sm">Rs. {Math.round(totals.total).toLocaleString()}</span>
+                      <span className="text-emerald-500 font-bold text-sm">Rs. {Math.round(totals.total).toLocaleString()}</span>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -1269,7 +1269,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                         )}
                         <div className={`flex justify-between text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                           <span>Total ({totals.orderedQty} items)</span>
-                          <span className="text-orange-400">Rs. {Math.round(totals.total).toLocaleString()}</span>
+                          <span className="text-emerald-400">Rs. {Math.round(totals.total).toLocaleString()}</span>
                         </div>
                       </div>
                     )}
@@ -1364,7 +1364,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                       value={receivedBy}
                       onChange={(e) => setReceivedBy(e.target.value)}
                       placeholder="Enter name..."
-                      className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                      className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                         theme === 'dark'
                           ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                           : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400'
@@ -1381,7 +1381,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                       value={vehicleNumber}
                       onChange={(e) => setVehicleNumber(e.target.value)}
                       placeholder="e.g., WP ABC-1234"
-                      className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                      className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                         theme === 'dark'
                           ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                           : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400'
@@ -1402,7 +1402,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                       value={driverName}
                       onChange={(e) => setDriverName(e.target.value)}
                       placeholder="Enter driver name..."
-                      className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                      className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                         theme === 'dark'
                           ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                           : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400'
@@ -1419,7 +1419,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                       value={deliveryNote}
                       onChange={(e) => setDeliveryNote(e.target.value)}
                       placeholder="Delivery note/reference..."
-                      className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                      className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                         theme === 'dark'
                           ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                           : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400'
@@ -1439,7 +1439,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Additional notes..."
                     rows={2}
-                    className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none ${
+                    className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none ${
                       theme === 'dark'
                         ? 'border-slate-700 bg-slate-800/50 text-white placeholder-slate-500'
                         : 'border-slate-200 bg-white text-slate-900 placeholder-slate-400'
@@ -1470,12 +1470,12 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                     theme === 'dark' ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'
                   }`}>
                     <div className="flex items-center gap-2 mb-3">
-                      <Building2 className="w-4 h-4 text-orange-500" />
+                      <Building2 className="w-4 h-4 text-emerald-500" />
                       <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Supplier</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${
-                        theme === 'dark' ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600'
+                        theme === 'dark' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
                       }`}>
                         {currentSupplier?.company?.charAt(0) || '?'}
                       </div>
@@ -1538,7 +1538,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                 {/* Items */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <Package className="w-4 h-4 text-orange-500" />
+                    <Package className="w-4 h-4 text-emerald-500" />
                     <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                       Items ({items.length})
                     </span>
@@ -1574,7 +1574,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                                 {item.originalUnitPrice && item.originalUnitPrice !== item.unitPrice ? (
                                   <div className="flex flex-col items-end">
                                     <span className="line-through text-red-400 text-xs">Rs. {item.originalUnitPrice.toLocaleString()}</span>
-                                    <span className="text-orange-400">Rs. {item.unitPrice.toLocaleString()}</span>
+                                    <span className="text-emerald-400">Rs. {item.unitPrice.toLocaleString()}</span>
                                   </div>
                                 ) : (
                                   <>Rs. {item.unitPrice.toLocaleString()}</>
@@ -1583,7 +1583,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                               <td className={`p-3 text-right ${discountAmt > 0 ? 'text-red-400' : (theme === 'dark' ? 'text-slate-500' : 'text-slate-400')}`}>
                                 {discountAmt > 0 ? `-Rs. ${Math.round(discountAmt).toLocaleString()}` : '—'}
                               </td>
-                              <td className="p-3 text-right font-semibold text-orange-400">
+                              <td className="p-3 text-right font-semibold text-emerald-400">
                                 Rs. {Math.round(item.totalAmount).toLocaleString()}
                               </td>
                             </tr>
@@ -1608,7 +1608,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                               </p>
                               <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{item.category}</p>
                             </div>
-                            <span className="text-orange-400 font-bold text-sm whitespace-nowrap">
+                            <span className="text-emerald-400 font-bold text-sm whitespace-nowrap">
                               Rs. {Math.round(item.totalAmount).toLocaleString()}
                             </span>
                           </div>
@@ -1643,7 +1643,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                     theme === 'dark' ? 'border-slate-700 text-white' : 'border-slate-200 text-slate-900'
                   }`}>
                     <span>Grand Total</span>
-                    <span className="text-orange-400">
+                    <span className="text-emerald-400">
                       Rs. {Math.round(totals.total).toLocaleString()}
                     </span>
                   </div>
@@ -1715,7 +1715,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
                   (step === 1 && !canProceedToStep2) ||
                   (step === 2 && !canProceedToStep3)
                 }
-                className="flex items-center justify-center gap-1.5 px-5 sm:px-6 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 active:from-orange-800 active:to-amber-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium text-sm transition-all shadow-lg shadow-orange-500/25 touch-manipulation"
+                className="flex items-center justify-center gap-1.5 px-5 sm:px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:from-emerald-800 active:to-teal-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium text-sm transition-all shadow-lg shadow-emerald-500/25 touch-manipulation"
               >
                 Continue
                 <ChevronRight className="w-4 h-4" />
@@ -1726,7 +1726,7 @@ export const GRNWizardModal: React.FC<GRNWizardModalProps> = ({
               <button
                 onClick={handleCreate}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-5 sm:px-6 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 active:from-orange-800 active:to-amber-800 disabled:opacity-50 text-white rounded-xl font-medium text-sm transition-all shadow-lg shadow-orange-500/25 touch-manipulation"
+                className="flex items-center gap-2 px-5 sm:px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:from-emerald-800 active:to-teal-800 disabled:opacity-50 text-white rounded-xl font-medium text-sm transition-all shadow-lg shadow-emerald-500/25 touch-manipulation"
               >
                 {isLoading ? (
                   <>
