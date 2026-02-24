@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { SearchableSelect } from '../components/ui/searchable-select';
@@ -22,7 +22,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/
 
 export const ShopSetup: React.FC = () => {
   const { theme } = useTheme();
-  const { user, refreshUser, getAccessToken } = useAuth();
+  const { user, refreshUser, getAccessToken, logout } = useAuth();
   const navigate = useNavigate();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,6 +48,23 @@ export const ShopSetup: React.FC = () => {
       navigate('/dashboard', { replace: true });
     }
   }, [user, navigate]);
+
+  // If not authenticated at all, redirect to login
+  useEffect(() => {
+    if (!user && !getAccessToken()) {
+      navigate('/login', { replace: true });
+    }
+  }, [user, getAccessToken, navigate]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch {
+      // Force redirect even if logout API fails
+      navigate('/login', { replace: true });
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -440,9 +457,32 @@ export const ShopSetup: React.FC = () => {
         </div>
 
         {/* Footer Note */}
-        <p className={`text-center mt-6 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-          You can update these details later from Settings
-        </p>
+        <div className="text-center mt-6 space-y-3">
+          <p className={`text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+            You can update these details later from Settings
+          </p>
+          <div className={`flex items-center justify-center gap-2 text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+            <span>Having trouble?</span>
+            <button
+              onClick={handleLogout}
+              className={`font-medium transition-colors ${
+                theme === 'dark' ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-700'
+              }`}
+            >
+              Logout & try again
+            </button>
+            <span>or</span>
+            <Link
+              to="/login"
+              onClick={handleLogout}
+              className={`font-medium transition-colors ${
+                theme === 'dark' ? 'text-emerald-400 hover:text-emerald-300' : 'text-emerald-600 hover:text-emerald-700'
+              }`}
+            >
+              Back to Login
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

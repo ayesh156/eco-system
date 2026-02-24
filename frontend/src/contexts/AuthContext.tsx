@@ -439,7 +439,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Redirect to shop setup if user doesn't have a shop
-  if (!hasShop && window.location.pathname !== '/shop-setup') {
+  // SUPER_ADMIN doesn't need a shop to operate
+  if (!hasShop && user?.role !== 'SUPER_ADMIN' && window.location.pathname !== '/shop-setup') {
     window.location.href = '/shop-setup';
     return null;
   }
