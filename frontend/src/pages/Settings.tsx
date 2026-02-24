@@ -1510,10 +1510,8 @@ export const Settings: React.FC = () => {
             }`}>
               <div className="p-4 sm:p-6">
                 <div className="flex items-center gap-2.5 sm:gap-3 mb-5 sm:mb-6">
-                  <div className={`w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br ${accent.gradient} rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 bg-opacity-20`}
-                    style={{ background: `linear-gradient(135deg, var(--tw-gradient-from, rgba(16,185,129,0.2)), var(--tw-gradient-to, rgba(59,130,246,0.1)))` }}
-                  >
-                    <Sparkles className={`w-4 h-4 sm:w-6 sm:h-6 ${theme === 'dark' ? accent.textDark : accent.text}`} />
+                  <div className={`w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0`}>
+                    <Sparkles className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -1770,69 +1768,84 @@ export const Settings: React.FC = () => {
                     </div>
 
                     {/* Default Tax Percentage */}
-                    <div className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all ${
+                    <div className={`p-3 sm:p-5 rounded-xl sm:rounded-2xl border transition-all ${
                       taxSettings.enabled
-                        ? theme === 'dark' ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'
+                        ? theme === 'dark' ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-emerald-50/50 border-emerald-200'
                         : theme === 'dark' ? 'bg-slate-800/30 border-slate-700/50 opacity-50' : 'bg-slate-50 border-slate-200 opacity-50'
                     }`}>
-                      <label className={`block text-xs sm:text-sm font-semibold mb-2 sm:mb-3 ${
-                        taxSettings.enabled
-                          ? theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'
-                          : theme === 'dark' ? 'text-slate-500' : 'text-slate-600'
-                      }`}>
-                        Default Tax Percentage (%)
-                      </label>
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="range"
-                          min="0"
-                          max="30"
-                          step="0.5"
-                          value={taxSettings.defaultPercentage}
-                          onChange={(e) => {
-                            updateTaxSettings({ defaultPercentage: parseFloat(e.target.value) });
+                      {/* Big Percentage Display + Stepper */}
+                      <div className="flex items-center justify-center gap-3 sm:gap-5">
+                        {/* Minus Button */}
+                        <button
+                          onClick={() => {
+                            const val = Math.max(0, taxSettings.defaultPercentage - 0.5);
+                            updateTaxSettings({ defaultPercentage: val });
                             saveTaxSettings();
                           }}
-                          disabled={!taxSettings.enabled}
-                          className={`flex-1 h-3 rounded-full appearance-none cursor-pointer ${
-                            taxSettings.enabled
-                              ? 'accent-emerald-500'
-                              : 'opacity-50 cursor-not-allowed'
+                          disabled={!taxSettings.enabled || taxSettings.defaultPercentage <= 0}
+                          className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl font-bold transition-all active:scale-90 ${
+                            taxSettings.enabled && taxSettings.defaultPercentage > 0
+                              ? theme === 'dark'
+                                ? 'bg-slate-700/70 text-slate-200 hover:bg-slate-600 border border-slate-600'
+                                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-sm'
+                              : 'opacity-30 cursor-not-allowed ' + (theme === 'dark' ? 'bg-slate-800 text-slate-600 border border-slate-700' : 'bg-slate-100 text-slate-400 border border-slate-200')
                           }`}
-                        />
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            max="30"
-                            step="0.5"
-                            value={taxSettings.defaultPercentage}
-                            onChange={(e) => {
-                              const value = Math.min(30, Math.max(0, parseFloat(e.target.value) || 0));
-                              updateTaxSettings({ defaultPercentage: value });
-                              saveTaxSettings();
-                            }}
-                            disabled={!taxSettings.enabled}
-                            className={`w-20 px-3 py-2 rounded-xl border text-center font-bold transition-all ${
-                              taxSettings.enabled
-                                ? theme === 'dark' 
-                                  ? 'bg-slate-800 border-emerald-500/50 text-emerald-400 focus:ring-2 focus:ring-emerald-500/30' 
-                                  : 'bg-white border-emerald-300 text-emerald-700 focus:ring-2 focus:ring-emerald-500/30'
-                                : theme === 'dark'
-                                  ? 'bg-slate-800/50 border-slate-700 text-slate-500 cursor-not-allowed'
-                                  : 'bg-slate-100 border-slate-300 text-slate-500 cursor-not-allowed'
-                            }`}
-                          />
-                          <span className={`font-bold text-2xl ${
+                        >
+                          −
+                        </button>
+
+                        {/* Centre Display Ring */}
+                        <div className="relative">
+                          <div className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center transition-all duration-500 ${
                             taxSettings.enabled
-                              ? theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'
-                              : theme === 'dark' ? 'text-slate-600' : 'text-slate-400'
-                          }`}>%</span>
+                              ? 'bg-gradient-to-br from-emerald-500/10 to-teal-500/10 ring-2 ring-emerald-500/30'
+                              : theme === 'dark' ? 'bg-slate-800/50 ring-1 ring-slate-700' : 'bg-slate-100 ring-1 ring-slate-200'
+                          }`}
+                            style={taxSettings.enabled ? {
+                              boxShadow: '0 0 40px -8px rgba(16,185,129,0.2), inset 0 0 30px -8px rgba(16,185,129,0.08)'
+                            } : {}}
+                          >
+                            <div className="text-center">
+                              <div className={`text-3xl sm:text-5xl font-black tracking-tight leading-none ${
+                                taxSettings.enabled
+                                  ? theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'
+                                  : theme === 'dark' ? 'text-slate-600' : 'text-slate-400'
+                              }`}>
+                                {taxSettings.defaultPercentage}
+                              </div>
+                              <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest mt-0.5 ${
+                                taxSettings.enabled
+                                  ? theme === 'dark' ? 'text-emerald-500/70' : 'text-emerald-500'
+                                  : theme === 'dark' ? 'text-slate-600' : 'text-slate-400'
+                              }`}>
+                                % Tax
+                              </div>
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Plus Button */}
+                        <button
+                          onClick={() => {
+                            const val = Math.min(30, taxSettings.defaultPercentage + 0.5);
+                            updateTaxSettings({ defaultPercentage: val });
+                            saveTaxSettings();
+                          }}
+                          disabled={!taxSettings.enabled || taxSettings.defaultPercentage >= 30}
+                          className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl font-bold transition-all active:scale-90 ${
+                            taxSettings.enabled && taxSettings.defaultPercentage < 30
+                              ? theme === 'dark'
+                                ? 'bg-slate-700/70 text-slate-200 hover:bg-slate-600 border border-slate-600'
+                                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-sm'
+                              : 'opacity-30 cursor-not-allowed ' + (theme === 'dark' ? 'bg-slate-800 text-slate-600 border border-slate-700' : 'bg-slate-100 text-slate-400 border border-slate-200')
+                          }`}
+                        >
+                          +
+                        </button>
                       </div>
-                      
-                      {/* Quick Preset Buttons */}
-                      <div className="flex gap-2 mt-4">
+
+                      {/* Quick Preset Chips */}
+                      <div className="flex flex-wrap items-center justify-center gap-2 mt-4 sm:mt-5">
                         {[5, 8, 12, 15, 18].map(percentage => (
                           <button
                             key={percentage}
@@ -1841,14 +1854,16 @@ export const Settings: React.FC = () => {
                               saveTaxSettings();
                             }}
                             disabled={!taxSettings.enabled}
-                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                            className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 ${
                               taxSettings.enabled
                                 ? taxSettings.defaultPercentage === percentage
-                                  ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/30'
+                                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 scale-105'
                                   : theme === 'dark'
-                                    ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 border border-slate-600'
-                                    : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
-                                : 'bg-slate-700/20 text-slate-500 cursor-not-allowed border border-slate-600/30'
+                                    ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/70 border border-slate-600/80 hover:border-emerald-500/40'
+                                    : 'bg-white text-slate-600 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300'
+                                : theme === 'dark'
+                                  ? 'bg-slate-800/30 text-slate-600 border border-slate-700/40 cursor-not-allowed'
+                                  : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
                             }`}
                           >
                             {percentage}%
@@ -1859,13 +1874,13 @@ export const Settings: React.FC = () => {
                       {/* Info Box */}
                       {taxSettings.enabled && (
                         <div className={`mt-4 p-3 rounded-xl flex items-start gap-3 ${
-                          theme === 'dark' ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'
+                          theme === 'dark' ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'
                         }`}>
-                          <Info className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                          <p className={`text-xs ${
-                            theme === 'dark' ? 'text-emerald-400/90' : 'text-emerald-700'
+                          <Info className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                          <p className={`text-[11px] sm:text-xs leading-relaxed ${
+                            theme === 'dark' ? 'text-emerald-400/80' : 'text-emerald-700'
                           }`}>
-                            This will be the default tax rate for all new invoices. You can still adjust the tax for individual invoices during creation.
+                            Default tax for all new invoices. Adjustable per invoice during creation.
                           </p>
                         </div>
                       )}
