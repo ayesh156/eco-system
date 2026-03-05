@@ -6,22 +6,23 @@ import { productBrands, mockProducts, brandLogos } from '../data/mockData';
 import { brandService } from '../services/brandService';
 import { deleteBrandImage, isSupabaseUrl, isSupabaseConfigured } from '../services/brandCategoryImageService';
 import { BrandFormModal } from '../components/modals/BrandFormModal';
-import type { Brand } from '../components/modals/BrandFormModal';
 import { DeleteConfirmationModal } from '../components/modals/DeleteConfirmationModal';
+import type { Brand } from '../components/modals/BrandFormModal';
 import { 
-  Building2, Plus, Edit, Trash2, Search, X, LayoutGrid, List, 
+  Building2, Plus, Edit, Search, X, LayoutGrid, List, 
   ArrowDownUp, SortAsc, SortDesc, Calendar, ChevronLeft, ChevronRight,
   ChevronsLeft, ChevronsRight, Package, Image as ImageIcon, Check,
-  Loader2, AlertCircle, CheckCircle2, MoreVertical
+  Loader2, AlertCircle, CheckCircle2, Trash2
 } from 'lucide-react';
 
-// Extended Brand interface with image and date
+// Extended Brand interface with image, date, and active status
 interface ExtendedBrand extends Brand {
   image?: string;
   createdAt: string;
   website?: string;
   contactEmail?: string;
   contactPhone?: string;
+  isActive?: boolean;
 }
 
 export const Brands: React.FC = () => {
@@ -64,8 +65,8 @@ export const Brands: React.FC = () => {
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [brandToDelete, setBrandToDelete] = useState<ExtendedBrand | null>(null);
   
   // Local brands state - loads from API
@@ -75,8 +76,7 @@ export const Brands: React.FC = () => {
   const [highlightedBrandId, setHighlightedBrandId] = useState<string | null>(null);
 
   // 3-dot action menu state for mobile card view
-  const [activeBrandMenu, setActiveBrandMenu] = useState<string | null>(null);
-  const brandMenuRef = useRef<HTMLDivElement>(null);
+
 
   // Load brands from API
   useEffect(() => {
@@ -93,6 +93,7 @@ export const Brands: React.FC = () => {
           productCount: brand._count?.products || 0,
           image: brand.image || brandLogos[brand.name] || '',
           createdAt: brand.createdAt,
+          isActive: brand.isActive !== undefined ? brand.isActive : true,
         }));
         setBrands(extendedBrands);
       } catch (error) {
@@ -117,9 +118,7 @@ export const Brands: React.FC = () => {
       if (endCalendarRef.current && !endCalendarRef.current.contains(event.target as Node)) {
         setShowEndCalendar(false);
       }
-      if (brandMenuRef.current && !brandMenuRef.current.contains(event.target as Node)) {
-        setActiveBrandMenu(null);
-      }
+
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -336,6 +335,23 @@ export const Brands: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
+  const handleConfirmDelete = async () => {
+    if (!brandToDelete) return;
+    try {
+      // Delete brand image from Supabase if applicable
+      if (brandToDelete.image && isSupabaseConfigured() && isSupabaseUrl(brandToDelete.image)) {
+        await deleteBrandImage(brandToDelete.image);
+      }
+      await brandService.delete(brandToDelete.id, effectiveShopId);
+      setBrands(prev => prev.filter(b => b.id !== brandToDelete.id));
+      setIsDeleteModalOpen(false);
+      setBrandToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete brand:', error);
+      setApiError(error instanceof Error ? error.message : 'Failed to delete brand');
+    }
+  };
+
   // Function to get Clearbit logo URL for a brand name
   const getBrandLogoUrl = (brandName: string): string => {
     // Check if we have a predefined logo
@@ -357,6 +373,7 @@ export const Brands: React.FC = () => {
         contactEmail: (brand as any).contactEmail || undefined,
         contactPhone: (brand as any).contactPhone || undefined,
         image: brand.image || undefined,
+        isActive: brand.isActive,
       };
 
       if (selectedBrand) {
@@ -371,6 +388,7 @@ export const Brands: React.FC = () => {
           website: updated.website || (b as any).website,
           contactEmail: (updated as any).contactEmail || (b as any).contactEmail,
           contactPhone: (updated as any).contactPhone || (b as any).contactPhone,
+          isActive: updated.isActive !== undefined ? updated.isActive : b.isActive,
         } : b));
         setHighlightedBrandId(brand.id);
       } else {
@@ -387,6 +405,7 @@ export const Brands: React.FC = () => {
           website: (created as any).website,
           contactEmail: (created as any).contactEmail,
           contactPhone: (created as any).contactPhone,
+          isActive: created.isActive !== undefined ? created.isActive : true,
         };
         setBrands(prev => [newBrand, ...prev]);
         setHighlightedBrandId(created.id);
@@ -396,27 +415,6 @@ export const Brands: React.FC = () => {
     } catch (error) {
       console.error('Failed to save brand:', error);
       setApiError(error instanceof Error ? error.message : 'Failed to save brand');
-    }
-  };
-
-  const handleConfirmDelete = async () => {
-    if (brandToDelete) {
-      try {
-        // Delete brand image from Supabase if it exists
-        if (brandToDelete.image && isSupabaseUrl(brandToDelete.image) && isSupabaseConfigured()) {
-          console.log('🗑️ Deleting brand image from Supabase:', brandToDelete.image);
-          await deleteBrandImage(brandToDelete.image);
-        }
-        await brandService.delete(brandToDelete.id, effectiveShopId);
-        setBrands(prev => prev.filter(b => b.id !== brandToDelete.id));
-      } catch (error) {
-        console.error('Failed to delete brand:', error);
-        setApiError(error instanceof Error ? error.message : 'Failed to delete brand');
-        // Still remove from UI for demo
-        setBrands(prev => prev.filter(b => b.id !== brandToDelete.id));
-      }
-      setIsDeleteModalOpen(false);
-      setBrandToDelete(null);
     }
   };
 
@@ -828,6 +826,9 @@ export const Brands: React.FC = () => {
                   <th className={`text-center px-4 py-3 text-xs font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                     Products
                   </th>
+                  <th className={`text-center px-4 py-3 text-xs font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Status
+                  </th>
                   <th className={`text-left px-4 py-3 text-xs font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                     Created
                   </th>
@@ -893,6 +894,22 @@ export const Brands: React.FC = () => {
                         {brand.productCount}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                        brand.isActive !== false
+                          ? theme === 'dark'
+                            ? 'bg-gradient-to-r from-emerald-500/15 to-teal-500/10 text-emerald-400 border border-emerald-500/25'
+                            : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-600 border border-emerald-200'
+                          : theme === 'dark'
+                            ? 'bg-gradient-to-r from-red-500/10 to-orange-500/5 text-red-400 border border-red-500/20'
+                            : 'bg-gradient-to-r from-red-50 to-orange-50 text-red-500 border border-red-200'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          brand.isActive !== false ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'
+                        }`} />
+                        {brand.isActive !== false ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
                     <td className={`px-4 py-3 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                       {new Date(brand.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
@@ -901,7 +918,13 @@ export const Brands: React.FC = () => {
                         <button onClick={() => handleEditBrand(brand)} className={`p-2 rounded-xl transition-colors ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`} title="Edit">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDeleteClick(brand)} className={`p-2 rounded-xl transition-colors ${theme === 'dark' ? 'hover:bg-red-500/10 text-red-400' : 'hover:bg-red-50 text-red-500'}`} title="Delete">
+                        <button 
+                          onClick={() => handleDeleteClick(brand)} 
+                          className={`p-2 rounded-xl transition-colors ${
+                            theme === 'dark' ? 'hover:bg-red-500/10 text-slate-400 hover:text-red-400' : 'hover:bg-red-50 text-slate-500 hover:text-red-500'
+                          }`} 
+                          title="Delete"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -954,7 +977,12 @@ export const Brands: React.FC = () => {
                   <button onClick={() => handleEditBrand(brand)} className={`p-1.5 rounded-lg transition-colors ${theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}`}>
                     <Edit className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => handleDeleteClick(brand)} className={`p-1.5 rounded-lg transition-colors ${theme === 'dark' ? 'hover:bg-red-500/10 text-red-400' : 'hover:bg-red-50 text-red-500'}`}>
+                  <button 
+                    onClick={() => handleDeleteClick(brand)} 
+                    className={`p-1.5 rounded-lg transition-colors ${
+                      theme === 'dark' ? 'hover:bg-red-500/10 text-slate-400 hover:text-red-400' : 'hover:bg-red-50 text-slate-500 hover:text-red-500'
+                    }`}
+                  >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -963,12 +991,14 @@ export const Brands: React.FC = () => {
           </div>
         </div>
       ) : (
-        /* Card View - Creative responsive grid with 3-dot action menus */
+        /* Card View - Creative responsive grid */
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4">
           {paginatedBrands.map((brand) => (
             <div 
               key={brand.id}
-              className={`group relative rounded-xl sm:rounded-2xl border p-3 sm:p-4 md:p-5 transition-all hover:shadow-lg ${
+              className={`group relative rounded-xl sm:rounded-2xl border overflow-hidden transition-all hover:shadow-lg ${
+                brand.isActive === false ? 'opacity-60 hover:opacity-90' : ''
+              } ${
                 highlightedBrandId === brand.id
                   ? theme === 'dark'
                     ? 'bg-emerald-900/30 border-emerald-500/50 ring-2 ring-emerald-500/30'
@@ -978,6 +1008,8 @@ export const Brands: React.FC = () => {
                     : 'bg-white border-slate-200 hover:border-emerald-500/50'
               }`}
             >
+              {/* Inner padded content */}
+              <div className="p-3 sm:p-4 md:p-5">
               {/* Highlight badge */}
               {highlightedBrandId === brand.id && (
                 <div className="mb-2 sm:mb-3 flex items-center gap-1">
@@ -988,66 +1020,32 @@ export const Brands: React.FC = () => {
                 </div>
               )}
 
-              {/* Top row: Logo + 3-dot menu */}
-              <div className="flex items-start justify-between mb-2.5 sm:mb-4">
-                <div>
-                  {renderBrandImage(brand, isMobile ? 'sm' : 'lg')}
-                </div>
-                {/* 3-dot menu button */}
-                <div className="relative" ref={activeBrandMenu === brand.id ? brandMenuRef : null}>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveBrandMenu(activeBrandMenu === brand.id ? null : brand.id);
-                    }}
-                    className={`p-1 sm:p-1.5 rounded-lg transition-all ${
-                      activeBrandMenu === brand.id
-                        ? theme === 'dark' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-900'
-                        : theme === 'dark' 
-                          ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 md:opacity-0 md:group-hover:opacity-100' 
-                          : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 md:opacity-0 md:group-hover:opacity-100'
-                    }`}
-                  >
-                    <MoreVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
-                  {/* Dropdown menu */}
-                  {activeBrandMenu === brand.id && (
-                    <div className={`absolute right-0 top-full mt-1 w-32 sm:w-36 rounded-xl border shadow-xl z-20 overflow-hidden ${
-                      theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-                    }`}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveBrandMenu(null);
-                          handleEditBrand(brand);
-                        }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs sm:text-sm transition-colors ${
-                          theme === 'dark' ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                        Edit Brand
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveBrandMenu(null);
-                          handleDeleteClick(brand);
-                        }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs sm:text-sm transition-colors ${
-                          theme === 'dark' ? 'text-red-400 hover:bg-red-500/10' : 'text-red-500 hover:bg-red-50'
-                        }`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
+              {/* Top row: Logo + Status Badge */}
+              <div className="flex items-start justify-between gap-2 mb-2.5 sm:mb-4">
+                {renderBrandImage(brand, isMobile ? 'sm' : 'lg')}
+                {/* Creative Status Badge */}
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider transition-all flex-shrink-0 ${
+                  brand.isActive !== false
+                    ? theme === 'dark'
+                      ? 'bg-gradient-to-r from-emerald-500/15 to-teal-500/10 text-emerald-400 border border-emerald-500/25 shadow-sm shadow-emerald-500/10'
+                      : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-600 border border-emerald-200 shadow-sm shadow-emerald-100'
+                    : theme === 'dark'
+                      ? 'bg-gradient-to-r from-red-500/10 to-orange-500/5 text-red-400 border border-red-500/20'
+                      : 'bg-gradient-to-r from-red-50 to-orange-50 text-red-500 border border-red-200'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    brand.isActive !== false ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'
+                  }`} />
+                  {brand.isActive !== false ? 'Active' : 'Inactive'}
+                </span>
               </div>
 
               {/* Brand info */}
-              <h3 className={`font-semibold text-xs sm:text-sm md:text-base truncate ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+              <h3 className={`font-semibold text-xs sm:text-sm md:text-base truncate ${
+                brand.isActive !== false
+                  ? theme === 'dark' ? 'text-white' : 'text-slate-900'
+                  : theme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+              }`}>
                 {brand.name}
               </h3>
               <div className="flex items-center gap-1.5 mt-1 sm:mt-1.5">
@@ -1063,32 +1061,33 @@ export const Brands: React.FC = () => {
                   year: 'numeric'
                 })}
               </p>
+              </div>{/* end inner padded content */}
 
-              {/* Quick action bar - always visible on mobile, hover on desktop */}
-              <div className={`mt-2.5 sm:mt-3 pt-2 sm:pt-2.5 border-t flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity ${
-                theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200'
+              {/* Quick Action Bar — Always visible, creative design */}
+              <div className={`flex items-center border-t ${
+                theme === 'dark' ? 'border-slate-700/50' : 'border-slate-200/80'
               }`}>
                 <button
                   onClick={() => handleEditBrand(brand)}
-                  className={`flex-1 flex items-center justify-center gap-1 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                    theme === 'dark' 
-                      ? 'text-slate-300 hover:bg-slate-700/50 hover:text-emerald-400' 
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-emerald-600'
+                  className={`group/edit flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] sm:text-xs font-semibold transition-all duration-200 rounded-bl-xl sm:rounded-bl-2xl ${
+                    theme === 'dark'
+                      ? 'text-slate-400 hover:text-blue-300 hover:bg-blue-500/15 active:scale-95'
+                      : 'text-slate-500 hover:text-blue-600 hover:bg-blue-50 active:scale-95'
                   }`}
                 >
-                  <Edit className="w-3 h-3" />
+                  <Edit className="w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform duration-200 group-hover/edit:-rotate-6" />
                   Edit
                 </button>
-                <div className={`w-px h-4 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
+                <div className={`w-px h-4 self-center ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`} />
                 <button
                   onClick={() => handleDeleteClick(brand)}
-                  className={`flex-1 flex items-center justify-center gap-1 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                    theme === 'dark' 
-                      ? 'text-slate-300 hover:bg-red-500/10 hover:text-red-400' 
-                      : 'text-slate-600 hover:bg-red-50 hover:text-red-500'
+                  className={`group/del flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[10px] sm:text-xs font-semibold transition-all duration-200 rounded-br-xl sm:rounded-br-2xl ${
+                    theme === 'dark'
+                      ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/15 active:scale-95'
+                      : 'text-slate-500 hover:text-red-500 hover:bg-red-50 active:scale-95'
                   }`}
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 transition-transform duration-200 group-hover/del:scale-110" />
                   Delete
                 </button>
               </div>
@@ -1274,10 +1273,10 @@ export const Brands: React.FC = () => {
       <DeleteConfirmationModal
         isOpen={isDeleteModalOpen}
         title="Delete Brand"
-        message="Are you sure you want to delete this brand? Products with this brand will need to be reassigned."
+        message="Are you sure you want to delete this brand? This action cannot be undone."
         itemName={brandToDelete?.name}
         onConfirm={handleConfirmDelete}
-        onCancel={() => setIsDeleteModalOpen(false)}
+        onCancel={() => { setIsDeleteModalOpen(false); setBrandToDelete(null); }}
       />
     </div>
   );

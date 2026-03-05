@@ -17,6 +17,7 @@ export interface APIBrand {
   name: string;
   description?: string;
   image?: string;
+  isActive?: boolean;
   website?: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -32,6 +33,7 @@ export interface CreateBrandDTO {
   name: string;
   description?: string;
   image?: string;
+  isActive?: boolean;
   website?: string;
   contactEmail?: string;
   contactPhone?: string;

@@ -267,6 +267,7 @@ model Category {
   name        String
   description String?
   image       String?   @db.Text  // Compressed image URL from Supabase
+  isActive    Boolean   @default(true)
   
   // Shop relation
   shopId      String
@@ -287,6 +288,7 @@ model Brand {
   name        String
   description String?
   image       String?   @db.Text  // Compressed image URL from Supabase
+  isActive    Boolean   @default(true)
   website     String?
   contactEmail String?
   contactPhone String?

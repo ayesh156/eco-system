@@ -17,6 +17,7 @@ export interface APICategory {
   name: string;
   description?: string;
   image?: string;
+  isActive?: boolean;
   shopId: string;
   createdAt: string;
   updatedAt: string;
@@ -29,6 +30,7 @@ export interface CreateCategoryDTO {
   name: string;
   description?: string;
   image?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateCategoryDTO extends Partial<CreateCategoryDTO> {}

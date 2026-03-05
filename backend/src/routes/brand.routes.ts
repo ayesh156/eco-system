@@ -237,7 +237,7 @@ router.post('/', sensitiveRateLimiter, validateBrand, async (req: Request, res: 
       return res.status(403).json({ success: false, message: 'Shop access required' });
     }
 
-    const { name, description, image, website, contactEmail, contactPhone } = req.body;
+    const { name, description, image, website, contactEmail, contactPhone, isActive } = req.body;
 
     // Check for duplicate name in same shop
     const existing = await prisma.brand.findFirst({
@@ -258,6 +258,7 @@ router.post('/', sensitiveRateLimiter, validateBrand, async (req: Request, res: 
         website,
         contactEmail,
         contactPhone,
+        isActive: isActive !== undefined ? isActive : true,
         shopId,
       },
       include: {
@@ -296,7 +297,7 @@ router.put('/:id', validateBrand, async (req: Request, res: Response, next: Next
       return res.status(403).json({ success: false, message: 'Brand does not belong to your shop' });
     }
 
-    const { name, description, image, website, contactEmail, contactPhone } = req.body;
+    const { name, description, image, website, contactEmail, contactPhone, isActive } = req.body;
 
     // Check for duplicate name (excluding current brand)
     if (name && name.toLowerCase() !== existing.name.toLowerCase()) {
@@ -313,7 +314,7 @@ router.put('/:id', validateBrand, async (req: Request, res: Response, next: Next
 
     const brand = await prisma.brand.update({
       where: { id },
-      data: { name, description, image, website, contactEmail, contactPhone },
+      data: { name, description, image, website, contactEmail, contactPhone, ...(isActive !== undefined && { isActive }) },
       include: {
         _count: {
           select: { products: true }

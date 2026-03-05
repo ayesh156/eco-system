@@ -216,7 +216,7 @@ router.post('/', sensitiveRateLimiter, validateCategory, async (req: Request, re
       return res.status(403).json({ success: false, message: 'Shop access required' });
     }
 
-    const { name, description, image } = req.body;
+    const { name, description, image, isActive } = req.body;
 
     // Check for duplicate name in same shop
     const existing = await prisma.category.findFirst({
@@ -234,6 +234,7 @@ router.post('/', sensitiveRateLimiter, validateCategory, async (req: Request, re
         name,
         description,
         image,
+        isActive: isActive !== undefined ? isActive : true,
         shopId,
       },
       include: {
@@ -272,7 +273,7 @@ router.put('/:id', validateCategory, async (req: Request, res: Response, next: N
       return res.status(403).json({ success: false, message: 'Category does not belong to your shop' });
     }
 
-    const { name, description, image } = req.body;
+    const { name, description, image, isActive } = req.body;
 
     // Check for duplicate name (excluding current category)
     if (name && name.toLowerCase() !== existing.name.toLowerCase()) {
@@ -289,7 +290,7 @@ router.put('/:id', validateCategory, async (req: Request, res: Response, next: N
 
     const category = await prisma.category.update({
       where: { id },
-      data: { name, description, image },
+      data: { name, description, image, ...(isActive !== undefined && { isActive }) },
       include: {
         _count: {
           select: { products: true }

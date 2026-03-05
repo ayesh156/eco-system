@@ -22,6 +22,7 @@ export interface Category {
   description?: string;
   icon?: string;
   image?: string;
+  isActive?: boolean;
   productCount: number;
 }
 
@@ -50,6 +51,7 @@ interface CategoryFormData {
   description: string;
   icon: string;
   image: string;
+  isActive: boolean;
 }
 
 export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
@@ -67,6 +69,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     description: '',
     icon: 'package',
     image: '',
+    isActive: true,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -111,6 +114,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             description: freshCategoryData.description || '',
             icon: 'package',
             image: freshCategoryData.image || '',
+            isActive: freshCategoryData.isActive !== undefined ? freshCategoryData.isActive : true,
           });
         } catch (error) {
           console.error('Failed to load category data:', error);
@@ -121,6 +125,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             description: category.description || '',
             icon: category.icon || 'package',
             image: category.image || '',
+            isActive: category.isActive !== undefined ? category.isActive : true,
           });
         } finally {
           setIsLoadingCategory(false);
@@ -132,6 +137,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
           description: '',
           icon: 'package',
           image: '',
+          isActive: true,
         });
         setIsLoadingCategory(false);
       }
@@ -336,6 +342,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         description: formData.description,
         icon: formData.icon,
         image: finalImageUrl,
+        isActive: formData.isActive,
         productCount: category?.productCount || 0,
       };
       
@@ -890,6 +897,50 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                     : 'bg-white border-slate-200'
                 }`}
               />
+            </div>
+
+            {/* Status Toggle — Active / Inactive */}
+            <div className="space-y-2">
+              <Label className={`flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                Status
+              </Label>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, isActive: !prev.isActive }))}
+                disabled={isSaving}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-300 ${
+                  formData.isActive
+                    ? theme === 'dark'
+                      ? 'bg-emerald-500/10 border-emerald-500/40 hover:border-emerald-400'
+                      : 'bg-emerald-50 border-emerald-300 hover:border-emerald-400'
+                    : theme === 'dark'
+                      ? 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                      : 'bg-slate-50 border-slate-300 hover:border-slate-400'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full transition-colors ${
+                    formData.isActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-slate-400'
+                  }`} />
+                  <span className={`text-sm font-medium ${
+                    formData.isActive
+                      ? theme === 'dark' ? 'text-emerald-400' : 'text-emerald-700'
+                      : theme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+                  }`}>
+                    {formData.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                {/* Toggle Switch */}
+                <div className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${
+                  formData.isActive
+                    ? 'bg-emerald-500'
+                    : theme === 'dark' ? 'bg-slate-600' : 'bg-slate-300'
+                }`}>
+                  <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-300 ${
+                    formData.isActive ? 'translate-x-[22px]' : 'translate-x-0.5'
+                  }`} />
+                </div>
+              </button>
             </div>
 
             {/* Action Buttons */}
